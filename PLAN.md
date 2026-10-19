@@ -11,7 +11,8 @@ features. Leave the Abby and Gust working trees unchanged.
 The operator confirmed that the original notes mean Kanel + Kysely + lit-html.
 The other requirements are typed errors, agent-native operations, immutability
 where possible, functions and plain objects, no application classes, vertical
-slices, email magic-link login, and Tailwind CSS.
+slices, email magic-link login, and Tailwind CSS. The operator additionally
+requested SAM (State–Action–Model) composed with lit-html as in Abby.
 
 ## Extraction inventory
 
@@ -26,6 +27,7 @@ Source: `/home/gust/code/abby`, inspected at commit `5fa4fe4`.
 | `src/standalone/identity/*` | Security design, not class implementation | Function factory; general accounts; typed operations |
 | `src/storage/postgres-magic-link-store.ts` | Atomic redemption, hashed tokens, database time, shared rate limits | New Kysely adapter; no clinic grants |
 | `src/standalone/dashboard/sign-in-main.ts` | lit-html rendering and fragment handling | Fresh Tailwind UI and structured transport |
+| `src/core/transition.ts`, `src/core/runtime.ts`, dashboard `view.ts` | Typed proposals, deterministic acceptance, effects outside acceptance, derived rendering | Function-based auth UI SAM loop; no call/domain model or controller classes |
 | `scripts/with-postgres.sh` | Disposable, isolated database checks | No shared database; bounded local PostgreSQL process |
 
 Do not extract voice, Twilio, Cliniko, LLM SDKs, patient models, billing, tenancy,
@@ -62,7 +64,12 @@ fitness features or sample CRUD unrelated to validating the foundations.
    implementation or tests, or access any existing `.env`.
 7. Build a small accessible lit-html/Tailwind sign-in, confirmation, and signed-in
    shell. Include loading, success, invalid/expired-link, and retry states. Keep
-   keyboard navigation, labels, focus styles, and narrow screens usable.
+   keyboard navigation, labels, focus styles, and narrow screens usable. Compose
+   SAM with lit-html: actions produce typed proposals, a pure acceptor owns an
+   immutable model, state representation derives the view, and a next-action
+   predicate selects effects. Effect completions return as correlated proposals.
+   Templates never mutate the model or perform network/navigation work. Keep
+   bearer tokens outside the UI model and reject stale/duplicate completions.
 8. Add concise `AGENTS.md` rules, an architecture explanation, operation contracts,
    environment example, local setup, source provenance, and automated enforcement
    for no classes, no feature-internal imports, and no shared-data mutation.
@@ -83,18 +90,36 @@ fitness features or sample CRUD unrelated to validating the foundations.
   link requests acknowledge acceptance without promising delivery; redemption is
   intentionally single-use and concurrent retries must have one winner; session
   reads and sign-out have explicit contracts. Require database and browser tests.
+- Pass 4: Implementation review found two practical issues to address before
+  publication: use disposable Docker PostgreSQL because this host has client tools
+  but no server binaries, and enforce feature boundaries for re-exports/dynamic
+  imports as well as normal imports. Reuse CSRF cookies across tabs and keep them
+  valid for the session lifetime; do not consume links while opening a page.
+- Pass 5: Added the operator's SAM requirement before initial publication. Abby's
+  call core owns deterministic transitions and external effects; its lit-html
+  dashboard separates its view but uses mutable controller classes. Adapt these
+  architectural ideas into one explicit function-based SAM/lit-html loop for the
+  auth UI. Add headless transition/effect tests and retain real-browser coverage.
 
 ## Acceptance evidence (fill during implementation)
 
-- [ ] New private repository and independent Git history.
-- [ ] Extraction allowlist respected; no Abby runtime/product dependencies.
-- [ ] Kanel-generated Kysely types match a fresh migrated PostgreSQL schema.
-- [ ] Typed, callable core operations and structured errors, including provisioning.
-- [ ] Function-based vertical slice and enforced import/style rules.
-- [ ] Working email magic-link login and session lifecycle.
-- [ ] lit-html and built Tailwind UI verified in a real browser.
+- [x] New private repository and independent Git history.
+- [x] Extraction allowlist respected; no Abby runtime/product dependencies.
+- [x] Kanel-generated Kysely types match a fresh migrated PostgreSQL schema.
+- [x] Typed, callable core operations and structured errors, including provisioning.
+- [x] Function-based vertical slice and enforced import/style rules.
+- [x] Working email magic-link login and session lifecycle.
+- [x] lit-html and built Tailwind UI verified in a real browser.
+- [x] SAM/lit-html composition, including effect correlation and headless tests.
 - [ ] Local tests, build, and authoritative GitHub CI pass.
-- [ ] Documentation includes exact commands, limitations, and configuration needs.
+- [x] Documentation includes exact commands, limitations, and configuration needs.
+
+Local evidence: clean `npm ci --no-fund --no-audit`, then
+`bash scripts/with-postgres.sh npm run verify`: 24 Node integration/SAM tests and 4
+Chromium tests passed, plus lint, strict typecheck, migrations, generation and
+build. `git diff --exit-code -- src/platform/database/generated` and
+`git diff --check` passed. Desktop/mobile screenshots were visually inspected.
+GitHub CI evidence will be recorded after the implementation PR runs.
 
 ## Known limits
 
