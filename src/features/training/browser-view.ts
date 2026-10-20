@@ -25,7 +25,7 @@ function setRows(state: TrainingState, exercise: Exercise, propose: Propose) {
           @blur=${() => { if (state.drafts[`${exercise.id}:${slot}:${field}`] !== undefined) propose({ kind: "setCommitted", id: exercise.id, slot, field }); }}
           @keydown=${(event: KeyboardEvent) => { if (event.key === "Enter") { event.preventDefault(); propose({ kind: "setCommitted", id: exercise.id, slot, field }); } }}></td>`)}
         <td class="p-1 text-center"><button class="sc-icon-button ${set?.done ? "text-sc-ink" : "text-sc-muted"}" aria-label=${`Complete set ${slot + 1} for ${exercise.name}`} aria-pressed=${set?.done ?? false}
-          @click=${() => propose({ kind: "setToggled", id: exercise.id, slot })}>✓</button>
+          @click=${() => propose({ kind: "setToggled", id: exercise.id, slot })}>${set?.done ? "✓" : "○"}</button>
           ${state.stats.records.includes(`${exercise.id}:${slot}`) ? html`<span class="text-xs font-medium text-sc-ink">PR</span>` : nothing}</td></tr>`;
     })}</tbody></table>`;
 }
@@ -65,7 +65,7 @@ export function trainingView(state: TrainingState, propose: Propose) {
     <p class="sc-copy text-xs">Foundation program · follows your chosen training days</p>
     ${workout ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Workout date</span><input class="sc-textarea" type="date" .value=${workout.date} ?disabled=${state.pending !== undefined} @change=${(event: Event) => propose({ kind: "dateSelected", date: (event.target as HTMLInputElement).value })}></label>` : nothing}
     ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p><div class="flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "retry" })}>Retry</button><button class="sc-secondary" @click=${() => propose({ kind: "reload" })}>Reload saved workout</button></div>` : nothing}
-    ${!state.snapshot ? html`<p class="sc-copy" role="status">Loading your workout…</p>` : state.snapshot.blocked ? html`<h2 class="sc-display text-3xl">${state.snapshot.blocked === "setup_required" ? "Set up your week first." : "Clearance first."}</h2><p class="sc-copy">${state.snapshot.blocked === "setup_required" ? "Complete your Day 1 setup to build your training week." : "You flagged a health concern. Confirm your doctor’s clearance in your profile before training."}</p><a class="sc-primary text-center" href="/">Back to your profile and scorecard</a>`
+    ${!state.snapshot ? state.error ? nothing : html`<p class="sc-copy" role="status">Loading your workout…</p>` : state.snapshot.blocked ? html`<h2 class="sc-display text-3xl">${state.snapshot.blocked === "setup_required" ? "Set up your week first." : "Clearance first."}</h2><p class="sc-copy">${state.snapshot.blocked === "setup_required" ? "Complete your Day 1 setup to build your training week." : "You flagged a health concern. Confirm your doctor’s clearance in your profile before training."}</p><a class="sc-primary text-center" href="/">Back to your profile and scorecard</a>`
     : day?.rest ? html`<p class="sc-copy">Programmed rest. Recovery is where the work turns into results.</p><a class="sc-primary text-center" href="/">Back to scorecard</a>`
     : html`${state.snapshot.readOnly ? html`<p class="sc-copy">Future session preview. Logging becomes available on this date.</p>` : nothing}
       <p class="sc-copy text-xs" data-testid="training-save-status" aria-live="polite">${state.saving ? "Saving workout…" : state.error ? "Changes not saved" : "Workout saved to your account"}</p>

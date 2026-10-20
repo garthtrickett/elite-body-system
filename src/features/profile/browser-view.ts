@@ -75,6 +75,7 @@ export function onboardingView(model: ProfileUiModel, actions: ProfileUiActions,
 
 export function profileView(model: ProfileUiModel, actions: ProfileUiActions, busy: boolean) {
   const d = model.draft;
+  const targetLabels: Readonly<Record<keyof Targets, string>> = { energy: "Energy (kcal)", protein: "Protein (g)", water: "Water (L)", sleep: "Sleep (h)", steps: "Steps" };
   return html`<h3 class="sc-display text-3xl">${d.name || "Your profile"}</h3><p class="sc-copy">${d.completed ? "Setup complete" : "Setup in progress"} · ${d.timezone}</p>
     <button class="sc-secondary" ?disabled=${busy} @click=${() => actions.propose({ kind: "editSetup" })}>${d.completed ? "Review setup" : "Resume setup"}</button>
     <div class="sc-profile-grid"><section class="sc-panel-card"><h3 class="sc-label">Your plan</h3><dl class="sc-copy mt-3 space-y-3 text-sm">
@@ -87,7 +88,7 @@ export function profileView(model: ProfileUiModel, actions: ProfileUiActions, bu
       <div><dt class="sc-label">Emergency contact</dt><dd class="break-words">${d.emergency.name || "Not recorded"} ${d.emergency.phone}</dd></div>
     </dl></section>
     <section class="sc-panel-card"><h3 class="sc-label">Daily targets</h3><p class="sc-copy my-2 text-xs">Adjust these to the targets agreed with your coach.</p><div class="grid grid-cols-2 gap-3">${(Object.keys(d.targets) as (keyof Targets)[]).map(key => html`
-      <label class="sc-form-field"><span class="sc-label">${key}</span><input class="sc-textarea" type="number" step=${key === "water" || key === "sleep" ? "0.1" : "1"} .value=${live(model.targetDrafts[key])} ?disabled=${busy}
+      <label class="sc-form-field"><span class="sc-label">${targetLabels[key]}</span><input class="sc-textarea" type="number" step=${key === "water" || key === "sleep" ? "0.1" : "1"} .value=${live(model.targetDrafts[key])} ?disabled=${busy}
         @input=${(event: Event) => actions.propose({ kind: "targetChanged", field: key, value: (event.target as HTMLInputElement).value })}></label>`)}</div>
       <button class="sc-primary mt-4 w-full" ?disabled=${busy} @click=${() => actions.propose({ kind: "save" })}>${busy ? "Saving…" : "Save targets"}</button></section>
     ${model.error ? html`<p class="sc-error" role="alert">${model.error}</p>` : nothing}

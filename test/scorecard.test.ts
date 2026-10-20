@@ -88,3 +88,18 @@ test("carousel bounds, dialog intents and account updates preserve scorecard edi
   model = acceptScorecardProposal(model, { kind: "panelClosed" });
   assert.deepEqual(nextScorecardAction(model), { kind: "closePanel" });
 });
+
+test("weight charts use recorded dates and show an empty state before any weigh-in", () => {
+  const model = initial(), day = model.date;
+  const noWeights = { ...model, profile: { ...model.profile, profile: { ...model.profile.profile, startingWeight: undefined } }, day: emptyScorecard(), history: [] };
+  assert.equal(representScorecard(noWeights).hasWeightData, false);
+  const profile = { ...model.profile.profile, startDate: "2026-01-01", startingWeight: 80 };
+  const trend = representScorecard({ ...model, profile: { ...model.profile, profile }, date: "2026-01-11", day: emptyScorecard(), history: [
+    { date: "2026-01-02", revision: 1, scorecard: { ...emptyScorecard(), values: { ...emptyScorecard().values, weight: 79 } } },
+    { date: "2026-01-10", revision: 1, scorecard: { ...emptyScorecard(), values: { ...emptyScorecard().values, weight: 78 } } },
+  ] });
+  assert.equal(trend.trendStartDay, 1); assert.equal(trend.trendEndDay, 10);
+  assert.equal(trend.trendStartWeight, 80); assert.equal(trend.trendEndWeight, 78);
+  assert.equal(trend.trendPoints.split(" ")[1]?.split(",")[0], "34.4");
+  assert.equal(model.date, day);
+});

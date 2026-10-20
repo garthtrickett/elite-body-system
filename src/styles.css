@@ -220,7 +220,7 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-date-field { max-width: 220px; }
   .sc-meal-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr); gap: 2rem; align-items: start; }
   .sc-meal-history { margin-top: 0; padding-left: 1.5rem; border-left: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); }
-  .sc-meal-history h2 { font-size: 26px; }
+  .sc-meal-history h2.sc-display { font-size: 26px; }
   .sc-meal-editor > .sc-copy, .sc-lesson-overview > .sc-copy, .sc-map-context > .sc-copy { max-width: 65ch; }
   .sc-course-layout { display: grid; grid-template-columns: minmax(210px, .8fr) minmax(0, 1.7fr); gap: 2rem; align-items: start; }
   .sc-course-list { position: sticky; top: 2rem; }
@@ -256,4 +256,40 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-map-introduction .sc-map-controls { flex-direction: row; }
   .sc-map-controls > .sc-primary { min-width: 240px; }
   .sc-course-welcome { display: block; padding: 2rem; }
+}
+
+/* Refinements from the full desktop/mobile screenshot sweep. */
+.sc-empty-trend { display: flex; align-items: center; min-height: 120px; }
+.sc-panel-header { display: flex; align-items: center; gap: 1rem; position: sticky; top: 0; z-index: 2; background: var(--color-sc-bg); padding-block: .5rem; }
+.sc-panel-header h2 { font-size: 32px; }
+.sc-icon-button { border-radius: .5rem; }
+.sc-text-action { display: inline-flex; min-height: 44px; align-items: center; text-align: left; text-underline-offset: 3px; }
+.sc-page > header > a, .sc-auth .sc-brand { display: inline-flex; align-items: center; min-height: 44px; }
+.sc-meal-summary { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.sc-weight-input.sc-number-compact { width: 7ch; font-size: 32px; }
+.sc-meal-history .sc-meal-summary + section { padding-top: 1rem; border-top: 1px solid var(--color-sc-border); }
+@media (max-width: 1023px) {
+  .sc-workout-list { flex-direction: row; overflow-x: auto; scroll-snap-type: x proximity; padding: .25rem; margin-inline: -.25rem; }
+  .sc-workout-list > button { flex: 0 0 min(72vw, 260px); scroll-snap-align: start; }
+}
+@media (min-width: 768px) {
+  .sc-dialog { height: fit-content; }
+  .sc-dialog-setup { height: min(720px, calc(100dvh - 4rem)); }
+  .sc-dialog-setup .sc-panel-body { height: 100%; min-height: 0; }
+  .sc-dialog-setup .sc-setup-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px; }
+  .sc-dialog-setup .sc-panel-feedback { min-height: 24px; flex-shrink: 0; }
+}
+@media (min-width: 1024px) {
+  .sc-meal-history:has(.sc-meal-summary) { position: sticky; top: 2rem; }
+  .sc-meal-summary { padding: 1.25rem; border: 1px solid var(--color-sc-border); border-radius: .75rem; background: var(--color-sc-card); }
+  .sc-meal-summary .sc-panel-card { padding: 0; border: 0; }
+}
+
+@media (max-width: 1023px) {
+  .sc-mindset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sc-focus-tile { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) 44px; min-height: 120px; column-gap: 1rem; }
+  .sc-focus-tile > .sc-label { grid-column: 1; grid-row: 1; }
+  .sc-focus-tile > .sc-check-button { grid-column: 2; grid-row: 1 / 4; align-self: center; }
+  .sc-focus-tile > .sc-target { grid-column: 1; grid-row: 3; }
+  .sc-focus-priority { grid-column: 1; grid-row: 2; font-size: .875rem; line-height: 1.625; }
 }

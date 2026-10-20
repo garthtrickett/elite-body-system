@@ -4,7 +4,7 @@ import type { ScorecardActions } from "./browser-actions.ts";
 import { icon } from "./icons.ts";
 import { onboardingView, profileView } from "../profile/browser.ts";
 
-const titles = { setup: "This is Day 1.", profile: "Your profile", ltr: "L to R" } as const;
+const titles = { setup: "Your setup", profile: "Your profile", ltr: "L to R" } as const;
 
 function ltrPanel(state: ScorecardState, actions: ScorecardActions) {
   return html`<p class="sc-copy">Empty your head on the left. Pull today’s goals to the right. Star the one that gets your 30 minutes.</p>
@@ -41,13 +41,13 @@ function panelContent(state: ScorecardState, actions: ScorecardActions) {
 }
 
 export function scorecardPanel(state: ScorecardState, actions: ScorecardActions) {
-  return html`<dialog class="sc-dialog" aria-labelledby="sc-panel-title" @cancel=${(event: Event) => { event.preventDefault(); actions.closePanel(); }}>
+  return html`<dialog class="sc-dialog ${state.panel === "setup" ? "sc-dialog-setup" : ""}" aria-labelledby="sc-panel-title" @cancel=${(event: Event) => { event.preventDefault(); actions.closePanel(); }}>
     <div class="sc-panel-body">
-      <button class="sc-icon-button -ml-2" aria-label="Back to scorecard" @click=${actions.closePanel}>${icon("back")}</button>
-      <h2 id="sc-panel-title" class="sc-display text-[40px] leading-[1.1]">${state.panel ? titles[state.panel] : ""}</h2>
+      <header class="sc-panel-header"><button class="sc-icon-button -ml-2" aria-label="Back to scorecard" @click=${actions.closePanel}>${icon("back")}</button>
+      <h2 id="sc-panel-title" class="sc-display text-[40px] leading-[1.1]">${state.panel ? titles[state.panel] : ""}</h2></header>
       ${panelContent(state, actions)}
-      ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
-      ${state.syncError ? html`<p class="sc-error" role="alert">${state.syncError}</p><button class="sc-secondary" @click=${actions.retrySync}>Retry save</button><button class="sc-secondary" @click=${actions.reloadClient}>Reload saved version</button>` : nothing}
+      ${state.panel === "setup" || state.message || state.syncError ? html`<div class="sc-panel-feedback space-y-3">${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
+      ${state.syncError ? html`<p class="sc-error" role="alert">${state.syncError}</p><button class="sc-secondary" @click=${actions.retrySync}>Retry save</button><button class="sc-secondary" @click=${actions.reloadClient}>Reload saved version</button>` : nothing}</div>` : nothing}
     </div>
   </dialog>`;
 }

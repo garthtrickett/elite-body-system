@@ -11,7 +11,7 @@ type Propose = (proposal: LearningProposal) => void;
 function mapBuilder(state: LearningState, propose: Propose) {
   const map = state.map, step = map ? MAP_STEPS[map.step] : undefined;
   if (!map || !step) return nothing;
-  return html`<div class="sc-map-builder ${step.keys ? "" : "sc-map-introduction"}"><div class="sc-map-context"><p class="sc-eyebrow">Neural Map · ${map.step + 1} of ${MAP_STEPS.length}</p><h2 class="sc-display text-[38px] leading-[1.1]">${step.part ? `${step.part} ` : ""}${step.title}</h2><p class="sc-copy">${step.lead}</p>
+  return html`<div class="sc-map-builder ${step.keys ? "" : "sc-map-introduction"}"><div class="sc-map-context"><p class="sc-eyebrow">Neural Map · ${map.step + 1} of ${MAP_STEPS.length}${step.part ? ` · Part ${step.part}` : ""}</p><h1 class="sc-display text-[38px] leading-[1.1]">${step.title}</h1><p class="sc-copy">${step.lead}</p>
     ${step.history?.map(item => html`<section class="sc-panel-card"><h3 class="sc-label">${item.was}</h3><p class="sc-copy mt-2">${item.now}</p><p class="sc-copy mt-2 text-xs">${item.src}</p></section>`)}
     ${step.networks?.map(network => html`<section class="sc-panel-card space-y-3"><h3 class="sc-label">${network.name}</h3><p class="sc-copy">${network.job}</p><p class="sc-copy">${network.alone}</p><p class="sc-copy">${network.withMap}</p><p class="sc-copy text-xs">${network.src}</p></section>`)}
     ${step.apart ? html`<p class="sc-copy">${step.apart}</p>` : nothing}${step.together ? html`<p class="sc-copy">${step.together}</p>` : nothing}
@@ -36,13 +36,14 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
   if (!snapshot) return nothing;
   const episode = EPISODES.find(item => item.id === state.episode);
   const titles = { mindset: "Neural Map", nutrition: "Elite Body Nutrition", activity: "The 4-Day Split" };
+  const available = EPISODES.some(item => item.pillar === pillar && ["open", "done"].includes(episodeStatus({ episode: item, snapshot })));
   const done = episode ? !!snapshot.progress.done[episode.id] : false;
   const url = episode ? snapshot.videoUrls[`course:${episode.id}`] : undefined;
   return html`<div class="sc-course-layout">
     <div class="sc-course-list ${episode ? "sc-course-list-concealed" : ""}">
       <div class="sc-course-list-heading"><p class="sc-eyebrow">${pillar} course · Week ${snapshot.week}</p><h1 class="sc-display mt-2 text-[40px] leading-[1.1]">${titles[pillar]}</h1>
         <p class="sc-copy mt-3">One episode every three weeks, alongside the other two pillars.</p></div>
-      ${!snapshot.setupComplete ? html`<p class="sc-copy">Complete Day 1 setup to unlock your first lesson.</p>` : nothing}
+      ${!snapshot.setupComplete ? html`<p class="sc-copy">Complete Day 1 setup to unlock your first lesson.</p><a class="sc-secondary" href="/?panel=setup">Complete your setup</a>` : nothing}
       ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>Neural Map · Five-part build ›</a>` : nothing}
       ${EPISODES.filter(item => item.pillar === pillar).map(item => {
         const status = episodeStatus({ episode: item, snapshot });
@@ -57,19 +58,21 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
         ${url ? html`<video class="w-full rounded-xl bg-sc-card" controls preload="metadata" src=${url} aria-label=${episode.title}></video>` : html`<div class="sc-panel-card"><p class="sc-label">${episode.mins} minute lesson</p><p class="sc-copy mt-2">The video has not been uploaded yet. You can read the lesson overview and work through its tasks below.</p></div>`}
         <p class="sc-copy">${episode.desc}</p></div>
       <div class="sc-lesson-tasks"><h3 class="sc-label">This week’s tasks</h3>
-        ${episode.tasks.map((task, index) => html`<label class="sc-form-field"><span class="text-sm font-medium">${task}</span><textarea class="sc-textarea" rows="3" maxlength="5000" ?readonly=${done} .value=${live(state.answers[episode.id]?.[index] ?? "")}
-          @input=${(event: Event) => propose({ kind: "answerChanged", index, value: (event.target as HTMLTextAreaElement).value })}></textarea></label>`)}
+        ${episode.tasks.map((task, index) => done
+          ? html`<section class="sc-panel-card"><h4 class="text-sm font-medium">${task}</h4><p class="sc-copy mt-3 whitespace-pre-wrap">${state.answers[episode.id]?.[index] || "—"}</p></section>`
+          : html`<label class="sc-form-field"><span class="text-sm font-medium">${task}</span><textarea class="sc-textarea" rows="3" maxlength="5000" .value=${live(state.answers[episode.id]?.[index] ?? "")}
+            @input=${(event: Event) => propose({ kind: "answerChanged", index, value: (event.target as HTMLTextAreaElement).value })}></textarea></label>`)}
         <button class="sc-primary" ?disabled=${state.saving || done} @click=${() => propose({ kind: "episodeCompleted" })}>${done ? "✓ Lesson complete" : "Mark lesson complete"}</button>
       </div>
-    </article>` : html`<div class="sc-course-welcome sc-panel-card"><p class="sc-eyebrow">Learn, then put it into practice.</p><h2 class="sc-display mt-3 text-4xl">A little each week.<br>A standard for life.</h2><p class="sc-copy mt-4">Choose an available lesson to read its overview and work through the tasks. Your answers are saved as you go.</p></div>`}
+    </article>` : html`<div class="sc-course-welcome sc-panel-card"><p class="sc-eyebrow">Learn, then put it into practice.</p><h2 class="sc-display mt-3 text-4xl">A little each week.<br>A standard for life.</h2><p class="sc-copy mt-4">${!snapshot.setupComplete ? "Complete your Day 1 setup to begin. Your lessons unlock as you work through the program." : available ? "Choose an available lesson to read its overview and work through the tasks. Your answers are saved as you go." : "Your lessons follow your program. The episode cards show when each one unlocks."}</p></div>`}
   </div>`;
 }
 
 export function learningView(state: LearningState, page: "map" | Pillar, propose: Propose) {
   return workspace({ page, navigationDisabled: state.saving, content: html`<div class="sc-page"><header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
-    <p class="sc-copy text-xs" aria-live="polite" data-testid="learning-save-status">${state.saving ? "Saving your progress…" : state.error ? "Changes not saved" : "Progress saved to your account"}</p>
+    ${state.snapshot ? html`<p class="sc-copy text-xs" aria-live="polite" data-testid="learning-save-status">${state.saving ? "Saving your progress…" : state.error ? "Changes not saved" : "Progress saved to your account"}</p>` : nothing}
     ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p><div class="flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "retry" })}>Retry</button><button class="sc-secondary" @click=${() => propose({ kind: "reload" })}>Reload saved version</button></div>` : nothing}
-    ${!state.snapshot ? html`<p class="sc-copy" role="status">Loading your learning progress…</p>` : page === "map" ? state.editingMap ? mapBuilder(state, propose) : mapReading(state, propose) : courseView(state, page, propose)}
+    ${!state.snapshot ? state.error ? nothing : html`<p class="sc-copy" role="status">Loading your learning progress…</p>` : page === "map" ? state.editingMap ? mapBuilder(state, propose) : mapReading(state, propose) : courseView(state, page, propose)}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
   </div>` });
 }
