@@ -1,4 +1,5 @@
 import { html, nothing } from "lit-html";
+import { workspace } from "../../shared/browser-layout.ts";
 import { live } from "lit-html/directives/live.js";
 import type { Exercise } from "./catalog.ts";
 import { PROGRAM, WEEK, SET_METHODS } from "./catalog.ts";
@@ -58,21 +59,23 @@ export function trainingView(state: TrainingState, propose: Propose) {
   const bases = workout ? PROGRAM[workout.planKey] ?? [] : [];
   const selectedIndex = bases.findIndex(exercise => exercise.id === state.selected);
   const selectedBase = bases[selectedIndex], selected = state.exercises[selectedIndex];
-  return html`<div class="sc-app"><div class="sc-shell gap-4 p-5">
+  return workspace({ page: "training", navigationDisabled: state.saving, content: html`<div class="sc-page">
     <header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     <div class="flex items-baseline justify-between gap-2"><h1 class="sc-display text-[40px] leading-[1.1]">${day?.name ?? "Your training"}</h1><span class="sc-data text-xl text-sc-ink" aria-label="Workout elapsed time">${formatTime(state.elapsed)}</span></div>
     <p class="sc-copy text-xs">Foundation program · follows your chosen training days</p>
-    ${workout ? html`<label class="sc-form-field"><span class="sc-label">Workout date</span><input class="sc-textarea" type="date" .value=${workout.date} ?disabled=${state.pending !== undefined} @change=${(event: Event) => propose({ kind: "dateSelected", date: (event.target as HTMLInputElement).value })}></label>` : nothing}
+    ${workout ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Workout date</span><input class="sc-textarea" type="date" .value=${workout.date} ?disabled=${state.pending !== undefined} @change=${(event: Event) => propose({ kind: "dateSelected", date: (event.target as HTMLInputElement).value })}></label>` : nothing}
     ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p><div class="flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "retry" })}>Retry</button><button class="sc-secondary" @click=${() => propose({ kind: "reload" })}>Reload saved workout</button></div>` : nothing}
     ${!state.snapshot ? html`<p class="sc-copy" role="status">Loading your workout…</p>` : state.snapshot.blocked ? html`<h2 class="sc-display text-3xl">${state.snapshot.blocked === "setup_required" ? "Set up your week first." : "Clearance first."}</h2><p class="sc-copy">${state.snapshot.blocked === "setup_required" ? "Complete your Day 1 setup to build your training week." : "You flagged a health concern. Confirm your doctor’s clearance in your profile before training."}</p><a class="sc-primary text-center" href="/">Back to your profile and scorecard</a>`
     : day?.rest ? html`<p class="sc-copy">Programmed rest. Recovery is where the work turns into results.</p><a class="sc-primary text-center" href="/">Back to scorecard</a>`
     : html`${state.snapshot.readOnly ? html`<p class="sc-copy">Future session preview. Logging becomes available on this date.</p>` : nothing}
       <p class="sc-copy text-xs" data-testid="training-save-status" aria-live="polite">${state.saving ? "Saving workout…" : state.error ? "Changes not saved" : "Workout saved to your account"}</p>
+      <div class="sc-workout-layout">
+      <div class="sc-workout-list" role="group" aria-label="Workout exercises">${bases.map((base, i) => html`<button class="sc-panel-card text-left ${state.selected === base.id ? "border border-sc-ink" : ""}" aria-pressed=${state.selected === base.id} @click=${() => propose({ kind: "exerciseSelected", id: base.id })}><span class="block font-medium">${state.selected === base.id ? "› " : ""}${state.exercises[i]?.name}</span><span class="sc-copy text-xs">${base.sets ? `${base.sets} sets · ${base.reps} reps` : base.type}</span></button>`)}</div>
+      <div class="sc-workout-main">
       ${workout?.restUntil ? html`<section class="sc-panel-card border border-sc-border"><div class="flex items-center justify-between"><h2 class="sc-label">Rest</h2><span class="sc-data text-4xl text-sc-ink" aria-label="Rest remaining">${formatTime(state.remaining)}</span></div>
         ${state.remaining === 0 ? html`<p role="status" class="text-sm text-sc-ink">Rest complete.</p>` : nothing}<div class="mt-2 flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "restExtended", seconds: 30 })}>+30 seconds</button><button class="sc-secondary" @click=${() => propose({ kind: "restSkipped" })}>Skip rest</button></div></section>` : nothing}
-      <div class="flex flex-col gap-2">${bases.map((base, i) => html`<button class="sc-panel-card text-left ${state.selected === base.id ? "border border-sc-ink" : ""}" aria-pressed=${state.selected === base.id} @click=${() => propose({ kind: "exerciseSelected", id: base.id })}><span class="block font-medium">${state.selected === base.id ? "› " : ""}${state.exercises[i]?.name}</span><span class="sc-copy text-xs">${base.sets ? `${base.sets} sets · ${base.reps} reps` : base.type}</span></button>`)}</div>
       ${selected && selectedBase ? exerciseDetail(state, selectedBase, selected, propose) : nothing}
       <div class="sc-panel-card"><p class="sc-label">This session</p><p class="sc-copy mt-2">${state.stats.sets} sets · ${Math.round(state.stats.volume)} kg moved · ${state.stats.records.length} PRs</p></div>
-      <button class="sc-primary" ?disabled=${state.saving || state.snapshot.readOnly || !!workout?.finishedAt} @click=${() => propose({ kind: "finish" })}>${workout?.finishedAt ? "✓ Workout complete" : "Finish workout"}</button>`}
-  </div></div>`;
+      <button class="sc-primary" ?disabled=${state.saving || state.snapshot.readOnly || !!workout?.finishedAt} @click=${() => propose({ kind: "finish" })}>${workout?.finishedAt ? "✓ Workout complete" : "Finish workout"}</button></div></div>`}
+  </div>` });
 }

@@ -1,4 +1,5 @@
 import { html, nothing } from "lit-html";
+import { workspace } from "../../shared/browser-layout.ts";
 import { live } from "lit-html/directives/live.js";
 import type { MealProposal, MealState } from "./browser-model.ts";
 import { MACROS, MICROS, mealTotals } from "./data.ts";
@@ -43,19 +44,22 @@ function captureView(state: MealState, actions: Actions) {
       ${!state.snapshot?.analysisAvailable ? html`<p class="sc-copy text-xs">AI meal analysis is not configured yet. Manual entry and My Meals are available.</p>` : nothing}
       <button class="sc-secondary" @click=${() => actions.propose({ kind: "manualRequested" })}>Enter nutrition manually</button>
       <p class="sc-copy text-xs">For a whole meal with known totals, leave its portion at 100 g and enter those totals.</p>
-      <h2 class="sc-display mt-4 text-[30px]">My Meals</h2><p class="sc-copy text-xs">Your 30 most recently saved meals. Open one to adjust its portion before logging again.</p>
-      ${state.snapshot?.favorites.map(entry => html`<section class="sc-panel-card"><button class="block w-full text-left" @click=${() => actions.propose({ kind: "favoriteSelected", id: entry.id })}><strong class="text-sm">${entry.meal.name} ›</strong><p class="sc-copy mt-1 text-xs">${mealTotals(entry.meal).energy} kcal · ${mealTotals(entry.meal).protein} g protein</p></button><button class="sc-copy mt-3 text-xs underline" @click=${() => actions.propose({ kind: "removeFavoriteRequested", id: entry.id })}>Remove ${entry.meal.name} from My Meals</button></section>`)}
-      ${!state.snapshot?.favorites.length ? html`<p class="sc-copy text-xs">Save a meal when logging it to build your list.</p>` : nothing}
     </fieldset>`;
 }
+function favoritesView(state: MealState, actions: Actions) {
+  return html`<fieldset class="sc-meal-favorites flex min-w-0 flex-col gap-3" ?disabled=${state.locked}>      <h2 class="sc-display mt-4 text-[30px]">My Meals</h2><p class="sc-copy text-xs">Your 30 most recently saved meals. Open one to adjust its portion before logging again.</p>
+      ${state.snapshot?.favorites.map(entry => html`<section class="sc-panel-card"><button class="block w-full text-left" @click=${() => actions.propose({ kind: "favoriteSelected", id: entry.id })}><strong class="text-sm">${entry.meal.name} ›</strong><p class="sc-copy mt-1 text-xs">${mealTotals(entry.meal).energy} kcal · ${mealTotals(entry.meal).protein} g protein</p></button><button class="sc-copy mt-3 text-xs underline" @click=${() => actions.propose({ kind: "removeFavoriteRequested", id: entry.id })}>Remove ${entry.meal.name} from My Meals</button></section>`)}
+      ${!state.snapshot?.favorites.length ? html`<p class="sc-copy text-xs">Save a meal when logging it to build your list.</p>` : nothing}
+</fieldset>`;
+}
 export function mealsView(state: MealState, actions: Actions) {
-  return html`<div class="sc-app"><div class="sc-shell gap-4 p-5"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: Event) => { if (state.locked) e.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+  return workspace({ page: "meals", navigationDisabled: state.locked, content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: Event) => { if (state.locked) e.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p>${state.retry ? html`<button class="sc-secondary" @click=${() => actions.propose({ kind: "retry" })}>Retry same action</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "reload" })}>Reload saved meals</button>` : nothing}` : nothing}
     ${state.busy ? html`<p class="sc-copy" role="status">${state.pending?.kind === "analyze" ? "Analysing your meal…" : state.pending?.kind === "preparePhotos" ? "Preparing your photos…" : state.pending?.kind === "load" ? "Loading your meals…" : "Saving your meal…"}</p>` : nothing}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
-    ${state.snapshot ? html`<label class="sc-form-field"><span class="sc-label">Meal date</span><input class="sc-textarea" type="date" aria-label="Meal date" ?disabled=${state.locked} .value=${live(state.snapshot.date)} @change=${(e: Event) => actions.propose({ kind: "dateChanged", value: (e.target as HTMLInputElement).value })}></label>
-      ${state.draft ? reviewView(state, actions) : captureView(state, actions)}
-      <section class="mt-4 space-y-3"><h2 class="sc-display text-[30px]">Logged for ${state.snapshot.date}</h2><p class="sc-copy text-xs">Logging adds calories and protein to your scorecard. Removing a meal subtracts its contribution. Manual scorecard edits are kept, with a minimum total of zero.</p>
-        ${state.snapshot.entries.map(entry => html`<article class="sc-panel-card"><h3 class="text-sm font-medium">${entry.meal.name}</h3><p class="sc-copy mt-1 text-xs">${mealTotals(entry.meal).energy} kcal · ${mealTotals(entry.meal).protein} g protein</p><button class="sc-copy mt-3 text-xs underline" ?disabled=${state.locked} @click=${() => actions.propose({ kind: "removeRequested", id: entry.id })}>Remove ${entry.meal.name} from this day</button></article>`)}${!state.snapshot.entries.length ? html`<p class="sc-copy text-xs">No meals logged for this date.</p>` : nothing}</section>` : nothing}
-  </div></div>`;
+    ${state.snapshot ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Meal date</span><input class="sc-textarea" type="date" aria-label="Meal date" ?disabled=${state.locked} .value=${live(state.snapshot.date)} @change=${(e: Event) => actions.propose({ kind: "dateChanged", value: (e.target as HTMLInputElement).value })}></label>
+      <div class="sc-meal-layout"><div class="sc-meal-editor">${state.draft ? reviewView(state, actions) : captureView(state, actions)}</div>
+      <div class="sc-meal-history">${!state.draft ? favoritesView(state, actions) : nothing}<section class="mt-4 space-y-3"><h2 class="sc-display text-[30px]">Logged for ${state.snapshot.date}</h2><p class="sc-copy text-xs">Logging adds calories and protein to your scorecard. Removing a meal subtracts its contribution. Manual scorecard edits are kept, with a minimum total of zero.</p>
+        ${state.snapshot.entries.map(entry => html`<article class="sc-panel-card"><h3 class="text-sm font-medium">${entry.meal.name}</h3><p class="sc-copy mt-1 text-xs">${mealTotals(entry.meal).energy} kcal · ${mealTotals(entry.meal).protein} g protein</p><button class="sc-copy mt-3 text-xs underline" ?disabled=${state.locked} @click=${() => actions.propose({ kind: "removeRequested", id: entry.id })}>Remove ${entry.meal.name} from this day</button></article>`)}${!state.snapshot.entries.length ? html`<p class="sc-copy text-xs">No meals logged for this date.</p>` : nothing}</section></div></div>` : nothing}
+  </div>` });
 }

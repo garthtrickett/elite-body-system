@@ -69,3 +69,21 @@ test("day rollover waits for in-flight edits, then loads the new client day", ()
   model = acceptScorecardProposal(model, { kind: "daySaved", id: pending.id, result: { ok: true, value: { date: pending.date, scorecard: pending.scorecard, revision: 1 } } });
   assert.equal(model.pending?.kind, "load"); assert.equal(model.loaded, false);
 });
+
+test("a requested account panel opens after loading once and setup review starts at the beginning", () => {
+  const value = { ...loaded(), profile: { revision: 1, profile: { ...emptyProfile(), completed: true, setupStep: 33 } } };
+  for (const panel of ["profile", "setup"] as const) {
+    let model = acceptScorecardProposal(initialScorecardModel(account, panel), { kind: "started" });
+    assert.equal(model.panel, undefined);
+    const completion = { kind: "clientLoaded", id: 1, result: { ok: true, value } } as const;
+    assert.equal(acceptScorecardProposal(model, { ...completion, id: 999 }), model);
+    model = acceptScorecardProposal(model, completion);
+    assert.equal(model.panel, panel);
+    assert.equal(model.launchPanel, undefined);
+    assert.equal(model.profileUi.draft.setupStep, panel === "setup" ? 0 : 33);
+    model = acceptScorecardProposal(model, { kind: "panelClosed" });
+    model = acceptScorecardProposal(model, { kind: "reloadClient" });
+    model = acceptScorecardProposal(model, { ...completion, id: model.pending!.id });
+    assert.equal(model.panel, undefined);
+  }
+});

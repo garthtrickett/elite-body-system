@@ -16,6 +16,7 @@ export type ScorecardModel = Readonly<{
   card: number;
   touchX: number | undefined;
   panel: Panel | undefined;
+  launchPanel: "profile" | "setup" | undefined;
   goalDraft: string;
   message: string;
   account: AccountState;
@@ -46,10 +47,10 @@ type LocalProposal =
   | Readonly<{ kind: "profileProposed"; proposal: ProfileProposal }>;
 export type ScorecardProposal = LocalProposal | SyncProposal | Readonly<{ kind: "started" | "retrySync" | "reloadClient" }> | Readonly<{ kind: "dayObserved"; date: string }>;
 
-export function initialScorecardModel(account: AccountState): ScorecardModel {
+export function initialScorecardModel(account: AccountState, launchPanel?: "profile" | "setup"): ScorecardModel {
   const profile = emptyProfile();
   return { day: emptyScorecard(), drafts: { weight: "", energy: "", protein: "", water: "", sleep: "", steps: "" },
-    errors: {}, card: 0, touchX: undefined, panel: undefined, goalDraft: "", message: "", account,
+    errors: {}, card: 0, touchX: undefined, panel: undefined, launchPanel, goalDraft: "", message: "", account,
     profile: { profile, revision: 0 }, profileUi: initialProfileUi(profile), date: "", observedDate: "", dayRevision: 0, history: [],
     loaded: false, syncError: "", generation: 0, savedGeneration: 0, sequence: 0, pending: undefined };
 }
@@ -127,9 +128,11 @@ export function acceptScorecardProposal(model: ScorecardModel, proposal: Scoreca
       if (model.pending?.kind !== "load" || model.pending.id !== proposal.id) return model;
       if (!proposal.result.ok) return { ...model, pending: undefined, syncError: proposal.result.error.message };
       const value = proposal.result.value;
-      return { ...model, loaded: true, pending: undefined, profile: value.profile, profileUi: initialProfileUi(value.profile.profile),
+      const loadedUi = initialProfileUi(value.profile.profile);
+      const profileUi = model.launchPanel === "setup" && value.profile.profile.completed ? acceptProfileProposal(loadedUi, { kind: "editSetup" }) : loadedUi;
+      return { ...model, loaded: true, pending: undefined, profile: value.profile, profileUi,
         date: value.day.date, observedDate: value.day.date, day: value.day.scorecard, dayRevision: value.day.revision, drafts: draftsFor(value.day.scorecard), history: value.history,
-        panel: model.loaded && model.panel === "setup" && model.profile.profile.completed ? "setup" : value.profile.profile.completed ? undefined : "setup", generation: 0, savedGeneration: 0, syncError: "" };
+        launchPanel: undefined, panel: model.launchPanel ?? (model.loaded && model.panel === "setup" && model.profile.profile.completed ? "setup" : value.profile.profile.completed ? undefined : "setup"), generation: 0, savedGeneration: 0, syncError: "" };
     }
     case "daySaved": {
       if (model.pending?.kind !== "saveDay" || model.pending.id !== proposal.id) return model;
@@ -187,7 +190,7 @@ export function representScorecard(model: ScorecardModel) {
   const programDay = Math.max(1, Math.round((Date.parse(model.date || profile.startDate) - Date.parse(profile.startDate)) / 86400000) + 1);
   const tracked = history.reduce((sum, day) => sum + day.nutrition + day.activity + day.mindset, 0);
   return { ...model, ...representDay(model.day, profile.targets), weightDelta: Math.abs(difference).toFixed(1), weightDown: difference >= 0,
-    trendPoints: points, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
+    trendPoints: points, hasWeightTrend: weights.length > 1, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
     rolloverNotice: !!model.observedDate && model.observedDate !== model.date,
     saving: model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile", targets: profile.targets } as const;
 }

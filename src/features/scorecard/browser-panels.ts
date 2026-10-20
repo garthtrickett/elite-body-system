@@ -8,10 +8,10 @@ const titles = { setup: "This is Day 1.", profile: "Your profile", ltr: "L to R"
 
 function ltrPanel(state: ScorecardState, actions: ScorecardActions) {
   return html`<p class="sc-copy">Empty your head on the left. Pull today’s goals to the right. Star the one that gets your 30 minutes.</p>
-    <label class="sc-label" for="brain-dump">Left · Brain dump</label>
+    <div class="sc-ltr-layout"><div class="sc-ltr-column"><label class="sc-label" for="brain-dump">Left · Brain dump</label>
     <textarea id="brain-dump" class="sc-textarea" rows="5" maxlength="5000" placeholder="Everything on your mind. Tasks, worries, ideas. No order."
-      .value=${state.day.brainDump} @input=${(event: Event) => actions.changeBrainDump({ value: (event.target as HTMLTextAreaElement).value })}></textarea>
-    <h3 class="sc-label">Right · Today’s goals</h3>
+      .value=${state.day.brainDump} @input=${(event: Event) => actions.changeBrainDump({ value: (event.target as HTMLTextAreaElement).value })}></textarea></div>
+    <div class="sc-ltr-column"><h3 class="sc-label">Right · Today’s goals</h3>
     <ul class="space-y-2">${state.day.goals.map(goal => html`<li class="sc-goal">
       <button class="sc-icon-button ${goal.priority ? "text-sc-ink" : "text-sc-muted"}" aria-label=${`Prioritize ${goal.text}`} aria-pressed=${goal.priority}
         @click=${() => actions.selectPriority({ id: goal.id })}>${icon("star")}</button>
@@ -24,7 +24,7 @@ function ltrPanel(state: ScorecardState, actions: ScorecardActions) {
         @input=${(event: Event) => actions.changeGoalDraft({ value: (event.target as HTMLInputElement).value })}>
       <button class="sc-secondary" type="submit">+ Add</button>
     </form>
-    <p class="sc-copy text-xs">Starred goal goes to your Focus box.</p>
+    <p class="sc-copy text-xs">Starred goal goes to your Focus box.</p></div></div>
     <button class="sc-primary mt-auto" @click=${actions.closePanel}>Done</button>`;
 }
 

@@ -23,6 +23,23 @@ plus the production Docker smoke check (migrations, unprivileged runtime, databa
 health, HTTPS cookies, assets and private paths). Exact-commit CI is also required
 before merge. Final videos and approved wording remain explicitly unconfigured.
 
+## Desktop client workspace
+
+The desktop increment expands the existing client workflows with persistent
+navigation, three visible progress cards, a three-pillar scorecard, workout
+selection beside logging, course selection beside lessons/tasks, meal entry beside
+saved meals and day history, and guidance beside Neural Map writing. Profile and
+L to R dialogs use a wider, bounded layout. Phone navigation and the progress
+carousel remain available below the desktop breakpoint. Account-panel links from
+other workflows are consumed after a successful scorecard load.
+
+Local acceptance: `bash scripts/with-postgres.sh npm run verify` passed with
+65 server/model tests and 24 Chromium tests, including desktop saved edits,
+account navigation, dialog focus, mobile reflow and 200% zoom. Generated schema
+types have no diff. Desktop screenshots at 1024, 1440 and 1920px were inspected.
+Production-image checks and exact-commit verification are also required in CI
+before merging and deploying this increment.
+
 ## Earlier scorecard increment (historical)
 
 The initial sample scorecard port was merged and deployed before this client

@@ -47,7 +47,9 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     reloadClient: () => propose({ kind: "reloadClient" }),
     signOut: config.signOut,
   };
-  const runtime = createScorecardRuntime({ account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }) });
+  const panelQuery = new URLSearchParams(window.location.search).get("panel");
+  const launchPanel = panelQuery === "profile" || panelQuery === "setup" ? panelQuery : undefined;
+  const runtime = createScorecardRuntime({ ...(launchPanel ? { launchPanel } : {}), account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }) });
   runtime.propose({ kind: "started" });
   const keepDialogFocus = (event: KeyboardEvent) => {
     if (event.key !== "Tab") return;
