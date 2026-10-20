@@ -1,5 +1,19 @@
 # Extraction provenance
 
+The scorecard UI, coaching terminology, sample targets/tolerances, and sample
+exercise/course content were ported from the owner Harry’s `ebs-platform.zip`,
+provided by the operator on 20 October 2026. The source is a single-file vanilla
+JavaScript prototype. This implementation rewrites the shell/scorecard as typed
+functions, a pure SAM acceptor, safe lit-html templates, and Tailwind styles;
+it does not embed the original script or depend on its Claude artifact runtime.
+The archive itself and its later feature implementations are not copied into
+this repository. Preview Map/consistency fixtures are illustrative sample data.
+
+The prototype’s Bebas Neue and Work Sans fonts are bundled from the
+[Google Fonts repository](https://github.com/google/fonts), with each font’s
+SIL Open Font License alongside it in `src/assets/fonts`. Runtime font loading
+does not contact Google. The original foundation provenance follows.
+
 Inspected source: the operator's `/home/gust/code/abby` checkout at `5fa4fe4`
 (`5fa4fe4 Merge pull request #451 ...`), without changing that checkout or reading
 its environment file. This repository has independent Git history.

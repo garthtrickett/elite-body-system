@@ -1,8 +1,9 @@
 import { build } from "esbuild";
-import { mkdir } from "node:fs/promises";
+import { cp, mkdir } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
 await mkdir("dist", { recursive: true });
+await cp("src/assets/fonts", "dist/fonts", { recursive: true });
 await build({ entryPoints: ["src/browser.ts"], bundle: true, format: "esm", platform: "browser",
   target: "es2022", minify: true, outfile: "dist/app.js" });
 const css = spawnSync(process.execPath, ["node_modules/@tailwindcss/cli/dist/index.mjs",

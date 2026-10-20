@@ -70,7 +70,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
         "Set-Cookie": setCookie(names.csrf, csrf, 28_800),
-        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" });
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" });
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-mode="${path === "/" ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
       return;
     }

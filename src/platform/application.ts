@@ -13,6 +13,8 @@ export function createApplication(config: Config) {
   const assets = new Map([
     ["/assets/app.js", { file: new URL("../../dist/app.js", import.meta.url), type: "text/javascript; charset=utf-8" }],
     ["/assets/app.css", { file: new URL("../../dist/app.css", import.meta.url), type: "text/css; charset=utf-8" }],
+    ["/assets/fonts/bebas-neue.ttf", { file: new URL("../../dist/fonts/bebas-neue.ttf", import.meta.url), type: "font/ttf" }],
+    ["/assets/fonts/work-sans.ttf", { file: new URL("../../dist/fonts/work-sans.ttf", import.meta.url), type: "font/ttf" }],
   ]);
   const server = createServer((request, response) => {
     async function route(): Promise<void> {
