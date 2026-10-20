@@ -1,4 +1,4 @@
-import { html, nothing } from "lit-html";
+import { html, nothing, svg } from "lit-html";
 import { workspace } from "../../shared/browser-layout.ts";
 import { live } from "lit-html/directives/live.js";
 import type { Metric } from "./operations.ts";
@@ -54,8 +54,8 @@ function carousel(state: ScorecardState, actions: ScorecardActions) {
         <p class="mt-2 text-xs text-sc-muted">${state.startWeight ? `Started at ${state.startWeight} kg` : "Add your starting weight in setup"}</p>${metricError("weight", state)}</section>
       <section class="sc-progress-card ${state.card === 1 ? "sc-progress-current" : ""}" aria-label="Weight trend"><h2 class="sc-label text-xs">Weight Trend</h2>
         <svg class="my-2 h-20 w-full overflow-visible" viewBox="0 0 310 80" preserveAspectRatio="none" role="img" aria-label=${`Weight trend from ${state.startWeight} to ${state.day.values.weight ?? state.startWeight} kilograms`}>
-          ${state.hasWeightTrend ? html`<polygon points=${`${state.trendPoints} 310,80 0,80`} class="sc-trend-area"></polygon>
-          <polyline points=${state.trendPoints} fill="none" class="sc-trend-line" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>` : html`<circle cx="155" cy="40" r="4" fill="currentColor"></circle>`}
+          ${state.hasWeightTrend ? svg`<polygon points=${`${state.trendPoints} 310,80 0,80`} class="sc-trend-area"></polygon>
+          <polyline points=${state.trendPoints} fill="none" class="sc-trend-line" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>` : svg`<circle cx="155" cy="40" r="4" fill="currentColor"></circle>`}
         </svg><div class="flex justify-between text-xs font-medium"><span class="text-sc-muted">Day 1 · ${state.startWeight} kg</span><span class="text-sc-ink">Day ${state.programDay} · ${state.day.values.weight ?? "—"} kg</span></div></section>
       <section class="sc-progress-card ${state.card === 2 ? "sc-progress-current" : ""}" aria-label="Consistency"><div class="mb-2 flex items-baseline justify-between"><h2 class="sc-label text-xs">Consistency</h2><span class="sc-data text-3xl text-sc-ink">${state.consistency}%</span></div>
         <table class="sc-consistency" aria-label="Tracking over the last seven days"><colgroup><col class="w-[78px]">${state.trackingHistory.map(() => html`<col>`)}</colgroup><thead><tr><td></td>${state.trackingHistory.map(day => html`<th scope="col">${day.day.slice(0, 1)}<span class="sr-only">${day.day.slice(1)}</span></th>`)}</tr></thead>

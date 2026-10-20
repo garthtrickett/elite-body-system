@@ -43,6 +43,8 @@ test("desktop scorecard keeps progress visible and account dialogs work across r
     await expect(nav(page).getByRole("link", { name: "Scorecard", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("region", { name: "Body weight", exact: true })).toBeVisible();
     await expect(page.getByRole("img", { name: /Weight trend from/ })).toBeVisible();
+    expect(await page.getByRole("img", { name: /Weight trend from/ }).evaluate(element =>
+      [...element.children].some(child => child instanceof SVGGraphicsElement && child.getBBox().width > 0))).toBe(true);
     await expect(page.getByRole("table", { name: "Tracking over the last seven days" })).toBeVisible();
     await fits(page);
     await page.screenshot({ path: info.outputPath(`scorecard-${width}.png`), fullPage: true });
