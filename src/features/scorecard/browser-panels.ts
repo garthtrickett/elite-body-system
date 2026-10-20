@@ -43,7 +43,7 @@ function panelContent(state: ScorecardState, actions: ScorecardActions) {
 export function scorecardPanel(state: ScorecardState, actions: ScorecardActions) {
   return html`<dialog class="sc-dialog ${state.panel === "setup" ? "sc-dialog-setup" : ""}" aria-labelledby="sc-panel-title" @cancel=${(event: Event) => { event.preventDefault(); actions.closePanel(); }}>
     <div class="sc-panel-body">
-      <header class="sc-panel-header"><button class="sc-icon-button -ml-2" aria-label="Back to scorecard" @click=${actions.closePanel}>${icon("back")}</button>
+      <header class="sc-panel-header"><button class="sc-icon-button -ml-2" aria-label="Close dialog" @click=${actions.closePanel}><span aria-hidden="true">×</span></button>
       <h2 id="sc-panel-title" class="sc-display text-[40px] leading-[1.1]">${state.panel ? titles[state.panel] : ""}</h2></header>
       ${panelContent(state, actions)}
       ${state.panel === "setup" || state.message || state.syncError ? html`<div class="sc-panel-feedback space-y-3">${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}

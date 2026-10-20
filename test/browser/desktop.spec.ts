@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createDatabase } from "../../src/platform/database/connection.ts";
 import { createProfiles, createPostgresProfileStore } from "../../src/features/profile/index.ts";
 import { startTestApp, testDatabaseUrl } from "../support/app.ts";
+import { createScorecards, emptyScorecard } from "../../src/features/scorecard/index.ts";
 import { completedProfile } from "../support/client.ts";
 
 let app: Awaited<ReturnType<typeof startTestApp>>;
@@ -14,7 +15,11 @@ async function signIn(page: Page) {
   const email = `desktop-${randomUUID()}@example.test`, account = await app.auth.provisionAccount({ email });
   if (!account.ok) throw new Error("Fixture account unavailable");
   const db = createDatabase(testDatabaseUrl());
-  try { expect((await createProfiles({ store: createPostgresProfileStore(db) }).save({ accountId: account.value.id, revision: 0, profile: completedProfile() })).ok).toBe(true); }
+  try {
+    expect((await createProfiles({ store: createPostgresProfileStore(db), now: () => new Date(`${completedProfile().startDate}T12:00:00Z`) }).save({ accountId: account.value.id, revision: 0, profile: completedProfile() })).ok).toBe(true);
+    expect((await createScorecards(db).save({ accountId: account.value.id, date: new Date().toISOString().slice(0, 10), revision: 0,
+      scorecard: { ...emptyScorecard(), values: { ...emptyScorecard().values, weight: 78.3 } } })).ok).toBe(true);
+  }
   finally { await db.destroy(); }
   await app.auth.requestLink({ email, clientKey: randomUUID() });
   const session = await app.auth.redeemLink({ token: new URL(await app.readLink(email)).hash.slice(1) });
@@ -74,7 +79,7 @@ test("desktop scorecard keeps progress visible and account dialogs work across r
   await page.keyboard.press("Escape");
   await expect(page.getByLabel("Calories eaten today")).toHaveValue("2150");
   await page.goto(`${app.origin}/?panel=setup`);
-  await expect(page.getByRole("dialog")).toContainText("Your setup · 1 of 34");
+  await expect(page.getByRole("dialog")).toContainText("Step 1 of 34");
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(nav(page)).toBeHidden();

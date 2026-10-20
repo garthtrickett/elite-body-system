@@ -37,6 +37,8 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
   const episode = EPISODES.find(item => item.id === state.episode);
   const titles = { mindset: "Neural Map", nutrition: "Elite Body Nutrition", activity: "The 4-Day Split" };
   const available = EPISODES.some(item => item.pillar === pillar && ["open", "done"].includes(episodeStatus({ episode: item, snapshot })));
+  const next = EPISODES.find(item => item.pillar === pillar && episodeStatus({ episode: item, snapshot }) !== "done");
+  const nextStatus = next ? episodeStatus({ episode: next, snapshot }) : undefined;
   const done = episode ? !!snapshot.progress.done[episode.id] : false;
   const url = episode ? snapshot.videoUrls[`course:${episode.id}`] : undefined;
   return html`<div class="sc-course-layout">
@@ -47,7 +49,7 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
       ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>Neural Map · Five-part build ›</a>` : nothing}
       ${EPISODES.filter(item => item.pillar === pillar).map(item => {
         const status = episodeStatus({ episode: item, snapshot });
-        return html`<button class="sc-panel-card text-left disabled:opacity-50" aria-pressed=${episode?.id === item.id}
+        return html`<button class="sc-panel-card sc-course-card text-left" aria-pressed=${episode?.id === item.id}
           ?disabled=${state.saving || status === "scheduled" || status === "blocked"} @click=${() => propose({ kind: "episodeSelected", id: item.id })}>
           <span class="block text-sm font-medium">Week ${item.week} · ${item.title}</span><span class="sc-copy mt-1 block text-xs">${status === "done" ? "Complete · tap to review" : status === "open" ? "Start lesson" : status === "scheduled" ? `Unlocks week ${item.week}` : "Complete earlier weeks to unlock"}</span></button>`;
       })}
@@ -64,7 +66,8 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
             @input=${(event: Event) => propose({ kind: "answerChanged", index, value: (event.target as HTMLTextAreaElement).value })}></textarea></label>`)}
         <button class="sc-primary" ?disabled=${state.saving || done} @click=${() => propose({ kind: "episodeCompleted" })}>${done ? "✓ Lesson complete" : "Mark lesson complete"}</button>
       </div>
-    </article>` : html`<div class="sc-course-welcome sc-panel-card"><p class="sc-eyebrow">Learn, then put it into practice.</p><h2 class="sc-display mt-3 text-4xl">A little each week.<br>A standard for life.</h2><p class="sc-copy mt-4">${!snapshot.setupComplete ? "Complete your Day 1 setup to begin. Your lessons unlock as you work through the program." : available ? "Choose an available lesson to read its overview and work through the tasks. Your answers are saved as you go." : "Your lessons follow your program. The episode cards show when each one unlocks."}</p></div>`}
+    </article>` : html`<section class="sc-course-welcome sc-panel-card"><p class="sc-eyebrow">${!snapshot.setupComplete ? "Start here" : next ? "Your next lesson" : "Course complete"}</p><h2 class="sc-display mt-3 text-3xl">${!snapshot.setupComplete ? "Set up your program" : next?.title ?? "Keep putting it into practice."}</h2><p class="sc-copy mt-3">${!snapshot.setupComplete ? "Complete Day 1 setup to unlock your lessons." : nextStatus === "scheduled" ? `Unlocks in week ${next?.week}. You’re in week ${snapshot.week}. Keep building your daily rhythm while you wait.` : nextStatus === "blocked" ? "Complete the earlier lesson to unlock this one." : available ? "Read the overview and work through the tasks. Your answers are saved as you go." : "Review your completed lessons whenever you need a reminder."}</p>
+        ${!snapshot.setupComplete ? html`<a class="sc-primary mt-4" href="/?panel=setup">Complete setup</a>` : next && nextStatus === "open" ? html`<button class="sc-primary mt-4" @click=${() => propose({ kind: "episodeSelected", id: next.id })}>Start lesson</button>` : html`<a class="sc-secondary mt-4" href="/">Go to today’s scorecard</a>`}</section>`}
   </div>`;
 }
 

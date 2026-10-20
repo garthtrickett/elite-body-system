@@ -31,7 +31,7 @@ test("set logs, instructions, history and timers survive refresh, then a complet
   await signIn(page);
   await page.goto(`${app.origin}/training?date=${monday(-7)}`);
   await expect(page.getByRole("heading", { name: "Compound Day", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true })).toHaveText("○");
+  await expect(page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true })).toHaveAttribute("aria-pressed", "false");
   await page.getByLabel("Weighted Pull-up set 1 weight").fill("15"); await page.getByLabel("Weighted Pull-up set 1 weight").press("Enter");
   await page.getByLabel("Weighted Pull-up set 1 reps").fill("5"); await page.getByLabel("Weighted Pull-up set 1 reps").press("Enter");
   await page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true }).click();

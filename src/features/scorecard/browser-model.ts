@@ -196,7 +196,7 @@ export function representScorecard(model: ScorecardModel) {
   const tracked = history.reduce((sum, day) => sum + day.nutrition + day.activity + day.mindset, 0);
   return { ...model, ...representDay(model.day, profile.targets), weightDelta: Math.abs(difference).toFixed(1), weightDown: difference >= 0,
     trendPoints: points, hasWeightData: weights.length > 0, hasWeightTrend: weights.length > 1,
-    trendStartDay: programDayFor(first?.date), trendEndDay: programDayFor(last?.date), trendStartWeight: first?.weight, trendEndWeight: last?.weight, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
+    trendStartDay: programDayFor(first?.date), trendEndDay: programDayFor(last?.date), trendStartWeight: first?.weight, trendEndWeight: last?.weight, trackedEntries: tracked, consistencyTotal: 63, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
     rolloverNotice: !!model.observedDate && model.observedDate !== model.date,
     saving: model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile", targets: profile.targets } as const;
 }
