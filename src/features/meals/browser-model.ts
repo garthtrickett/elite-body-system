@@ -1,9 +1,11 @@
 import type { ClientResult } from "../../shared/client-result.ts";
 import { isDay } from "../../shared/validation.ts";
-import { emptyMeal, emptyNutrients, parseMeal, mealTotals, MACROS, MICROS, isUuid } from "./data.ts";
+import { emptyMeal, emptyNutrients, parseMeal, mealTotals, mealNumberProblem, MACROS, MICROS, isUuid } from "./data.ts";
 import type { Meal, MealSnapshot, Macro, Micro } from "./data.ts";
 import type { MealPhoto } from "./provider.ts";
 export type MealEffect =
+  | Readonly<{ kind: "confirmNavigation"; id: number; href: string }>
+  | Readonly<{ kind: "navigate"; id: number; href: string }>
   | Readonly<{ kind: "load"; id: number; date?: string }>
   | Readonly<{ kind: "preparePhotos"; id: number; selection: number }>
   | Readonly<{ kind: "analyze"; id: number; description: string; photos: readonly MealPhoto[] }>
@@ -11,9 +13,11 @@ export type MealEffect =
   | Readonly<{ kind: "remove" | "removeFavorite"; id: number; mealId: string; date: string }>;
 export type MealModel = Readonly<{
   snapshot: MealSnapshot | null; draft: Meal | null; fields: Readonly<Record<string, string>>; description: string; photos: readonly MealPhoto[];
-  favorite: boolean; sequence: number; pending: MealEffect | null; retry: MealEffect | null; error: string | null; message: string | null;
+  validationAttempt: number; favorite: boolean; sequence: number; pending: MealEffect | null; retry: MealEffect | null; error: string | null; message: string | null;
 }>;
 export type MealProposal =
+  | Readonly<{ kind: "navigationRequested"; href: string }>
+  | Readonly<{ kind: "navigationConfirmed"; id: number; leave: boolean }>
   | Readonly<{ kind: "started" | "manualRequested" | "draftCancelled" | "analysisRequested" | "ingredientAdded" | "retry" | "reload" }>
   | Readonly<{ kind: "descriptionChanged"; value: string }>
   | Readonly<{ kind: "dateChanged"; value: string }>
@@ -32,22 +36,45 @@ export type MealProposal =
   | Readonly<{ kind: "analyzed"; id: number; result: ClientResult<Meal> }>
   | Readonly<{ kind: "completed"; id: number; effectKind: "load" | "log" | "remove" | "removeFavorite"; result: ClientResult<MealSnapshot> }>
   | Readonly<{ kind: "failed"; id: number }>;
-export const initialMealModel = (): MealModel => ({ snapshot: null, draft: null, fields: {}, description: "", photos: [], favorite: false, sequence: 0, pending: null, retry: null, error: null, message: null });
+export const initialMealModel = (): MealModel => ({ snapshot: null, draft: null, fields: {}, description: "", photos: [], validationAttempt: 0, favorite: false, sequence: 0, pending: null, retry: null, error: null, message: null });
 const fieldKey = (index: number, field: string) => `${index}:${field}`;
 function queue(model: MealModel, effect: MealEffect): MealModel { return { ...model, sequence: effect.id, pending: effect, retry: null, error: null, message: null }; }
 function review(model: MealModel, meal: Meal): MealModel { return { ...model, draft: meal, fields: {}, favorite: false, pending: null, error: null, message: null }; }
-function applyFields(model: MealModel): ClientResult<Meal> {
-  if (!model.draft) return { ok: false, error: { code: "invalid_input", message: "Choose a meal to review first." } };
-  return parseMeal({ ...model.draft, items: model.draft.items.map((item, index) => {
+function draftWithFields(model: MealModel): Meal | null {
+  if (!model.draft) return null;
+  return { ...model.draft, items: model.draft.items.map((item, index) => {
     const numeric = (field: string, fallback: number | null) => { const text = model.fields[fieldKey(index, field)]; return text === undefined ? fallback : text.trim() === "" ? (field === "grams" || MACROS.includes(field as Macro) ? NaN : null) : /^\d+(\.\d+)?$/.test(text.trim()) ? Number(text) : NaN; };
     const changed = [...MACROS, ...MICROS].some(field => model.fields[fieldKey(index, field)] !== undefined);
-    return { ...item, grams: numeric("grams", item.grams), source: changed ? "manual" : item.source,
-      per100: { energy: numeric("energy", item.per100.energy), protein: numeric("protein", item.per100.protein), carbs: numeric("carbs", item.per100.carbs), fat: numeric("fat", item.per100.fat), fibre: numeric("fibre", item.per100.fibre), iron: numeric("iron", item.per100.iron), potassium: numeric("potassium", item.per100.potassium), vitaminC: numeric("vitaminC", item.per100.vitaminC) } };
-  }) });
+    return { ...item, grams: numeric("grams", item.grams) ?? NaN, source: changed ? "manual" : item.source,
+      per100: { energy: numeric("energy", item.per100.energy) ?? NaN, protein: numeric("protein", item.per100.protein) ?? NaN, carbs: numeric("carbs", item.per100.carbs) ?? NaN, fat: numeric("fat", item.per100.fat) ?? NaN, fibre: numeric("fibre", item.per100.fibre), iron: numeric("iron", item.per100.iron), potassium: numeric("potassium", item.per100.potassium), vitaminC: numeric("vitaminC", item.per100.vitaminC) } };
+  }) };
+}
+function applyFields(model: MealModel): ClientResult<Meal> {
+  const candidate = draftWithFields(model);
+  return candidate ? parseMeal(candidate) : { ok: false, error: { code: "invalid_input", message: "Choose a meal to review first." } };
+}
+function fieldProblems(model: MealModel): Readonly<Record<string, string>> {
+  const candidate = draftWithFields(model), problems: Record<string, string> = {};
+  if (!candidate) return problems;
+  if (!candidate.name.trim()) problems.name = "Enter a meal name.";
+  candidate.items.forEach((item, index) => {
+    if (!item.name.trim()) problems[fieldKey(index, "name")] = "Enter an ingredient name.";
+    const portion = mealNumberProblem({ field: "grams", value: item.grams });
+    if (portion) problems[fieldKey(index, "grams")] = portion;
+    [...MACROS, ...MICROS].forEach(field => {
+      const problem = mealNumberProblem({ field, value: item.per100[field] });
+      if (problem) problems[fieldKey(index, field)] = problem;
+    });
+  });
+  return problems;
 }
 
 export function acceptMealProposal(model: MealModel, proposal: MealProposal): MealModel {
   const id = model.sequence + 1;
+  if (proposal.kind === "navigationConfirmed") {
+    if (model.pending?.kind !== "confirmNavigation" || model.pending.id !== proposal.id) return model;
+    return proposal.leave ? queue(model, { kind: "navigate", id, href: model.pending.href }) : { ...model, pending: null };
+  }
   if (proposal.kind === "started") return !model.snapshot && !model.pending ? queue(model, { kind: "load", id }) : model;
   if (proposal.kind === "failed") {
     if (model.pending?.id !== proposal.id) return model;
@@ -74,6 +101,10 @@ export function acceptMealProposal(model: MealModel, proposal: MealProposal): Me
   // An uncertain write keeps its exact payload/request ID until confirmed or explicitly reloaded.
   if (proposal.kind === "reload") return queue({ ...model, draft: null, fields: {}, retry: null }, { kind: "load", id, ...(model.snapshot ? { date: model.snapshot.date } : {}) });
   if (model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind)) return model;
+  if (proposal.kind === "navigationRequested") {
+    if (!proposal.href.startsWith("/") || proposal.href.startsWith("//") || proposal.href.includes("\\")) return model;
+    return queue(model, { kind: model.draft || model.description.trim() || model.photos.length ? "confirmNavigation" : "navigate", id, href: proposal.href });
+  }
   if (proposal.kind === "descriptionChanged") return { ...model, description: proposal.value.slice(0, 4000), error: null, retry: null };
   if (proposal.kind === "dateChanged") return isDay(proposal.value) ? queue(model, { kind: "load", id, date: proposal.value }) : model;
   if (proposal.kind === "photosRequested") return model.photos.length < 4 ? queue(model, { kind: "preparePhotos", id, selection: proposal.selection }) : { ...model, error: "Remove a photo before adding another. Four photos maximum." };
@@ -107,14 +138,16 @@ export function acceptMealProposal(model: MealModel, proposal: MealProposal): Me
   }
   if (proposal.kind === "logRequested") {
     if (!model.snapshot || !isUuid(proposal.requestId)) return model;
-    const meal = applyFields(model); if (!meal.ok) return { ...model, error: meal.error.message };
-    if (!meal.value.items.some(item => item.grams > 0) || mealTotals(meal.value).energy <= 0) return { ...model, error: "Add a portion and calories before logging this meal." };
+    const meal = applyFields(model); if (!meal.ok) return { ...model, error: meal.error.message, validationAttempt: model.validationAttempt + 1 };
+    if (!meal.value.items.some(item => item.grams > 0) || mealTotals(meal.value).energy <= 0) return { ...model, error: "Add a portion and calories before logging this meal.", validationAttempt: model.validationAttempt + 1 };
     return queue({ ...model, draft: meal.value, fields: {} }, { kind: "log", id, requestId: proposal.requestId, date: model.snapshot.date, meal: meal.value, favorite: model.favorite });
   }
   return model;
 }
 export function representMeals(model: MealModel) {
   const parsed = model.draft ? applyFields(model) : null;
-  return { ...model, busy: model.pending !== null, locked: model.pending !== null || !!model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind), totals: parsed?.ok ? mealTotals(parsed.value) : null } as const;
+  const totals = parsed?.ok ? mealTotals(parsed.value) : null;
+  return { ...model, fieldErrors: fieldProblems(model), canLog: !!totals && totals.energy > 0 && !!parsed?.ok && parsed.value.items.some(item => item.grams > 0),
+    busy: model.pending !== null && model.pending.kind !== "confirmNavigation" && model.pending.kind !== "navigate", locked: model.pending !== null || !!model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind), totals } as const;
 }
 export type MealState = ReturnType<typeof representMeals>;

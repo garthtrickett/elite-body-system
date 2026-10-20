@@ -20,10 +20,16 @@ export function workspace(input: Readonly<{
   page: WorkspacePage;
   content: TemplateResult;
   navigationDisabled?: boolean;
+  navigate?: (href: string) => void;
   mobileFooter?: TemplateResult | undefined;
   openPanel?: (panel: "profile" | "setup") => void;
 }>) {
-  const guard = (event: Event) => { if (input.navigationDisabled) event.preventDefault(); };
+  const guard = (event: Event) => {
+    if (input.navigationDisabled) { event.preventDefault(); return; }
+    if (!input.navigate || !(event.currentTarget instanceof HTMLAnchorElement)) return;
+    if (event instanceof MouseEvent && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
+    event.preventDefault(); input.navigate(event.currentTarget.getAttribute("href") ?? "/");
+  };
   const items = (entries: readonly NavigationItem[]) => entries.map(item => html`<a class="sc-sidebar-link" href=${item.href}
     aria-current=${input.page === item.page ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>${item.label}</a>`);
   return html`<div class="sc-app"><div class="sc-workspace">
@@ -47,11 +53,11 @@ export function workspace(input: Readonly<{
       <a class="sc-nav-button ${input.page === "training" ? "sc-nav-active" : ""}" href="/training" aria-current=${input.page === "training" ? "page" : nothing} aria-label="Training" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Train</a>
       <a class="sc-nav-button ${input.page === "scorecard" ? "sc-nav-active" : ""}" href="/" aria-current=${input.page === "scorecard" ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Scorecard</a>
       ${input.openPanel ? html`<button class="sc-nav-button" @click=${() => input.openPanel?.("profile")}>Profile</button>` : html`<a class="sc-nav-button" href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Profile</a>`}
-      <details class="sc-mobile-more"><summary class="sc-nav-button" aria-label="More navigation">More <span aria-hidden="true">⌃</span></summary>
-        <div class="sc-mobile-menu"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}
+      <div class="sc-mobile-more"><button class="sc-nav-button ${input.page !== "scorecard" && input.page !== "training" ? "sc-nav-active" : ""}" aria-current=${input.page !== "scorecard" && input.page !== "training" ? "true" : nothing} aria-label="More navigation" popovertarget="workspace-more-menu">More <span aria-hidden="true">⌃</span></button>
+        <div class="sc-mobile-menu" id="workspace-more-menu" popover="auto"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}
 
         </div>
-      </details>
+      </div>
     </nav>
   </div></div>`;
 }

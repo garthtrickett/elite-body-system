@@ -384,3 +384,37 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-dialog-setup .sc-setup-content { flex: none; min-height: auto; overflow-y: visible; }
   .sc-dialog-setup .sc-setup-sections { display: none; }
 }
+
+/* Independent review: explicit feedback, compact tasks and consistent navigation. */
+.sc-field-error { color: var(--color-sc-problem); font-size: .75rem; line-height: 1.5; }
+.sc-textarea[aria-invalid="true"] { border-width: 2px; border-color: var(--color-sc-problem); }
+.sc-review-title { scroll-margin-top: 1rem; }
+.sc-review-title:focus { outline: 0; }
+.sc-mobile-nutrients, .sc-course-next { display: none; }
+.sc-sign-out { align-self: flex-start; margin-top: 1rem; }
+.sc-map-context .sc-copy { max-width: 65ch; }
+@media (max-width: 1023px) {
+  .sc-mobile-menu .sc-sidebar-link { padding-inline: .75rem; border-radius: .375rem; }
+  .sc-mobile-menu .sc-sidebar-link[aria-current="page"] { background: var(--color-sc-selected); color: var(--color-sc-ink); border-left: 2px solid var(--color-accent); }
+  .sc-mobile-menu[popover] { position: fixed; inset: auto .5rem calc(64px + env(safe-area-inset-bottom, 0px)) auto; margin: 0; color: var(--color-sc-ink); }
+  .sc-course-next { display: block; }
+  .sc-course-next h2 { font-size: 26px; }
+  .sc-course-next .sc-primary, .sc-course-next .sc-secondary { width: 100%; }
+  .sc-desktop-totals { display: none; }
+  .sc-mobile-nutrients { display: block; }
+}
+@media (min-width: 1024px) {
+  .sc-mobile-menu[popover] { display: none; }
+}
+@media (max-width: 1023px) and (max-height: 500px) {
+  .sc-mobile-nav { padding-top: 2px; padding-bottom: max(2px, env(safe-area-inset-bottom, 0px)); }
+  .sc-mobile-nav .sc-nav-button { min-height: 44px; }
+  .sc-mobile-footer { padding: .25rem .75rem; }
+  .sc-meal-quick-log .sc-primary { min-height: 44px; padding-block: .5rem; }
+  .sc-meal-quick-log .sc-label { display: none; }
+  .sc-page:has(.sc-review-title) { gap: .75rem; }
+  .sc-page:has(.sc-review-title) > header { display: none; }
+  .sc-page:has(.sc-review-title) > .sc-date-field { flex-direction: row; align-items: center; gap: 1rem; max-width: none; }
+  .sc-page:has(.sc-review-title) > .sc-date-field input { width: 190px; min-height: 44px; }
+  .sc-review-title { font-size: 32px; }
+}

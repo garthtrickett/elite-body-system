@@ -310,3 +310,20 @@ Changing `AUTH_RATE_KEY` resets request-budget identities. Existing sessions are
 revoked by deletion or expiry, not by changing that rate key. A reverse proxy's
 socket identity is shared by its callers unless a future explicit trust policy
 is added. The default client budget may need configuration for that deployment.
+
+### Meal review presentation and navigation
+
+Meal number validation has one authoritative owner in the meal data module.
+The browser represents draft field errors and logging eligibility from the same
+limits used by `parseMeal`; invalid text stays in the draft for correction.
+Entering review triggers one focus/scroll effect after rendering. Further edits
+retain the user's position. Attempted invalid submissions can reveal the first
+field error; transport failures reveal their retry feedback.
+
+Meal links propose a navigation intent. An unfinished draft/capture queues a
+confirmation effect; only its correlated acceptance queues navigation. Cancelling
+retains the draft, and uncertain writes remain frozen for their existing safe
+retry. Browser Back/refresh use native unload protection. No new local storage,
+account records or schema are introduced. The shared shell's More popover uses
+native dismissal/focus behaviour and derives active-route presentation from the
+workspace page.
