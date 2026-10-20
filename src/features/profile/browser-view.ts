@@ -66,7 +66,7 @@ function setupContent(model: ProfileUiModel, actions: ProfileUiActions) {
 export function onboardingView(model: ProfileUiModel, actions: ProfileUiActions, busy: boolean) {
   const step = SETUP_STEPS[model.draft.setupStep];
   return html`<div class="sc-eyebrow">Your setup · ${model.draft.setupStep + 1} of ${SETUP_STEPS.length}</div>
-    <fieldset ?disabled=${busy} class="flex flex-1 flex-col gap-4">${setupContent(model, actions)}
+    <fieldset ?disabled=${busy} class="sc-setup-content flex flex-1 flex-col gap-4">${setupContent(model, actions)}
       ${model.error ? html`<p class="sc-error" role="alert">${model.error}</p>` : nothing}
       ${step !== "done" ? html`<div class="mt-auto flex flex-col gap-2 pt-4"><button class="sc-primary" @click=${() => actions.propose({ kind: step === "commit" ? "complete" : "next" })}>${busy ? "Saving…" : step === "commit" ? "Commit to my plan" : "Save and continue"}</button>
         <div class="flex justify-between"><button class="sc-secondary" ?disabled=${model.draft.setupStep === 0} @click=${() => actions.propose({ kind: "back" })}>Back</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "save" })}>Save progress</button></div></div>` : nothing}
@@ -77,7 +77,7 @@ export function profileView(model: ProfileUiModel, actions: ProfileUiActions, bu
   const d = model.draft;
   return html`<h3 class="sc-display text-3xl">${d.name || "Your profile"}</h3><p class="sc-copy">${d.completed ? "Setup complete" : "Setup in progress"} · ${d.timezone}</p>
     <button class="sc-secondary" ?disabled=${busy} @click=${() => actions.propose({ kind: "editSetup" })}>${d.completed ? "Review setup" : "Resume setup"}</button>
-    <section class="sc-panel-card"><h3 class="sc-label">Your plan</h3><dl class="sc-copy mt-3 space-y-3 text-sm">
+    <div class="sc-profile-grid"><section class="sc-panel-card"><h3 class="sc-label">Your plan</h3><dl class="sc-copy mt-3 space-y-3 text-sm">
       <div><dt class="sc-label">Training</dt><dd>${[1, 2, 3, 4, 5, 6, 0].filter(day => d.trainingDays.includes(day)).map(day => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]).join(" · ") || "Not chosen"}</dd></div>
       <div><dt class="sc-label">Rest day</dt><dd>${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.restDay]}</dd></div>
       <div><dt class="sc-label">Training space and equipment</dt><dd class="whitespace-pre-wrap break-words">${d.equipment || "Not recorded"}</dd></div>
@@ -94,5 +94,5 @@ export function profileView(model: ProfileUiModel, actions: ProfileUiActions, bu
     <section class="sc-panel-card"><h3 class="sc-label">Health and consent</h3><p class="sc-copy mt-2">${d.health.answers.some(answer => answer === null) ? "Health screening incomplete" : d.health.answers.some(Boolean) ? d.health.clearance ? "Doctor clearance self-confirmed" : "Training on hold: clearance needed" : "No health concerns flagged"}</p>
       ${d.health.answers.some(Boolean) && !d.health.clearance ? html`<label class="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" @change=${(event: Event) => actions.propose({ kind: "clearanceChanged", value: (event.target as HTMLInputElement).checked })}>My doctor has cleared me to train</label><button class="sc-secondary mt-2" @click=${() => actions.propose({ kind: "save" })}>Save clearance confirmation</button>` : nothing}
       <p class="sc-copy mt-2 text-xs">${d.consent.accepted ? `Acknowledged draft-v1 as ${d.consent.signedName}` : "Draft consent not yet acknowledged"}</p></section>
-    <section class="sc-panel-card"><h3 class="sc-label">Your story</h3><dl class="space-y-3 pt-3">${STORY_FIELDS.filter(key => d.story[key]).map(key => html`<div><dt class="sc-label">${STORY_QUESTIONS[key].question}</dt><dd class="sc-copy whitespace-pre-wrap break-words">${d.story[key]}</dd></div>`)}</dl></section>`;
+    <section class="sc-panel-card"><h3 class="sc-label">Your story</h3><dl class="space-y-3 pt-3">${STORY_FIELDS.filter(key => d.story[key]).map(key => html`<div><dt class="sc-label">${STORY_QUESTIONS[key].question}</dt><dd class="sc-copy whitespace-pre-wrap break-words">${d.story[key]}</dd></div>`)}</dl></section></div>`;
 }

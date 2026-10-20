@@ -16,6 +16,28 @@ the [implementation plan](brand/brand-implementation-plan.md) records applicatio
 choices and validation. This presentation change does not alter operations,
 database schema, SAM transitions or authentication.
 
+## Responsive client workspace
+
+`src/shared/browser-layout.ts` renders the shared client shell. At 1024px and
+above it provides persistent daily-practice, course and account navigation;
+individual features provide their own templates and action callbacks. Links
+respect each feature’s pending-write guard. Phone views keep the bottom scorecard
+navigation and a single selected progress card. Desktop shows all three progress
+cards using the same inputs and model, without duplicate editable fields.
+
+Training separates exercise selection from its log/instructions/history. Courses
+keep the episode list beside the lesson and tasks. Meals place capture/review
+beside saved meals and day history. The Neural Map separates its guidance from
+writing, then presents reading sections in a grid. Profile and L to R use bounded,
+scrollable native dialogs with keyboard focus containment and restoration.
+
+Account links from another workflow use `/?panel=profile` or `/?panel=setup`.
+The browser validates that navigation intent and passes it to the scorecard
+runtime. The acceptor opens the requested panel only after a correlated successful
+load and consumes the intent once; retry and stale-load behavior are unchanged.
+Setup review begins at its first step. Schema, authentication and ownership rules
+remain the same.
+
 ## Client workflows and persistence
 
 Each vertical slice exports its server contract through `index.ts` and its

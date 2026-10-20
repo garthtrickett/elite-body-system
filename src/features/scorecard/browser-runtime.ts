@@ -4,10 +4,11 @@ import type { SyncEffect, SyncProposal } from "./browser-sync.ts";
 
 export function createScorecardRuntime(config: Readonly<{
   account: AccountState;
+  launchPanel?: "profile" | "setup";
   present: (state: ScorecardState) => void;
   perform: (effect: SyncEffect) => Promise<SyncProposal>;
 }>) {
-  let model = initialScorecardModel(config.account);
+  let model = initialScorecardModel(config.account, config.launchPanel);
   let dispatched = 0;
   let disposed = false;
   function propose(proposal: ScorecardProposal): void {

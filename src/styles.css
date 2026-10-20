@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "./features/**/*.ts";
+@source "./shared/**/*.ts";
 
 /* Source palette: Brand Foundations pp. 14–15. Other neutrals are UI roles. */
 @theme {
@@ -153,4 +154,106 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
 }
 @media (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .sc-app button:not(:disabled):not(:focus-visible):active { transform: scale(0.98); }
+}
+
+/* The same workflows expand into a workspace; mobile retains its task-first shell. */
+.sc-workspace { margin-inline: auto; max-width: 1680px; }
+.sc-sidebar { display: none; }
+.sc-page { display: flex; flex-direction: column; gap: 1rem; padding: 1.25rem; min-width: 0; }
+.sc-progress-grid > .sc-progress-card:not(.sc-progress-current) { display: none; }
+.sc-pillar-grid, .sc-workout-layout, .sc-workout-list, .sc-workout-main,
+.sc-meal-layout, .sc-meal-editor, .sc-meal-history, .sc-course-layout,
+.sc-course-list, .sc-lesson, .sc-lesson-overview, .sc-lesson-tasks,
+.sc-map-builder, .sc-map-context, .sc-map-writing, .sc-map-reading,
+.sc-ltr-layout, .sc-ltr-column, .sc-profile-grid { display: flex; min-width: 0; flex-direction: column; gap: 1rem; }
+.sc-workout-list { gap: .5rem; }
+.sc-course-list > button { width: 100%; }
+.sc-meal-history { margin-top: 1rem; }
+.sc-lesson { scroll-margin-top: 2rem; }
+.sc-map-actions { display: flex; flex-direction: column; gap: .75rem; }
+@media (min-width: 768px) {
+  .sc-workspace-body { max-width: 760px; }
+  .sc-page { padding: 2rem; }
+  .sc-dialog { width: calc(100% - 4rem); max-width: 800px; height: auto; max-height: calc(100dvh - 4rem); border: 1px solid var(--color-sc-border); border-radius: 1rem; }
+  .sc-panel-body { min-height: 0; padding: 2rem; }
+  .sc-profile-grid, .sc-ltr-layout, .sc-map-reading { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 1.5rem; }
+  .sc-profile-grid > .sc-error { grid-column: 1 / -1; }
+  .sc-setup-content { width: 100%; max-width: 640px; margin-inline: auto; }
+}
+@media (min-width: 1024px) {
+  html { scroll-padding-block-end: 2rem; }
+  .sc-workspace { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: 100dvh; }
+  .sc-sidebar { display: flex; flex-direction: column; gap: 2.5rem; position: sticky; top: 0; height: 100dvh; overflow-y: auto; padding: 2.5rem 1.25rem; border-right: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); }
+  .sc-sidebar-brand { display: block; padding-inline: .75rem; font-family: var(--font-display); font-size: 2rem; line-height: .95; letter-spacing: -.03em; }
+  .sc-sidebar-brand .sc-eyebrow { display: block; margin-top: 1rem; font-family: var(--font-sans); font-size: .625rem; letter-spacing: .08em; }
+  .sc-sidebar-nav { display: flex; flex-direction: column; gap: 2rem; }
+  .sc-sidebar-group { display: flex; flex-direction: column; gap: .25rem; }
+  .sc-sidebar-group > .sc-eyebrow { padding: 0 .75rem .5rem; font-size: .625rem; }
+  .sc-sidebar-link { display: flex; position: relative; align-items: center; min-height: 44px; padding: .625rem .75rem; border-radius: .5rem; text-align: left; font-size: .875rem; color: var(--color-sc-copy); }
+  .sc-sidebar-link[aria-current="page"] { background: var(--color-sc-selected); color: var(--color-sc-ink); }
+  .sc-sidebar-link[aria-current="page"]::before { content: ""; position: absolute; left: 0; width: 2px; height: 1rem; background: var(--color-accent); }
+  .sc-sidebar-footer { margin-top: auto; padding: 2rem .75rem 0; font-size: .75rem; line-height: 1.6; color: var(--color-sc-muted); }
+  .sc-workspace-body { width: 100%; max-width: 1320px; min-width: 0; padding: 2.5rem; }
+  .sc-page { padding: 0; gap: 1.5rem; }
+  .sc-page > header { padding-bottom: .75rem; border-bottom: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); }
+  .sc-nav { display: none; }
+  .sc-scorecard-header { padding: 0; }
+  .sc-scorecard-header h1 { font-size: 64px; }
+  .sc-content { gap: 2rem; }
+  .sc-content > section, .sc-pillar-grid > section { padding-inline: 0; }
+  .sc-progress-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .sc-progress-grid > .sc-progress-card:not(.sc-progress-current) { display: block; }
+  .sc-progress-grid > :last-child { grid-column: 1 / -1; }
+  .sc-progress-controls, .sc-card-caption { display: none; }
+  .sc-pillar-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
+  .sc-tile-grid { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+  .sc-tile { min-height: 136px; padding: 1rem; }
+  .sc-pillar-grid .sc-training-mark { min-height: 24px; height: 24px; }
+  .sc-tile .sc-number { max-width: 12ch; }
+  .sc-section-heading { flex-wrap: wrap; gap: .25rem; min-height: 52px; }
+  .sc-section-heading > span { margin-right: .25rem; }
+  .sc-log-button { padding-inline: .625rem; }
+  .sc-workout-layout { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 1.6fr); gap: 1.5rem; align-items: start; }
+  .sc-workout-list { position: sticky; top: 2rem; }
+  .sc-workout-list > button { padding: 1rem; }
+  .sc-workout-main > .sc-panel-card { padding: 1.5rem; }
+  .sc-date-field { max-width: 220px; }
+  .sc-meal-layout { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(230px, 1fr); gap: 2rem; align-items: start; }
+  .sc-meal-history { margin-top: 0; padding-left: 1.5rem; border-left: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); }
+  .sc-meal-history h2 { font-size: 26px; }
+  .sc-meal-editor > .sc-copy, .sc-lesson-overview > .sc-copy, .sc-map-context > .sc-copy { max-width: 65ch; }
+  .sc-course-layout { display: grid; grid-template-columns: minmax(210px, .8fr) minmax(0, 1.7fr); gap: 2rem; align-items: start; }
+  .sc-course-list { position: sticky; top: 2rem; }
+  .sc-course-list > button[aria-pressed="true"] { border-color: var(--color-sc-border); background: var(--color-sc-selected); }
+  .sc-course-list-heading { margin-bottom: .5rem; }
+  .sc-lesson { padding: 1.5rem; border: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); border-radius: 1rem; }
+  .sc-lesson-overview { padding-bottom: .5rem; }
+  .sc-map-builder { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; align-items: start; }
+  .sc-map-writing { position: sticky; top: 2rem; padding: 1.5rem; background: var(--color-sc-card); border: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); border-radius: 1rem; }
+  .sc-map-actions { flex-direction: row; }
+  .sc-map-actions > :first-child { min-width: 240px; }
+  .sc-map-reading .sc-panel-card { min-height: 180px; padding: 1.5rem; }
+  .sc-app :is(button, a, input, textarea, select, summary) { scroll-margin-block: 2rem; }
+}
+@media (min-width: 1280px) {
+  .sc-workspace { grid-template-columns: 232px minmax(0, 1fr); }
+  .sc-sidebar { padding-inline: 1.5rem; }
+  .sc-progress-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sc-progress-grid > :last-child { grid-column: auto; }
+  .sc-progress-card { min-height: 200px; padding: 1.25rem; }
+  .sc-section-heading { gap: .5rem; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-sidebar-link:hover { background: var(--color-sc-selected); }
+}
+.sc-map-controls { display: flex; flex-direction: column; gap: 1rem; }
+.sc-course-welcome { display: none; }
+@media (max-width: 1023px) {
+  .sc-course-list-concealed { display: none; }
+}
+@media (min-width: 1024px) {
+  .sc-map-introduction { display: flex; max-width: 780px; gap: 1.5rem; }
+  .sc-map-introduction .sc-map-controls { flex-direction: row; }
+  .sc-map-controls > .sc-primary { min-width: 240px; }
+  .sc-course-welcome { display: block; padding: 2rem; }
 }
