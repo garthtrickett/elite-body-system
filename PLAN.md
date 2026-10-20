@@ -2,11 +2,16 @@
 
 ## Goal and scope
 
-Create a new private GitHub repository, `garthtrickett/elite-body-system`, containing
+Create a new GitHub repository, `garthtrickett/elite-body-system`, containing
 only reusable foundations from Abby and the explicitly requested additions. This
 is boilerplate for an unrelated project. Do not copy Abby history, configuration,
 credentials, datasets, clinic concepts, integrations, deployment targets, or product
 features. Leave the Abby and Gust working trees unchanged.
+
+The repository was initially private as requested. On 20 October 2026, the
+operator explicitly authorized making it public and retrying GitHub CI after
+private Actions usage hit the account's included allowance. Public visibility is
+now the requested final state; no payment or budget settings were changed.
 
 The operator confirmed that the original notes mean Kanel + Kysely + lit-html.
 The other requirements are typed errors, agent-native operations, immutability
@@ -100,10 +105,13 @@ fitness features or sample CRUD unrelated to validating the foundations.
   dashboard separates its view but uses mutable controller classes. Adapt these
   architectural ideas into one explicit function-based SAM/lit-html loop for the
   auth UI. Add headless transition/effect tests and retain real-browser coverage.
+- Pass 6: Applied the operator's explicit public-visibility decision, checked the
+  tracked files before publication, and retried both billing-blocked CI runs for
+  the exact implementation head without changing or bypassing the checks.
 
-## Acceptance evidence (fill during implementation)
+## Acceptance evidence
 
-- [x] New private repository and independent Git history.
+- [x] New repository with independent Git history; public per the operator's update.
 - [x] Extraction allowlist respected; no Abby runtime/product dependencies.
 - [x] Kanel-generated Kysely types match a fresh migrated PostgreSQL schema.
 - [x] Typed, callable core operations and structured errors, including provisioning.
@@ -111,7 +119,7 @@ fitness features or sample CRUD unrelated to validating the foundations.
 - [x] Working email magic-link login and session lifecycle.
 - [x] lit-html and built Tailwind UI verified in a real browser.
 - [x] SAM/lit-html composition, including effect correlation and headless tests.
-- [ ] Local tests, build, and authoritative GitHub CI pass.
+- [x] Local tests, build, and authoritative GitHub CI pass.
 - [x] Documentation includes exact commands, limitations, and configuration needs.
 
 Local evidence: clean `npm ci --no-fund --no-audit`, then
@@ -119,7 +127,11 @@ Local evidence: clean `npm ci --no-fund --no-audit`, then
 Chromium tests passed, plus lint, strict typecheck, migrations, generation and
 build. `git diff --exit-code -- src/platform/database/generated` and
 `git diff --check` passed. Desktop/mobile screenshots were visually inspected.
-GitHub CI evidence will be recorded after the implementation PR runs.
+GitHub evidence: implementation head `02e559b6d6aab700781219b46d1ec3cc8d171fe6`
+passed both [pull-request CI](https://github.com/garthtrickett/elite-body-system/actions/runs/39343070514/attempts/2)
+and [push CI](https://github.com/garthtrickett/elite-body-system/actions/runs/39343069038/attempts/2)
+on retry after the authorized visibility change. The final documentation head is
+also checked before merge; its exact-head runs are linked from PR #1.
 
 ## Known limits
 

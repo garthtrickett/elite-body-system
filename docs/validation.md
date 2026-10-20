@@ -38,10 +38,18 @@ through the CLI was also verified twice with the same resulting account ID.
 
 ## GitHub validation
 
-The implementation PR's exact-head CI is the authoritative remote check. The
-workflow runs the same checks against a fresh checkout and PostgreSQL service,
-then requires generated files to have no diff. Its final run is linked from the
-pull request and the completion report after it passes.
+Implementation head `02e559b6d6aab700781219b46d1ec3cc8d171fe6` passed both
+[pull-request CI](https://github.com/garthtrickett/elite-body-system/actions/runs/39343070514/attempts/2)
+and [push CI](https://github.com/garthtrickett/elite-body-system/actions/runs/39343069038/attempts/2)
+on 20 October 2026. The workflow ran migrations, real Kanel introspection,
+convention checks, strict typechecking, the production build, all 24 Node/SAM
+tests, all 4 Chromium tests, generated-file reproducibility, and diff checks.
+
+The first attempts could not start a runner for the private repository. The
+operator explicitly authorized making this repository public; both unchanged-head
+reruns then passed. No check was skipped or weakened, and no billing settings
+were changed. The final documentation commit is checked again before merge;
+its exact-head runs are linked from PR #1.
 
 ## Scope and remaining uncertainty
 
