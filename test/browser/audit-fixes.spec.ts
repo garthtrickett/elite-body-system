@@ -34,7 +34,7 @@ async function signIn(page: Page) {
     const sessionResult = await app.auth.redeemLink({ token: new URL(await app.readLink(account.value.email)).hash.slice(1) });
     if (!sessionResult.ok) throw new Error("Fixture sign-in unavailable");
     await page.context().addCookies([{ name: "ebs-session", value: sessionResult.value.sessionToken, url: app.origin, httpOnly: true, sameSite: "Lax" }]);
-    return { today, trainingDate };
+    return { today, trainingDate, accountId: account.value.id };
   } finally { await db.destroy(); }
 }
 
@@ -147,4 +147,28 @@ test("desktop has one sign-in brand and course waiting states show readable next
   expect(await card.evaluate(element => getComputedStyle(element).opacity)).toBe("1");
   await expect(card).toContainText("Unlocks week 2");
   await page.screenshot({ path: info.outputPath("course-next-step.png"), fullPage: true });
+});
+
+
+test("short landscape setup gives long questions a full scrolling dialog", async ({ page }, info) => {
+  const { accountId } = await signIn(page), db = createDatabase(testDatabaseUrl());
+  try {
+    const profiles = createProfiles({ store: createPostgresProfileStore(db) }), current = await profiles.get({ accountId });
+    if (!current.ok) throw new Error("Fixture profile unavailable");
+    expect((await profiles.save({ accountId, revision: current.value.revision,
+      profile: { ...current.value.profile, completed: false, setupStep: 25 } })).ok).toBe(true);
+  } finally { await db.destroy(); }
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto(`${app.origin}/?panel=setup`);
+  await expect(page.getByRole("heading", { name: "Health check", exact: true })).toBeVisible();
+  expect(await page.locator(".sc-setup-content").evaluate(element => element.clientHeight)).toBeGreaterThan(250);
+  await page.screenshot({ path: info.outputPath("landscape-setup-start.png") });
+  const next = page.getByRole("button", { name: "Save and continue", exact: true });
+  await next.scrollIntoViewIfNeeded(); await expect(next).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Close dialog", exact: true })).toBeInViewport();
+  const box = (await next.boundingBox())!, dialog = (await page.getByRole("dialog").boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(dialog.y + dialog.height);
+  await page.screenshot({ path: info.outputPath("landscape-setup-end.png") });
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeHidden();
 });

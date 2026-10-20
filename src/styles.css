@@ -377,3 +377,10 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-workout-selector { position: sticky; top: 2rem; }
   .sc-workout-list { position: static; }
 }
+/* Short landscape dialogs scroll as a whole rather than squeezing the editor. */
+@media (min-width: 768px) and (max-height: 600px) {
+  .sc-dialog-setup { height: auto; max-height: calc(100dvh - 1rem); width: calc(100% - 2rem); }
+  .sc-dialog-setup .sc-panel-body { height: auto; padding: 1rem; }
+  .sc-dialog-setup .sc-setup-content { flex: none; min-height: auto; overflow-y: visible; }
+  .sc-dialog-setup .sc-setup-sections { display: none; }
+}

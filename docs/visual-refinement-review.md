@@ -122,3 +122,10 @@ The screenshot runner also captures the mobile scroll region's end and adds
 including conventions, strict typechecking, build, migrations and schema type
 generation with no generated-file diff. Exact-commit CI, screenshot acceptance
 and live deployment results are recorded in the release pull request.
+
+The follow-up screenshot review also found that the added setup progress area
+left too little editor space in short landscape dialogs. Below 600px height at
+wide widths, setup now scrolls as one dialog with its close header retained.
+A dedicated 844×390 long-health-form check covers both ends of that dialog.
+The preview-login tests close their browser page before stopping their owned
+HTTP server, fixing a CI teardown hang without changing login assertions.
