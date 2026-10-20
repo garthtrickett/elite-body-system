@@ -159,6 +159,25 @@ direct socket peer, so clients behind a proxy share its client budget.
 
 External delivery requires your own configuration and a separate real-inbox check.
 
+## Temporary Harry preview access
+
+The operator requested an email-free preview shortcut. With
+`AUTH_HARRY_PREVIEW=true`, entering `harrybaldwin` in the email field signs into
+the single `harrybaldwin@preview.invalid` account. Provision it explicitly with:
+
+```sh
+npm run account:provision -- harrybaldwin@preview.invalid
+```
+
+Anyone who knows the alias can use that preview account while it is enabled.
+It has ordinary client permissions and its own profile/data. Origin/CSRF checks,
+rate limits, HttpOnly cookies, normal session expiry and sign-out still apply.
+No email is sent. Normal email addresses continue through magic-link login.
+
+The shortcut defaults off. Set `AUTH_HARRY_PREVIEW=false` and redeploy to disable
+new shortcut logins and deny existing preview sessions. Set up Harry’s real email
+account when the sending domain is ready.
+
 ## Railway deployment
 
 The Docker image builds browser assets, removes development dependencies, and

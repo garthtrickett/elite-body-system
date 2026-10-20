@@ -253,6 +253,26 @@ with structured JSON output; it has no public HTTP endpoint.
 - Expired auth rows are pruned on new link issuance; old rate rows are pruned
   during budget reservation. No general background job or retention framework.
 
+## Temporary preview authentication
+
+At the operator’s explicit request, `signInHarryPreview({ alias, clientKey })`
+permits the fixed `harrybaldwin` alias only when `AUTH_HARRY_PREVIEW=true`.
+The dedicated `harrybaldwin@preview.invalid` account must be provisioned through
+the trusted account CLI. The caller cannot choose an account ID or another email.
+The operation reserves the existing persistent auth budgets, issues and atomically
+redeems an internal challenge, and returns a normal session to the HTTP adapter.
+No link or token enters a browser model or JSON response.
+
+`POST /api/auth/harry-preview` uses the same exact-origin, JSON and CSRF checks as
+magic-link redemption, then sets the normal HttpOnly/Secure session cookie.
+The SAM acceptor schedules this effect only for the exact alias (case/whitespace
+normalized), checks its completion ID/kind, and navigates after server success.
+HTML email validation is retained for ordinary addresses. Preview access has the
+same account ownership boundaries, expiry and sign-out as other client sessions.
+Disabling the flag also denies existing preview sessions during resolution.
+Anyone with the alias has access to this shared preview account while enabled;
+it is an explicit temporary exception to email ownership verification.
+
 ## Operational limits
 
 Account ownership authorizes the client operations above. There is no coach role,

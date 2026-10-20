@@ -21,3 +21,7 @@ export type AuthStore = Readonly<{
   signOut: (input: Readonly<{ digest: string }>) => Promise<void>;
 }>;
 export type DeliverLink = (input: Readonly<{ email: string; link: string; signal: AbortSignal }>) => Promise<void>;
+
+/** Temporary, explicitly enabled access to one isolated preview account. */
+export const HARRY_PREVIEW_EMAIL = "harrybaldwin@preview.invalid";
+export function isHarryPreviewAlias(value: unknown): boolean { return typeof value === "string" && value.trim().toLowerCase() === "harrybaldwin"; }

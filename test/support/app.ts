@@ -11,7 +11,7 @@ export function testDatabaseUrl(): string {
   return url;
 }
 
-export async function startTestApp() {
+export async function startTestApp(options: Readonly<{ harryPreview?: boolean }> = {}) {
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");
@@ -22,7 +22,7 @@ export async function startTestApp() {
   const origin = `http://127.0.0.1:${port}`;
   const outbox = await mkdtemp(join(tmpdir(), "elite-body-system-outbox-"));
   const app = createApplication({ databaseUrl: testDatabaseUrl(), publicOrigin: origin,
-    rateKey: "a".repeat(64), host: "127.0.0.1", port, delivery: { mode: "outbox", directory: outbox } });
+    rateKey: "a".repeat(64), harryPreview: options.harryPreview === true, host: "127.0.0.1", port, delivery: { mode: "outbox", directory: outbox } });
   app.server.listen(port, "127.0.0.1");
   await once(app.server, "listening");
   return {

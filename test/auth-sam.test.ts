@@ -129,3 +129,13 @@ test("effect exceptions become proposals and disposal rejects late completions w
   runtime.propose({ kind: "inspectionCompleted", id: 1, result: accountResult });
   assert.equal(runtime.getModel(), snapshot);
 });
+
+test("the preview alias schedules server authentication and accepts only its matching completion", () => {
+  const edited = accept(initial("request"), { kind: "emailChanged", email: "harrybaldwin" });
+  const pending = accept(edited, { kind: "linkRequested" }); assert.equal(pending.pending?.kind, "harryPreview");
+  assert.equal(accept(pending, { kind: "previewCompleted", id: 0, result: accountResult }), pending);
+  assert.equal(accept(pending, { kind: "redemptionCompleted", id: 1, result: accountResult }), pending);
+  const completed = accept(pending, { kind: "previewCompleted", id: 1, result: accountResult }); assert.equal(completed.pending?.kind, "navigate");
+  const rejected = accept(pending, { kind: "previewCompleted", id: 1, result: { ok: false, error: { code: "unauthenticated" } } }); assert.equal(rejected.pending, undefined); assert.match(rejected.problem, /unavailable/);
+  const regular = accept(accept(initial("request"), { kind: "emailChanged", email: "harrybaldwin@example.test" }), { kind: "linkRequested" }); assert.equal(regular.pending?.kind, "request");
+});
