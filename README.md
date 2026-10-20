@@ -103,8 +103,60 @@ origin controls emailed URLs and same-origin checks; it must match the browser's
 origin exactly. Forwarded client headers are not trusted: rate limits use the
 direct socket peer, so clients behind a proxy share its client budget.
 
-No remote email has been sent or deployment provisioned as part of this scaffold.
 External delivery requires your own configuration and a separate real-inbox check.
+
+## Railway deployment
+
+The Docker image builds browser assets, removes development dependencies, and
+runs Node 22 as an unprivileged user. Its explicit build context excludes local
+environment files, outbox messages, test output, and Git history.
+
+Create a Railway project with a PostgreSQL service named `Postgres` and an app
+service built from this repository. Set these app variables in Railway:
+
+```dotenv
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+PUBLIC_ORIGIN=https://your-app.up.railway.app
+AUTH_RATE_KEY=<64 random hexadecimal characters>
+NODE_ENV=production
+HOST=0.0.0.0
+PORT=3000
+EMAIL_MODE=resend
+EMAIL_FROM=onboarding@resend.dev
+RESEND_API_KEY=<your own sending key>
+```
+
+The public domain must target the configured `PORT` (3000 in this example). Set
+`PUBLIC_ORIGIN` to the exact HTTPS domain visitors use. Keep secrets in Railway
+variables, never in the repository or Docker build arguments.
+
+Configure the app service in Railway with Dockerfile builds, pre-deploy command
+`npm run db:migrate`, healthcheck path `/health` with a 60-second timeout, and
+restart on failure with at most 3 retries. Use one app replica in the same region
+as PostgreSQL. These service settings are stored in Railway; the Dockerfile is
+versioned here. Railway's older `railway.json` format is being retired, so this
+project does not depend on it.
+
+The pre-deploy migration must succeed before a new deployment starts. The HTTP
+check confirms the app can query PostgreSQL; it does not verify email
+delivery. The app and database communicate over Railway's private network. A
+database needs its own persistent volume.
+
+For initial testing, `onboarding@resend.dev` can send only to the email address
+associated with your Resend account. Provision that account explicitly after
+migration, using `node scripts/provision-account.ts you@example.com` in the app
+service. Use your own verified sending domain before admitting other recipients.
+Production configuration deliberately rejects the local outbox mode.
+
+Verify the same production image locally against an isolated test database:
+
+```sh
+docker build -t elite-body-system:local .
+bash scripts/with-postgres.sh bash -c 'docker run --rm --network host -e DATABASE_URL elite-body-system:local node scripts/migrate.ts && docker run --rm --network host -e DATABASE_URL -i elite-body-system:local node --input-type=module < scripts/smoke-production.mjs'
+```
+
+The image smoke check uses fixture email configuration and sends no email. CI
+runs it after the existing PostgreSQL and browser tests.
 
 ## Operations and architecture
 

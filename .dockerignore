@@ -1,0 +1,11 @@
+*
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!src/
+!src/**
+!scripts/
+!scripts/build.ts
+!scripts/migrate.ts
+!scripts/provision-account.ts

@@ -34,6 +34,12 @@ jobs:
       - run: npm ci --no-fund --no-audit
       - run: npx playwright install --with-deps chromium
       - run: npm run verify
+      - name: Build production image
+        run: docker build -t elite-body-system:ci .
+      - name: Verify production image against PostgreSQL
+        run: |
+          docker run --rm --network host -e DATABASE_URL elite-body-system:ci node scripts/migrate.ts
+          docker run --rm --network host -e DATABASE_URL -i elite-body-system:ci node --input-type=module < scripts/smoke-production.mjs
       - name: Generated database types match the schema
         run: git diff --exit-code -- src/platform/database/generated
       - run: git diff --check

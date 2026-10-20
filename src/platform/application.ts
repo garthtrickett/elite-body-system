@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { sql } from "kysely";
 import { createAuth, createAuthHttp, createLinkDelivery, createPostgresAuthStore } from "../features/auth/index.ts";
 import { createDatabase } from "./database/connection.ts";
 import type { Config } from "./config.ts";
@@ -16,6 +17,11 @@ export function createApplication(config: Config) {
   const server = createServer((request, response) => {
     async function route(): Promise<void> {
       const path = new URL(request.url ?? "/", config.publicOrigin).pathname;
+      if (request.method === "GET" && path === "/health") {
+        await sql`select 1`.execute(db);
+        response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        response.end(JSON.stringify({ ok: true })); return;
+      }
       const asset = assets.get(path);
       if (request.method === "GET" && asset) {
         const contents = await readFile(asset.file);

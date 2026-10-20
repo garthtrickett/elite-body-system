@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { createAuthHttp } from "../src/features/auth/index.ts";
+import { createApplication } from "../src/platform/application.ts";
 import { startTestApp } from "./support/app.ts";
 
 let app: Awaited<ReturnType<typeof startTestApp>>;
@@ -21,6 +22,32 @@ async function post(path: string, input: unknown, session: Awaited<ReturnType<ty
     headers: { Origin: app.origin, "Content-Type": "application/json", Cookie: session.cookie,
       "X-CSRF-Token": session.csrf ?? "", ...extra }, body: JSON.stringify(input) });
 }
+
+test("health checks database reachability without cookies or cached responses", async () => {
+  const response = await fetch(`${app.origin}/health`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.deepEqual(await response.json(), { ok: true });
+});
+
+test("health fails closed when PostgreSQL is unavailable without disclosing configuration", async () => {
+  const unavailable = createApplication({
+    databaseUrl: "postgresql://health:must-not-leak@127.0.0.1:1/health",
+    publicOrigin: "http://127.0.0.1:3000", host: "127.0.0.1", port: 3000,
+    rateKey: "a".repeat(64), delivery: { mode: "outbox", directory: app.outbox },
+  });
+  unavailable.server.listen(0, "127.0.0.1");
+  await once(unavailable.server, "listening");
+  try {
+    const address = unavailable.server.address();
+    assert.ok(address && typeof address !== "string");
+    const response = await fetch(`http://127.0.0.1:${address.port}/health`);
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await response.json(), { ok: false, error: { code: "unavailable" } });
+  } finally { await unavailable.close(); }
+});
 
 test("unauthenticated home redirects; sign-in has restrictive headers and Tailwind assets", async () => {
   const home = await page("/");
