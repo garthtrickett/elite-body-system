@@ -72,3 +72,60 @@ ignored and excluded from the production image.
 Final exercise/course videos and approved screening/consent wording remain pending.
 The visual review preserves those explicit draft/unconfigured states. It changes
 no account-admission rules, schema, targets, or lesson-unlocking rules.
+
+## Follow-up: 24 live-app audit findings
+
+This increment addresses the subsequent live audit of release `5561db7`.
+Numbers below match the operator's accepted 24-item report. The shared mobile
+workspace now gives scrolling content, optional meal actions, and navigation
+separate viewport rows. Navigation never floats over client controls. Desktop
+retains the sidebar and normal document scrolling.
+
+| # | Before | After | Why |
+| --- | --- | --- | --- |
+| 1 | Bottom navigation intercepted visible controls | Separate navigation row below the clipped scrolling region | Keep visible actions tappable |
+| 2 | Zero weight change had a down arrow | Neutral “No change” | Report direction accurately |
+| 3 | Goal completion replaced units and targets | Persistent kcal/h labels and target copy, separate completion message | Preserve metric meaning |
+| 4 | Desktop sign-in repeated the logo | Mobile-only logo respects its responsive visibility | Restore intended composition |
+| 5 | Narrow tile errors stacked outlines and borders | One field underline, tile border and unbordered message | Make validation readable |
+| 6 | Expired rest retained a large timer card | Compact completed-rest status | Keep the next set near the top |
+| 7 | Secondary mobile routes lost navigation | Shared navigation and More links on all workspace routes | Keep other daily tasks reachable |
+| 8 | One weigh-in showed a dot and duplicated endpoints | Actual first weight and guidance to add another sample | Explain why a trend is unavailable |
+| 9 | Repeated day initials lacked dates | Date labels with today distinguished | Identify each tracking day |
+| 10 | Tracking marks and percentage lacked explanation | None/partial/all legend and entries out of 63 | Explain the visual encoding |
+| 11 | Weight and kg were separated by excess field width | Weight field follows entry length | Group value and unit |
+| 12 | Empty inputs looked like passive missing data | “Add” placeholder and entry hint | Make editing discoverable |
+| 13 | Openable tiles looked static | Explicit Open/Read cues | Distinguish actions from information |
+| 14 | Completion used a tiny circle glyph | Visible 24px checkbox within the existing 44px button | Make completion controls recognisable |
+| 15 | Exercise strip had no position or navigation cue | Exercise count and previous/next controls | Expose the whole workout |
+| 16 | Laptop progress consumed two rows | Compact three-card row at intermediate desktop widths | Bring daily entries into view |
+| 17 | Course waiting screens used generic filler | Named next lesson, unlock week/current week and practical action | Give the waiting state purpose |
+| 18 | Whole disabled lesson cards were dimmed | Readable unlock status with a muted title | Keep availability information legible |
+| 19 | Profile targets followed the plan summary | Targets first in reading and keyboard order | Prioritise common edits |
+| 20 | Setup only showed a small step count | Named sections, current section and progress bar | Make the long journey understandable |
+| 21 | Dialog close used the same chevron as previous-step navigation | Explicit close icon/name; setup Back remains distinct | Separate exit from previous step |
+| 22 | Meal headings and actions used raw ISO dates | Human-readable calendar dates | Keep date presentation readable |
+| 23 | Photo upload exposed the native chooser row | Branded label, keyboard focus and selected-photo count | Finish the upload presentation |
+| 24 | Mobile meal totals and log action followed the long form | Persistent compact totals/log row and optional notes section | Keep the result and action available while editing |
+
+The new browser regression file is `test/browser/audit-fixes.spec.ts`. It uses
+fictional accounts and the disposable database, including a real expired rest
+timer, a first-day weigh-in and saved nutrition. It checks action hit testing at
+320×568, 390×844 and 768×1024; navigation across secondary routes; first-weight
+and tracking states; exercise navigation; profile/setup hierarchy; compact laptop
+entry placement; sign-in branding; locked course readability; and mobile meal
+logging geometry. Existing chart fixtures now contain multiple actual dated
+weights, so graph assertions remain meaningful.
+
+The screenshot runner also captures the mobile scroll region's end and adds
+768×1024 tablet and 844×390 landscape views. Local isolated verification passed 67 server/model and 35 Chromium tests,
+including conventions, strict typechecking, build, migrations and schema type
+generation with no generated-file diff. Exact-commit CI, screenshot acceptance
+and live deployment results are recorded in the release pull request.
+
+The follow-up screenshot review also found that the added setup progress area
+left too little editor space in short landscape dialogs. Below 600px height at
+wide widths, setup now scrolls as one dialog with its close header retained.
+A dedicated 844×390 long-health-form check covers both ends of that dialog.
+The preview-login tests close their browser page before stopping their owned
+HTTP server, fixing a CI teardown hang without changing login assertions.

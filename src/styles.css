@@ -83,12 +83,10 @@ strong, b { font-weight: 500; }
   .sc-dot { @apply w-1.5 bg-sc-border; }
   .sc-dot-active { @apply w-5 bg-sc-ink; }
   .sc-card-caption { @apply text-center text-xs text-sc-muted; }
-  .sc-nav { @apply sticky bottom-0 z-10 mt-5 flex items-center justify-around border-t border-sc-border bg-sc-bg pt-2; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
   .sc-nav-button { @apply relative flex min-h-14 min-w-14 flex-col items-center justify-center gap-1 px-2 text-sc-muted; }
   .sc-nav-button svg { @apply size-5; }
   .sc-nav-active { @apply text-sc-ink; }
   .sc-nav-active::after { @apply absolute bottom-0 h-0.5 w-5 bg-accent; content: ""; }
-  .sc-nav-caption { @apply text-xs; }
   .sc-consistency { @apply w-full table-fixed border-separate text-xs; border-spacing: 4px 6px; }
   .sc-consistency th { @apply font-normal text-sc-muted; }
   .sc-consistency th:first-child { @apply w-[78px] text-left text-xs; }
@@ -145,10 +143,6 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sc-tile-grid > :last-child { grid-column: 1 / -1; }
 }
-/* Leave the whole short viewport available to the task, including at zoom. */
-@media (max-height: 600px) {
-  .sc-nav { position: static; }
-}
 @media (hover: hover) and (pointer: fine) {
   .sc-app :is(.sc-primary, .sc-secondary, .sc-choice, .sc-training-button):not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(0.9); }
 }
@@ -196,7 +190,6 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-workspace-body { width: 100%; max-width: 1320px; min-width: 0; padding: 2.5rem; }
   .sc-page { padding: 0; gap: 1.5rem; }
   .sc-page > header { padding-bottom: .75rem; border-bottom: 1px solid color-mix(in srgb, var(--color-sc-ink) 15%, transparent); }
-  .sc-nav { display: none; }
   .sc-scorecard-header { padding: 0; }
   .sc-scorecard-header h1 { font-size: 64px; }
   .sc-content { gap: 2rem; }
@@ -264,7 +257,8 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
 .sc-panel-header h2 { font-size: 32px; }
 .sc-icon-button { border-radius: .5rem; }
 .sc-text-action { display: inline-flex; min-height: 44px; align-items: center; text-align: left; text-underline-offset: 3px; }
-.sc-page > header > a, .sc-auth .sc-brand { display: inline-flex; align-items: center; min-height: 44px; }
+.sc-page > header > a { display: inline-flex; align-items: center; min-height: 44px; }
+.sc-auth .sc-brand { align-items: center; min-height: 44px; }
 .sc-meal-summary { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
 .sc-weight-input.sc-number-compact { width: 7ch; font-size: 32px; }
 .sc-meal-history .sc-meal-summary + section { padding-top: 1rem; border-top: 1px solid var(--color-sc-border); }
@@ -292,4 +286,101 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .sc-focus-tile > .sc-check-button { grid-column: 2; grid-row: 1 / 4; align-self: center; }
   .sc-focus-tile > .sc-target { grid-column: 1; grid-row: 3; }
   .sc-focus-priority { grid-column: 1; grid-row: 2; font-size: .875rem; line-height: 1.625; }
+}
+
+/* Audit fixes: navigation owns a viewport row, never an overlay over client actions. */
+@media (max-width: 1023px) {
+  .sc-workspace { display: grid; grid-template-rows: minmax(0, 1fr) auto; height: 100dvh; min-height: 0; }
+  .sc-workspace:has(.sc-mobile-footer) { grid-template-rows: minmax(0, 1fr) auto auto; }
+  .sc-workspace-body { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding-bottom: 1.5rem; scroll-padding-block: 1rem 2rem; }
+  .sc-mobile-nav { position: relative; z-index: 5; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); width: 100%; padding: .25rem max(.5rem, env(safe-area-inset-right)) max(.25rem, env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left)); border-top: 1px solid var(--color-sc-border); background: var(--color-sc-bg); }
+  .sc-mobile-nav .sc-nav-button { font-size: .75rem; min-height: 48px; min-width: 0; flex-direction: row; padding-inline: .25rem; }
+  .sc-mobile-more > summary { list-style: none; }
+  .sc-mobile-more > summary::-webkit-details-marker { display: none; }
+  .sc-mobile-menu { position: absolute; bottom: calc(100% + .5rem); right: .5rem; width: min(320px, calc(100vw - 1rem)); max-height: calc(100dvh - 90px); overflow-y: auto; padding: 1rem; border: 1px solid var(--color-sc-border); border-radius: .75rem; background: var(--color-sc-card); box-shadow: 0 8px 30px #0008; }
+  .sc-mobile-menu > .sc-eyebrow { margin-top: .75rem; }
+  .sc-mobile-menu .sc-sidebar-link { display: flex; align-items: center; min-height: 44px; font-size: .875rem; }
+  .sc-mobile-footer { background: var(--color-sc-bg); border-top: 1px solid var(--color-sc-border); padding: .75rem 1rem; }
+  .sc-meal-quick-log { display: flex; align-items: center; justify-content: space-between; gap: .75rem; max-width: 720px; margin-inline: auto; }
+  .sc-meal-quick-log .sc-primary { font-size: .75rem; padding: .75rem 1rem; max-width: 52%; }
+  .sc-review-log-full { display: none; }
+}
+@media (min-width: 1024px) {
+  .sc-mobile-nav, .sc-mobile-footer { display: none; }
+}
+.sc-goal-met { font-size: .75rem; color: var(--color-sc-ink); }
+.sc-entry-hint { font-size: .6875rem; color: var(--color-sc-muted); }
+.sc-number::placeholder { font-size: 18px; }
+.sc-tile:has(.sc-number:focus-visible) { border-color: var(--color-sc-ink); }
+.sc-tile .sc-error { border: 0; padding: 0; font-size: .75rem; line-height: 1.5; }
+.sc-number[aria-invalid="true"] { border-bottom: 2px solid var(--color-sc-problem); }
+.sc-number:focus-visible { outline: 0 !important; border-bottom: 2px solid var(--color-sc-ink); }
+.sc-tile:has([aria-invalid="true"]) { border-color: var(--color-sc-problem); }
+.sc-tile .sc-unit { font-size: .75rem; }
+.sc-weight-row { justify-content: flex-start; column-gap: 1.5rem; }
+.sc-weight-input { width: 6ch; }
+.sc-weight-input.sc-number-compact { width: 6ch; }
+.sc-weight-input:focus-visible { outline: 2px solid var(--color-sc-ink) !important; outline-offset: 3px; }
+.sc-consistency th[aria-current="date"] { color: var(--color-sc-ink); background: var(--color-sc-selected); border-radius: 3px; }
+.sc-consistency abbr { text-decoration: none; }
+.sc-consistency-date { display: block; font-size: .625rem; }
+.sc-consistency-legend { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: .5rem; font-size: .6875rem; color: var(--color-sc-copy); }
+.sc-consistency-legend > span { display: inline-flex; gap: .25rem; align-items: center; }
+.sc-consistency-legend i { width: 12px; height: 10px; }
+.sc-tile-action { font-size: .75rem; text-decoration: underline; text-underline-offset: 3px; }
+.sc-map-tile a.sc-check-button { width: auto; min-height: 44px; align-self: start; gap: .5rem; text-decoration: underline; text-underline-offset: 3px; }
+.sc-checkbox { width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--color-sc-border); border-radius: 5px; font-size: 18px; }
+[aria-pressed="true"] > .sc-checkbox { color: var(--color-sc-bg); background: var(--color-sc-ink); border-color: var(--color-sc-ink); }
+.sc-checkbox svg { width: 18px; height: 18px; }
+.sc-workout-selector { min-width: 0; }
+.sc-exercise-navigation { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.sc-exercise-navigation .sc-icon-button { border: 1px solid var(--color-sc-border); font-size: 1.5rem; }
+.sc-rest-complete { padding: .625rem .75rem; border-radius: .5rem; background: var(--color-sc-selected); color: var(--color-sc-copy); font-size: .75rem; }
+.sc-course-card:disabled { opacity: 1 !important; }
+.sc-course-card:disabled > :first-child { color: var(--color-sc-muted); }
+.sc-course-card:disabled > .sc-copy { color: var(--color-sc-copy); }
+.sc-setup-progress { display: flex; flex-direction: column; gap: .5rem; }
+.sc-setup-progress-bar { appearance: none; width: 100%; height: 5px; border: 0; border-radius: 4px; overflow: hidden; background: var(--color-sc-selected); accent-color: var(--color-sc-ink); }
+.sc-setup-progress-bar::-webkit-progress-bar { background: var(--color-sc-selected); }
+.sc-setup-progress-bar::-webkit-progress-value { background: var(--color-sc-ink); }
+.sc-setup-progress-bar::-moz-progress-bar { background: var(--color-sc-ink); }
+.sc-setup-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem .75rem; font-size: .6875rem; color: var(--color-sc-muted); }
+.sc-setup-sections [aria-current="step"] { color: var(--color-sc-ink); font-weight: 500; }
+.sc-panel-header > .sc-icon-button { font-size: 1.75rem; }
+.sc-upload { position: relative; cursor: pointer; }
+.sc-upload-action { display: inline-flex; align-items: center; gap: .5rem; min-height: 44px; font-weight: 500; }
+.sc-upload-input { position: absolute; width: 1px !important; height: 1px; opacity: 0; overflow: hidden; }
+.sc-upload:focus-within { outline: 2px solid var(--color-sc-ink); outline-offset: 4px; }
+.sc-meal-notes > summary { padding-block: .625rem; }
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .sc-content { gap: 1.25rem; padding-top: 1.25rem; }
+  .sc-progress-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+  .sc-progress-grid > .sc-progress-card { padding: .75rem; min-height: 180px; }
+  .sc-progress-grid > :last-child { grid-column: auto; }
+  .sc-consistency { border-spacing: 2px 5px; }
+  .sc-consistency th:first-child { width: 56px; font-size: .625rem; }
+  .sc-consistency col:first-child { width: 56px; }
+  .sc-consistency-legend { gap: .375rem; font-size: .625rem; }
+  .sc-scorecard-header h1 { font-size: 48px; }
+}
+
+/* Explicit widths keep the value and unit grouped across browser engines. */
+.sc-weight-input.sc-weight-width-2 { width: 2ch; }
+.sc-weight-input.sc-weight-width-3 { width: 3ch; }
+.sc-weight-input.sc-weight-width-4 { width: 4ch; }
+.sc-weight-input.sc-weight-width-5 { width: 5ch; }
+.sc-weight-input.sc-weight-width-6 { width: 6ch; }
+.sc-weight-input.sc-weight-width-7 { width: 7ch; }
+.sc-weight-input.sc-weight-width-8 { width: 8ch; }
+
+@media (min-width: 1024px) {
+  .sc-workout-selector { position: sticky; top: 2rem; }
+  .sc-workout-list { position: static; }
+}
+/* Short landscape dialogs scroll as a whole rather than squeezing the editor. */
+@media (min-width: 768px) and (max-height: 600px) {
+  .sc-dialog-setup { height: auto; max-height: calc(100dvh - 1rem); width: calc(100% - 2rem); }
+  .sc-dialog-setup .sc-panel-body { height: auto; padding: 1rem; }
+  .sc-dialog-setup .sc-setup-content { flex: none; min-height: auto; overflow-y: visible; }
+  .sc-dialog-setup .sc-setup-sections { display: none; }
 }

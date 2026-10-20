@@ -66,12 +66,12 @@ try {
   const previous = new Date(monday); previous.setUTCDate(previous.getUTCDate() - 7);
   const previousDate = previous.toISOString().slice(0, 10), history = value(await training.get({ accountId: mature.id, date: previousDate }));
   value(await training.save({ accountId: mature.id, revision: 0, workout: { ...history.workout, sets: { wpullup: [{ kg: 12, reps: 5, done: true }] }, notes: { wpullup: "Controlled reps with a full range." } }, finish: true }));
-  for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: "mobile", width: 390, height: 844 }, { name: "compact-desktop", width: 1024, height: 768, edge: true }, { name: "small-mobile", width: 320, height: 700, edge: true }]) {
+  for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: "mobile", width: 390, height: 844 }, { name: "compact-desktop", width: 1024, height: 768, edge: true }, { name: "small-mobile", width: 320, height: 568, edge: true }, { name: "tablet", width: 768, height: 1024, edge: true }, { name: "landscape", width: 844, height: 390, edge: true }]) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: "reduce", hasTouch: viewport.width < 1024 });
     const page = await context.newPage(); page.on("pageerror", error => errors.push(`${viewport.name}: ${error.message}`));
     const directory = resolve(output, viewport.name); await mkdir(directory, { recursive: true });
     async function capture(name: string) {
-      await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); await new Promise(requestAnimationFrame); });
+      await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); document.querySelector(".sc-workspace-body")?.scrollTo(0, 0); await new Promise(requestAnimationFrame); });
       const metrics = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > innerWidth,
         height: document.documentElement.scrollHeight,
         smallTargets: [...document.querySelectorAll<HTMLElement>("button,a,input,select,summary")].filter(element => {
@@ -85,6 +85,12 @@ try {
         await scrollArea.evaluate(element => { element.scrollTop = element.scrollHeight; });
         await page.screenshot({ path: resolve(directory, `${name}-end.png`), animations: "disabled" });
         await scrollArea.evaluate(element => { element.scrollTop = 0; });
+      }
+      const content = page.locator(".sc-workspace-body");
+      if (!await dialog.isVisible() && await content.count() && await content.evaluate(element => element.scrollHeight > element.clientHeight + 20)) {
+        await content.evaluate(element => { element.scrollTop = element.scrollHeight; });
+        await page.screenshot({ path: resolve(directory, `${name}-end.png`), animations: "disabled" });
+        await content.evaluate(element => { element.scrollTop = 0; });
       }
       rows.push({ viewport: viewport.name, name, file: `${viewport.name}/${file}`, ...metrics });
       console.log(`${viewport.name}/${name}${metrics.overflow ? " OVERFLOW" : ""}`);

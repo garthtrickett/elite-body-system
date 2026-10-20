@@ -22,7 +22,11 @@ test("Harry enters the alias in the email field and signs into his own persisten
     await page.getByRole("button", { name: "Profile", exact: true }).click();
     await expect(page.getByText(HARRY_PREVIEW_EMAIL, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click(); await expect(page).toHaveURL(`${app.origin}/sign-in`);
-  } finally { await app.close(); }
+  } finally {
+    // Close browser connections before stopping this test-owned HTTP server.
+    // Otherwise a pending browser request can keep server.close() awaiting teardown.
+    await page.close(); await app.close();
+  }
 });
 
 test("disabled preview access cannot navigate into the app", async ({ page }) => {
@@ -34,5 +38,9 @@ test("disabled preview access cannot navigate into the app", async ({ page }) =>
     await expect(page.getByRole("alert")).toContainText("Preview sign-in is unavailable");
     await expect(page).toHaveURL(`${app.origin}/sign-in`);
     expect((await page.context().cookies()).some(cookie => cookie.name === "ebs-session")).toBe(false);
-  } finally { await app.close(); }
+  } finally {
+    // Close browser connections before stopping this test-owned HTTP server.
+    // Otherwise a pending browser request can keep server.close() awaiting teardown.
+    await page.close(); await app.close();
+  }
 });

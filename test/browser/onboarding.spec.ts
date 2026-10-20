@@ -87,8 +87,8 @@ test("setup resumes from PostgreSQL, completes Harry’s questions and persists 
   await page.getByRole("button", { name: "Save targets", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save targets", exact: true })).toBeEnabled();
   await page.keyboard.press("Escape");
-  await expect(page.getByLabel("Calories eaten today")).toHaveAttribute("placeholder", "—");
-  await expect(page.getByTestId("tile-energy")).toContainText("of 2400 cal");
+  await expect(page.getByLabel("Calories eaten today")).toHaveAttribute("placeholder", "Add");
+  await expect(page.getByTestId("tile-energy")).toContainText("of 2400 kcal");
   await page.getByLabel("Calories eaten today").fill("2400"); await page.getByLabel("Calories eaten today").press("Enter");
   await expect(page.getByTestId("tile-energy")).toHaveClass(/sc-tile-done/);
   await expect(page.getByTestId("save-status")).toHaveText("Saved to your account");

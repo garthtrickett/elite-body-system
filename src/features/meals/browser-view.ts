@@ -7,13 +7,14 @@ import type { Macro, Micro } from "./data.ts";
 type Actions = Readonly<{ propose: (proposal: MealProposal) => void; photos: (files: FileList | null) => void; log: () => void }>;
 const names: Readonly<Record<Macro | Micro, string>> = { energy: "Calories", protein: "Protein", carbs: "Carbs", fat: "Fat", fibre: "Fibre", iron: "Iron", potassium: "Potassium", vitaminC: "Vitamin C" };
 const unit = (key: Macro | Micro) => key === "energy" ? "kcal" : key === "iron" || key === "potassium" || key === "vitaminC" ? "mg" : "g";
+const displayDate = (date: string | undefined) => date ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)) : "selected day";
 function reviewView(state: MealState, actions: Actions) {
   const meal = state.draft; if (!meal) return nothing;
   return html`<p class="sc-eyebrow">Review before logging</p><h1 class="sc-display text-[42px] leading-[1.1]">Make it yours.</h1>
-    <p class="sc-copy">Check portions and ingredients, including oils and sauces. Photo portions and AI nutrition are estimates. No food database lookup has been performed.</p>
+    <p class="sc-copy">Check portions and ingredients, including oils and sauces. ${meal.items.some(item => item.source === "ai_estimate") ? "Photo portions and AI nutrition are estimates. No food database lookup has been performed." : "Enter nutrition from your label or known meal totals."}</p>
     <fieldset class="contents" ?disabled=${state.locked}>
       <label class="sc-form-field"><span class="sc-label">Meal name</span><input class="sc-textarea" maxlength="100" .value=${live(meal.name)} @input=${(e: Event) => actions.propose({ kind: "draftNamed", value: (e.target as HTMLInputElement).value })}></label>
-      <label class="sc-form-field"><span class="sc-label">Notes and assumptions</span><textarea class="sc-textarea" rows="3" maxlength="2000" .value=${live(meal.note)} @input=${(e: Event) => actions.propose({ kind: "draftNoted", value: (e.target as HTMLTextAreaElement).value })}></textarea></label>
+      <details class="sc-meal-notes"><summary class="sc-copy">Notes and assumptions <span class="text-xs">${meal.note ? "(added)" : "(optional)"}</span></summary><label class="sc-form-field"><span class="sr-only">Notes and assumptions</span><textarea class="sc-textarea" rows="2" maxlength="2000" .value=${live(meal.note)} @input=${(e: Event) => actions.propose({ kind: "draftNoted", value: (e.target as HTMLTextAreaElement).value })}></textarea></label></details>
       ${meal.items.map((item, index) => {
         const nutrient = (field: Macro | Micro) => html`<label class="sc-form-field"><span class="text-xs text-sc-muted">${names[field]} (${unit(field)})</span><input class="sc-textarea min-w-0" inputmode="decimal" aria-label=${`${names[field]} per 100g for ingredient ${index + 1}`}
           .value=${live(state.fields[`${index}:${field}`] ?? (item.per100[field] === null ? "" : String(item.per100[field])))}
@@ -33,7 +34,7 @@ function reviewSummary(state: MealState, actions: Actions) {
     ${state.totals ? html`<section class="sc-panel-card border border-sc-border" aria-label="Meal totals"><h2 class="sc-label">Meal totals</h2><div class="mt-3 grid grid-cols-2 gap-3">${MACROS.map(key => html`<p class="sc-copy text-xs">${names[key]}<strong class="mt-1 block text-lg text-sc-ink">${state.totals?.[key]} ${unit(key)}</strong></p>`)}</div>
         <p class="sc-copy mt-3 text-xs">${MICROS.map(key => `${names[key]} ${state.totals?.[key] === null ? "unknown" : `${state.totals?.[key]} ${unit(key)}`}`).join(" · ")}</p></section>` : nothing}
       <label class="sc-copy flex items-center gap-3"><input type="checkbox" .checked=${state.favorite} @change=${(e: Event) => actions.propose({ kind: "favoriteChanged", value: (e.target as HTMLInputElement).checked })}>Save to My Meals for next time</label>
-      <button class="sc-primary" @click=${actions.log}>Log meal for ${state.snapshot?.date}</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "draftCancelled" })}>Cancel review</button>
+      <button class="sc-primary sc-review-log-full" @click=${actions.log}>Log meal for ${displayDate(state.snapshot?.date)}</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "draftCancelled" })}>Cancel review</button>
   </fieldset>`;
 }
 function captureView(state: MealState, actions: Actions) {
@@ -41,7 +42,7 @@ function captureView(state: MealState, actions: Actions) {
     <fieldset class="contents" ?disabled=${state.locked}>
       <label class="sc-form-field"><span class="sc-label">What did you eat?</span><textarea class="sc-textarea" rows="4" maxlength="4000" placeholder="150 g chicken, a cup of cooked rice, broccoli and a teaspoon of olive oil…" .value=${live(state.description)}
         @input=${(e: Event) => actions.propose({ kind: "descriptionChanged", value: (e.target as HTMLTextAreaElement).value })}></textarea></label>
-      <label class="sc-upload">Add meal or label photos<input type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Meal photos" @change=${(e: Event) => { const input = e.target as HTMLInputElement; actions.photos(input.files); input.value = ""; }}></label>
+      <label class="sc-upload"><span class="sc-upload-action">+ Add meal or label photos</span><span class="sc-copy text-xs" aria-live="polite">${state.photos.length ? `${state.photos.length} ${state.photos.length === 1 ? "photo" : "photos"} selected` : "JPEG, PNG or WebP · up to 4 photos"}</span><input class="sc-upload-input" type="file" accept="image/jpeg,image/png,image/webp" multiple aria-label="Meal photos" @change=${(e: Event) => { const input = e.target as HTMLInputElement; actions.photos(input.files); input.value = ""; }}></label>
       ${state.photos.length ? html`<div class="grid grid-cols-2 gap-3">${state.photos.map((photo, index) => html`<div><img class="aspect-square w-full rounded-xl object-cover" src=${`data:${photo.mediaType};base64,${photo.data}`} alt=${`Meal photo ${index + 1}`}><button class="sc-text-action sc-copy py-2 text-xs underline" @click=${() => actions.propose({ kind: "photoRemoved", index })}>Remove photo ${index + 1}</button></div>`)}</div>` : nothing}
       <p class="sc-copy text-xs">Only this description and selected photos are sent to OpenAI when you analyse. Photos are resized, and are not saved in your account.</p>
       <button class="sc-primary" ?disabled=${!state.snapshot?.analysisAvailable} @click=${() => actions.propose({ kind: "analysisRequested" })}>Analyse meal</button>
@@ -58,13 +59,15 @@ function favoritesView(state: MealState, actions: Actions) {
 </fieldset>`;
 }
 export function mealsView(state: MealState, actions: Actions) {
-  return workspace({ page: "meals", navigationDisabled: state.locked, content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: Event) => { if (state.locked) e.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+  return workspace({ page: "meals", navigationDisabled: state.locked,
+    mobileFooter: state.draft ? html`<div class="sc-meal-quick-log"><div><p class="sc-label">Meal totals</p><p class="sc-copy text-xs" aria-live="polite">${state.totals?.energy ?? "—"} kcal · ${state.totals?.protein ?? "—"} g protein</p></div><button class="sc-primary" ?disabled=${state.locked} @click=${actions.log}>Log meal for ${displayDate(state.snapshot?.date)}</button></div>` : undefined,
+    content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: Event) => { if (state.locked) e.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p>${state.retry ? html`<button class="sc-secondary" @click=${() => actions.propose({ kind: "retry" })}>Retry same action</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "reload" })}>Reload saved meals</button>` : nothing}` : nothing}
     ${state.busy ? html`<p class="sc-copy" role="status">${state.pending?.kind === "analyze" ? "Analysing your meal…" : state.pending?.kind === "preparePhotos" ? "Preparing your photos…" : state.pending?.kind === "load" ? "Loading your meals…" : "Saving your meal…"}</p>` : nothing}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
     ${state.snapshot ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Meal date</span><input class="sc-textarea" type="date" aria-label="Meal date" ?disabled=${state.locked} .value=${live(state.snapshot.date)} @change=${(e: Event) => actions.propose({ kind: "dateChanged", value: (e.target as HTMLInputElement).value })}></label>
       <div class="sc-meal-layout"><div class="sc-meal-editor">${state.draft ? reviewView(state, actions) : captureView(state, actions)}</div>
-      <div class="sc-meal-history">${state.draft ? reviewSummary(state, actions) : favoritesView(state, actions)}<section class="mt-4 space-y-3"><h2 class="sc-display text-[30px]">Logged for ${state.snapshot.date}</h2><p class="sc-copy text-xs">Logging adds calories and protein to your scorecard. Removing a meal subtracts its contribution. Manual scorecard edits are kept, with a minimum total of zero.</p>
+      <div class="sc-meal-history">${state.draft ? reviewSummary(state, actions) : favoritesView(state, actions)}<section class="mt-4 space-y-3"><h2 class="sc-display text-[30px]">Logged for ${displayDate(state.snapshot.date)}</h2><p class="sc-copy text-xs">Logging adds calories and protein to your scorecard. Removing a meal subtracts its contribution. Manual scorecard edits are kept, with a minimum total of zero.</p>
         ${state.snapshot.entries.map(entry => html`<article class="sc-panel-card"><h3 class="text-sm font-medium">${entry.meal.name}</h3><p class="sc-copy mt-1 text-xs">${mealTotals(entry.meal).energy} kcal · ${mealTotals(entry.meal).protein} g protein</p><button class="sc-text-action sc-copy mt-3 text-xs underline" ?disabled=${state.locked} @click=${() => actions.propose({ kind: "removeRequested", id: entry.id })}>Remove ${entry.meal.name} from this day</button></article>`)}${!state.snapshot.entries.length ? html`<p class="sc-copy text-xs">No meals logged for this date.</p>` : nothing}</section></div></div>` : nothing}
   </div>` });
 }
