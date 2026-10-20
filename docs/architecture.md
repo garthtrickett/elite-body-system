@@ -1,5 +1,35 @@
 # Architecture and operation contracts
 
+## Scorecard preview slice
+
+`src/features/scorecard` owns the newly authorized product preview. `index.ts`
+exports immutable data types and typed `Result` operations (`setMetric`,
+`setDailyCheck`, `addGoal`, `selectPriority`) plus `representDay`. Target values
+and tolerances are authoritative in `operations.ts`; representation and UI labels
+use the same constants. `sample.ts` contains explicitly fictional Day 12 data.
+
+The browser interface is `browser.ts`. Typed proposals pass through
+`acceptScorecardProposal`; `representScorecard` derives tile completion and
+progress views. Draft inputs are separate from committed values, so invalid
+edits cannot corrupt the scorecard. Enter/blur commits and Escape restores the
+committed value. The native-dialog next-action predicate runs after acceptance
+and render, with duplicate dialog intents suppressed. The browser owns dialog
+focus trapping and restoration. There are no network or storage effects in this
+preview, and therefore no asynchronous scorecard completions to correlate.
+
+`src/browser.ts` composes auth and scorecard through their public browser entry
+points. Auth’s optional `presentHome` adapter receives only its renderable state
+and sign-out action after session resolution. It mounts the scorecard once and
+updates account/busy/error state thereafter without resetting scorecard edits.
+Sign-out continues through the existing correlated auth SAM effects, including
+error feedback and retry. No bearer values enter the scorecard.
+
+Server authentication still gates `/`. There are no fitness HTTP endpoints or
+schema changes. Every refresh reconstructs the labeled sample. Navigation to
+later features opens explicit preview panels rather than claiming to submit or
+save client information. Font assets are allowlisted individually and served
+from the same origin under `font-src 'self'`; inline scripts/styles remain blocked.
+
 ## Layout
 
 ```text
@@ -158,7 +188,8 @@ with structured JSON output; it has no public HTTP endpoint.
 Authentication establishes an account, not application authorization. Add actual
 product permissions when there are product operations to protect. There is no
 multi-tenant model, account management UI, email-change flow, session dashboard,
-or fitness domain. There is also no distributed email outbox/retry worker: a link
+or persisted fitness domain. The scorecard described above is an in-memory
+product preview. There is also no distributed email outbox/retry worker: a link
 request is acknowledged without promising successful provider delivery. Failed
 delivery revokes its challenge. Remote provider tests are stubbed; actual email
 delivery is unverified until separately configured and checked.

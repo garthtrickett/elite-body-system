@@ -1,5 +1,25 @@
 # Elite Body System — extraction and implementation plan
 
+## Current authorized product increment
+
+On 20 October 2026, the operator supplied Harry’s `ebs-platform.zip` prototype
+and requested its shell and scorecard inside the existing app, closely matching
+the design and using sample data for review. This expands the original
+boilerplate-only scope below. It does not authorize a wholesale app migration.
+
+The signed-in home is the integration point. This increment includes Harry’s
+dark 430px shell, local Bebas Neue/Work Sans fonts, nine scorecard tiles, editable
+numeric metrics and completion rules, weight/trend/consistency cards, bottom
+navigation, L to R goal entry, and daily Map/Focus/sample workout checks. Explicit
+preview panels keep navigation reviewable without suggesting that later flows
+are complete. Authentication and revocation remain real. Fitness state and
+history are sample data, held in memory and reset on refresh.
+
+Full onboarding, coach access, configurable per-client targets, fitness database
+persistence, workout logging/timers, course media/progress, and meal analysis
+remain later increments. The original extraction plan and evidence are retained
+below as history.
+
 ## Goal and scope
 
 Create a new GitHub repository, `garthtrickett/elite-body-system`, containing

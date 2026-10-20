@@ -1,8 +1,27 @@
 # Elite Body System
 
-Boilerplate for a new project: TypeScript, PostgreSQL, Kysely, Kanel, SAM with
-lit-html, Tailwind CSS, and email magic-link authentication. No Abby product functionality
-or history is included. The reviewed extraction scope is in [PLAN.md](PLAN.md).
+Elite Body System uses TypeScript, PostgreSQL, Kysely, Kanel, SAM with lit-html,
+Tailwind CSS, and email magic-link authentication. The signed-in home now contains
+the first port of Harry’s client scorecard. No Abby product functionality or
+history is included. The extraction and current product scope are in [PLAN.md](PLAN.md).
+
+## Scorecard preview
+
+Sign in and open `/` to review Harry’s dark, phone-width shell, weight/trend/
+consistency cards, and three-pillar daily scorecard. Enter metrics and press Enter
+or move focus to commit them; Escape cancels an edit. Goal tiles fill at the
+prototype’s targets. L to R supports a brain dump, goals, and a starred priority;
+Map, Focus, and sample workout completion update the same pure SAM model.
+
+This is explicitly a **sample Day 12**. Weight history, consistency, targets,
+the Map, and the training plan are fixtures. Changes live in memory and reset on
+refresh; no fitness data is written to PostgreSQL or browser storage. Account
+authentication and sign-out still use the real auth operations. Profile includes
+a sample reset and sign-out. The other navigation destinations explain their
+upcoming iterations: full onboarding, training logging, courses, and meal analysis.
+
+The fonts are served locally with their OFL licenses in `src/assets/fonts`.
+There are no external font, AI, WhatsApp, or video requests in this preview.
 
 ## Local setup
 

@@ -1,5 +1,29 @@
 # Validation evidence
 
+## Scorecard increment — 20 October 2026
+
+The isolated `bash scripts/with-postgres.sh npm run verify` passed with **30 Node
+tests and 8 Chromium tests**, zero skips, plus migration, Kanel generation,
+conventions, strict typechecking, and the Tailwind/esbuild build. Generated schema
+types have no diff. The tracked job used 1.5 GiB and two CPUs for the Node scope,
+with the helper’s separate 512 MiB/one-CPU PostgreSQL container. All database and
+outbox resources were disposable; no deployed database or real email was used.
+
+Browser evidence covers real authentication into the scorecard, invalid and
+committed metric editing, sample reset on refresh, target completion, goals and
+priority selection, safe text interpolation, native-dialog focus/keyboard access,
+course/meal/setup preview labels, and sign-out failure/retry/revocation. The
+scorecard writes no browser storage. Screenshots at 320px, 390px, and 1440px were
+inspected, along with weight trend, consistency, and L to R views.
+
+Visual inspection caught an inherited global font reset overriding component
+input sizes and an incorrectly sized first heatmap column. Both were corrected;
+all eight browser tests passed again, including explicit 56px weight/26px metric
+typography assertions and local font loading under CSP. This is local evidence
+for the working tree, not a claim of deployment or new GitHub CI results.
+
+The older foundation evidence below describes its scope at the time.
+
 ## Local checks — 19 October 2026
 
 Passed from a clean dependency installation:
