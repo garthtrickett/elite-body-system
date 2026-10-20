@@ -1,5 +1,21 @@
 # Architecture and operation contracts
 
+## Brand presentation
+
+`src/styles.css` owns the brand palette, derived semantic neutrals, font faces,
+and shared presentation roles. All existing browser slices use the same dark
+surfaces, Instrument Serif headings and Geist forms/data. Completion and selection
+use neutral surfaces with textual/check indicators; olive is limited to small
+section icons and the current navigation marker. Functional timers use Geist.
+
+Fonts are self-hosted WOFF2 with accompanying OFL notices and explicit HTTP asset
+routes. The build clears stale font output before copying the current assets.
+No external font request or CSP exception is required. Sign-in uses these same
+roles. The [brand findings](brand/brand-foundations.md) retain source direction;
+the [implementation plan](brand/brand-implementation-plan.md) records application
+choices and validation. This presentation change does not alter operations,
+database schema, SAM transitions or authentication.
+
 ## Client workflows and persistence
 
 Each vertical slice exports its server contract through `index.ts` and its

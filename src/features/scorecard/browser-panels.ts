@@ -13,7 +13,7 @@ function ltrPanel(state: ScorecardState, actions: ScorecardActions) {
       .value=${state.day.brainDump} @input=${(event: Event) => actions.changeBrainDump({ value: (event.target as HTMLTextAreaElement).value })}></textarea>
     <h3 class="sc-label">Right · Today’s goals</h3>
     <ul class="space-y-2">${state.day.goals.map(goal => html`<li class="sc-goal">
-      <button class="sc-icon-button ${goal.priority ? "text-accent" : "text-sc-muted"}" aria-label=${`Prioritize ${goal.text}`} aria-pressed=${goal.priority}
+      <button class="sc-icon-button ${goal.priority ? "text-sc-ink" : "text-sc-muted"}" aria-label=${`Prioritize ${goal.text}`} aria-pressed=${goal.priority}
         @click=${() => actions.selectPriority({ id: goal.id })}>${icon("star")}</button>
       <span class="min-w-0 flex-1 break-words text-sm">${goal.text}</span>
       <button class="sc-icon-button text-sc-muted" aria-label=${`Remove ${goal.text}`} @click=${() => actions.removeGoal({ id: goal.id })}>×</button>
@@ -44,7 +44,7 @@ export function scorecardPanel(state: ScorecardState, actions: ScorecardActions)
   return html`<dialog class="sc-dialog" aria-labelledby="sc-panel-title" @cancel=${(event: Event) => { event.preventDefault(); actions.closePanel(); }}>
     <div class="sc-panel-body">
       <button class="sc-icon-button -ml-2" aria-label="Back to scorecard" @click=${actions.closePanel}>${icon("back")}</button>
-      <h2 id="sc-panel-title" class="sc-display text-[40px] leading-none">${state.panel ? titles[state.panel] : ""}</h2>
+      <h2 id="sc-panel-title" class="sc-display text-[40px] leading-[1.1]">${state.panel ? titles[state.panel] : ""}</h2>
       ${panelContent(state, actions)}
       ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
       ${state.syncError ? html`<p class="sc-error" role="alert">${state.syncError}</p><button class="sc-secondary" @click=${actions.retrySync}>Retry save</button><button class="sc-secondary" @click=${actions.reloadClient}>Reload saved version</button>` : nothing}
