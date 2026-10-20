@@ -17,14 +17,14 @@ export function json(response: ServerResponse, status: number, body: unknown): v
   response.end(JSON.stringify(body));
 }
 
-function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
+function readBody(request: IncomingMessage, limit = MAX_BODY): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     let size = 0;
     let data = "";
     request.setEncoding("utf8");
     request.on("data", (chunk: string) => {
       size += Buffer.byteLength(chunk);
-      if (size > MAX_BODY) { reject(new Error("Body too large")); return; }
+      if (size > limit) { reject(new Error("Body too large")); return; }
       data += chunk;
     });
     request.on("error", reject);
@@ -36,6 +36,37 @@ function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
       } catch { reject(new Error("Invalid JSON")); }
     });
   });
+}
+
+/** Shared authenticated transport: callers never supply the account identity. */
+export function createAuthenticatedHttp(config: Readonly<{
+  auth: Auth; publicOrigin: string;
+  handle: (input: Readonly<{ account: import("./contracts.ts").Account; request: IncomingMessage; response: ServerResponse; body: Readonly<Record<string, unknown>> }>) => Promise<void>;
+}>) {
+  let inFlight = 0;
+  const secure = config.publicOrigin.startsWith("https:");
+  const sessionName = secure ? "__Host-ebs-session" : "ebs-session";
+  const csrfName = secure ? "__Host-ebs-csrf" : "ebs-csrf";
+  return async (request: IncomingMessage, response: ServerResponse): Promise<void> => {
+    const session = await config.auth.resolveSession({ sessionToken: cookie(request, sessionName) });
+    if (!session.ok) { json(response, session.error.code === "unavailable" ? 503 : 401, session); return; }
+    if (request.method !== "GET" && request.method !== "POST") { json(response, 405, { ok: false, error: { code: "invalid_input" } }); return; }
+    if (inFlight >= 8) { json(response, 503, { ok: false, error: { code: "unavailable", message: "Your account is busy. Try again." } }); return; }
+    inFlight += 1;
+    try {
+      let body: Readonly<Record<string, unknown>> = {};
+      if (request.method === "POST") {
+        const csrf = cookie(request, csrfName), supplied = request.headers["x-csrf-token"];
+        if (request.headers.origin !== config.publicOrigin || request.headers["content-type"]?.split(";")[0]?.trim() !== "application/json" ||
+            !validToken(csrf) || !validToken(supplied) || !timingSafeEqual(Buffer.from(csrf), Buffer.from(supplied))) {
+          json(response, 403, { ok: false, error: { code: "forbidden" } }); return;
+        }
+        try { body = await readBody(request, new URL(request.url ?? "/", config.publicOrigin).pathname === "/api/client/meals/analyze" ? 6 * 1024 * 1024 : 256 * 1024); }
+        catch { json(response, 400, { ok: false, error: { code: "invalid_input" } }); return; }
+      }
+      await config.handle({ account: session.value, request, response, body });
+    } finally { inFlight -= 1; }
+  };
 }
 
 export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string }>):
@@ -57,8 +88,9 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       sendResult(response, await auth.resolveSession({ sessionToken }));
       return;
     }
-    if (request.method === "GET" && ["/", "/sign-in", "/sign-in/confirm"].includes(path)) {
-      if (path === "/") {
+    const signedInPage = ["/", "/training", "/meals", "/mindset/map", "/courses/nutrition", "/courses/activity", "/courses/mindset"].includes(path);
+    if (request.method === "GET" && (signedInPage || ["/sign-in", "/sign-in/confirm"].includes(path))) {
+      if (signedInPage) {
         const session = await auth.resolveSession({ sessionToken });
         if (!session.ok) {
           if (session.error.code === "unavailable") { failure(response, 503, "unavailable"); return; }
@@ -70,8 +102,8 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
         "Set-Cookie": setCookie(names.csrf, csrf, 28_800),
-        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" });
-      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-mode="${path === "/" ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
+        "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'; img-src 'self' data:; media-src https:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'" });
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${path === "/training" ? "training" : path === "/meals" ? "meals" : path === "/mindset/map" ? "map" : path.startsWith("/courses/") ? path.slice(9) : "scorecard"}" data-mode="${signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
       return;
     }
     const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out"];

@@ -1,7 +1,7 @@
 export { createAuth } from "./operations.ts";
 export { createPostgresAuthStore } from "./postgres.ts";
 export { createLinkDelivery } from "./delivery.ts";
-export { createAuthHttp } from "./http.ts";
+export { createAuthHttp, createAuthenticatedHttp, json } from "./http.ts";
 export { LINK_ACKNOWLEDGEMENT } from "./contracts.ts";
 export type { Auth } from "./operations.ts";
 export type { DeliveryConfig } from "./delivery.ts";

@@ -5,6 +5,7 @@ import type { DeliveryConfig } from "../features/auth/index.ts";
 export type Config = Readonly<{
   databaseUrl: string; publicOrigin: string; rateKey: string; host: string; port: number;
   delivery: DeliveryConfig;
+  openAiApiKey?: string;
 }>;
 
 export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Readonly<{ code: "invalid_configuration" }>> {
@@ -29,6 +30,6 @@ export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Rea
     const delivery: DeliveryConfig = mode === "outbox" ? { mode, directory: ".data/outbox" }
       : { mode, from: env.EMAIL_FROM!, apiKey: env.RESEND_API_KEY! };
     return ok({ databaseUrl: env.DATABASE_URL!, publicOrigin: origin.origin, rateKey: env.AUTH_RATE_KEY!,
-      host: env.HOST ?? "127.0.0.1", port, delivery });
+      host: env.HOST ?? "127.0.0.1", port, delivery, ...(env.OPENAI_API_KEY ? { openAiApiKey: env.OPENAI_API_KEY } : {}) });
   } catch { return fail(); }
 }

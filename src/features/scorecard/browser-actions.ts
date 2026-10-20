@@ -1,5 +1,6 @@
 import type { DailyCheck, Metric } from "./operations.ts";
 import type { Panel } from "./browser-model.ts";
+import type { ProfileProposal } from "../profile/browser.ts";
 
 export type ScorecardActions = Readonly<{
   changeMetric: (input: Readonly<{ metric: Metric; value: string }>) => void;
@@ -16,6 +17,8 @@ export type ScorecardActions = Readonly<{
   addGoal: () => void;
   selectPriority: (input: Readonly<{ id: number }>) => void;
   removeGoal: (input: Readonly<{ id: number }>) => void;
-  resetSample: () => void;
+  proposeProfile: (proposal: ProfileProposal) => void;
+  retrySync: () => void;
+  reloadClient: () => void;
   signOut: () => void;
 }>;
