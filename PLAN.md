@@ -40,6 +40,18 @@ types have no diff. Desktop screenshots at 1024, 1440 and 1920px were inspected.
 Production-image checks and exact-commit verification are also required in CI
 before merging and deploying this increment.
 
+## Desktop and mobile refinement
+
+The full visual review covers all nine routes, every setup step and the main
+empty, filled, locked, error, meal-review and video states. The accepted sweep
+contains 236 states at 1440, 390, 1024 and 320px widths, with no page overflow or
+browser errors. Refinements clarify empty scorecards and real weight history,
+keep dialog navigation reachable, improve phone exercise selection and Focus,
+and place desktop meal totals beside ingredients. Completed lesson answers wrap
+fully. Local isolated verification passed 67 server/model tests and 29 Chromium
+tests; generated schema types are unchanged. The [review evidence](docs/visual-refinement-review.md)
+records the matrix, refinements, reproduction command and release requirements.
+
 ## Earlier scorecard increment (historical)
 
 The initial sample scorecard port was merged and deployed before this client

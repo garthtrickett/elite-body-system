@@ -28,7 +28,7 @@ export function authView(state: AuthUiState, actions: AuthUiActions) {
             <p class="sc-eyebrow mb-3">${mode === "home" ? "Your account" : "Welcome"}</p>
             <h1 class="sc-display text-[44px]">${mode === "home" ? "You’re signed in." : mode === "confirm" ? "Confirm it’s you." : "Sign in to your account."}</h1>
             ${mode === "request" ? html`
-              <p class="sc-copy mt-4">Enter your email and we’ll send you a secure sign-in link. No password needed.</p>
+              <p class="sc-copy mt-4">${preview ? "Open Harry’s temporary preview account. No email link needed." : "Enter your email and we’ll send you a secure sign-in link. No password needed."}</p>
               <form class="mt-8 space-y-5" @submit=${(event: Event) => { event.preventDefault(); actions.requestLink(); }}>
                 <div><label for="email" class="sc-label mb-2 block">Email address</label>
                   <input id="email" name="email" type=${preview ? "text" : "email"} autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" required maxlength="254"

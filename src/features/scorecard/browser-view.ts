@@ -8,18 +8,15 @@ import { icon } from "./icons.ts";
 import type { IconName } from "./icons.ts";
 import { scorecardPanel } from "./browser-panels.ts";
 
+const weightText = (value: number | undefined) => value === undefined ? "—" : value.toLocaleString("en-GB", { maximumFractionDigits: 2 });
 const labels = { weight: "Body weight in kg", energy: "Calories eaten today", protein: "Protein in grams", water: "Water in litres", sleep: "Hours slept", steps: "Steps today" } as const;
-function placeholders(state: ScorecardState) {
-  return { weight: "—", energy: String(state.targets.energy), protein: String(state.targets.protein), water: state.targets.water.toFixed(1),
-    sleep: `${state.targets.sleep}h`, steps: state.targets.steps.toLocaleString("en-GB") };
-}
 
 function metricInput(metric: Metric, state: ScorecardState, actions: ScorecardActions) {
-  return html`<input id=${`sc-${metric}`} class="sc-number ${(state.drafts[metric] || placeholders(state)[metric]).length > 5 ? "sc-number-compact" : ""} ${metric === "weight" ? "sc-weight-input" : metric === "protein" || metric === "water" ? "sc-with-unit" : ""}"
+  return html`<input id=${`sc-${metric}`} class="sc-number ${state.drafts[metric].length > 5 ? "sc-number-compact" : ""} ${metric === "weight" ? "sc-weight-input" : metric === "protein" || metric === "water" ? "sc-with-unit" : ""}"
     aria-label=${labels[metric]} aria-invalid=${state.errors[metric] ? "true" : "false"}
     aria-describedby=${state.errors[metric] ? `sc-error-${metric}` : nothing}
     type="text" inputmode=${metric === "steps" || metric === "energy" || metric === "protein" ? "numeric" : "decimal"}
-    enterkeyhint="done" autocomplete="off" maxlength="12" placeholder=${placeholders(state)[metric]} .value=${live(state.drafts[metric])}
+    enterkeyhint="done" autocomplete="off" maxlength="12" placeholder="—" .value=${live(state.drafts[metric])}
     @input=${(event: Event) => actions.changeMetric({ metric, value: (event.target as HTMLInputElement).value })}
     @blur=${() => actions.commitMetric({ metric })}
     @keydown=${(event: KeyboardEvent) => {
@@ -35,7 +32,7 @@ function metricError(metric: Metric, state: ScorecardState) {
 function metricTile(metric: Exclude<Metric, "weight">, title: string, unit: string, state: ScorecardState, actions: ScorecardActions) {
   const done = state.complete[metric];
   const target = metric === "energy" ? `of ${state.targets.energy} cal` : metric === "protein" ? `of ${state.targets.protein}g`
-    : metric === "water" ? `of ${state.targets.water.toFixed(1)}L` : metric === "sleep" ? `of ${state.targets.sleep}h` : `of ${placeholders(state).steps}`;
+    : metric === "water" ? `of ${state.targets.water.toFixed(1)}L` : metric === "sleep" ? `of ${state.targets.sleep}h` : `of ${state.targets.steps.toLocaleString("en-GB")}`;
   return html`<div class="sc-tile ${done ? "sc-tile-done" : ""}" data-testid=${`tile-${metric}`}>
     <label for=${`sc-${metric}`} class="sc-label">${title}</label>
     <div class="flex min-w-0 items-baseline gap-1">${metricInput(metric, state, actions)}${unit ? html`<span class="sc-unit">${unit}</span>` : nothing}</div>
@@ -50,13 +47,13 @@ function carousel(state: ScorecardState, actions: ScorecardActions) {
       @touchend=${(event: TouchEvent) => { const x = event.changedTouches[0]?.clientX; if (x !== undefined) actions.endTouch({ x }); }}>
       <section class="sc-progress-card ${state.card === 0 ? "sc-progress-current" : ""}" aria-label="Body weight"><label class="sc-label text-xs" for="sc-weight">Body Weight</label>
         <div class="sc-weight-row"><div class="flex min-w-0 items-baseline gap-1">${metricInput("weight", state, actions)}<span class="sc-unit">kg</span></div>
-          <span class="flex shrink-0 items-center gap-1 text-[17px] font-medium text-sc-ink"><span aria-hidden="true">${state.weightDown ? "↓" : "↑"}</span>${state.weightDelta} kg</span></div>
+          ${state.day.values.weight !== undefined && state.startWeight > 0 ? html`<span class="flex shrink-0 items-center gap-1 text-[17px] font-medium text-sc-ink"><span aria-hidden="true">${state.weightDown ? "↓" : "↑"}</span>${state.weightDelta} kg</span>` : nothing}</div>
         <p class="mt-2 text-xs text-sc-muted">${state.startWeight ? `Started at ${state.startWeight} kg` : "Add your starting weight in setup"}</p>${metricError("weight", state)}</section>
       <section class="sc-progress-card ${state.card === 1 ? "sc-progress-current" : ""}" aria-label="Weight trend"><h2 class="sc-label text-xs">Weight Trend</h2>
-        <svg class="my-2 h-20 w-full overflow-visible" viewBox="0 0 310 80" preserveAspectRatio="none" role="img" aria-label=${`Weight trend from ${state.startWeight} to ${state.day.values.weight ?? state.startWeight} kilograms`}>
+        ${state.hasWeightData ? html`<svg class="my-2 h-20 w-full overflow-visible" viewBox="0 0 310 80" preserveAspectRatio="none" role="img" aria-label=${`Weight trend from ${weightText(state.trendStartWeight)} to ${weightText(state.trendEndWeight)} kilograms`}>
           ${state.hasWeightTrend ? svg`<polygon points=${`${state.trendPoints} 310,80 0,80`} class="sc-trend-area"></polygon>
           <polyline points=${state.trendPoints} fill="none" class="sc-trend-line" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>` : svg`<circle cx="155" cy="40" r="4" fill="currentColor"></circle>`}
-        </svg><div class="flex justify-between text-xs font-medium"><span class="text-sc-muted">Day 1 · ${state.startWeight} kg</span><span class="text-sc-ink">Day ${state.programDay} · ${state.day.values.weight ?? "—"} kg</span></div></section>
+        </svg><div class="flex justify-between text-xs font-medium"><span class="text-sc-muted">Day ${state.trendStartDay} · ${weightText(state.trendStartWeight)} kg</span><span class="text-sc-ink">Day ${state.trendEndDay} · ${weightText(state.trendEndWeight)} kg</span></div>` : html`<p class="sc-empty-trend sc-copy">Your weigh-ins will appear here.<br>Add a starting weight in setup, or log today’s weight.</p>`}</section>
       <section class="sc-progress-card ${state.card === 2 ? "sc-progress-current" : ""}" aria-label="Consistency"><div class="mb-2 flex items-baseline justify-between"><h2 class="sc-label text-xs">Consistency</h2><span class="sc-data text-3xl text-sc-ink">${state.consistency}%</span></div>
         <table class="sc-consistency" aria-label="Tracking over the last seven days"><colgroup><col class="w-[78px]">${state.trackingHistory.map(() => html`<col>`)}</colgroup><thead><tr><td></td>${state.trackingHistory.map(day => html`<th scope="col">${day.day.slice(0, 1)}<span class="sr-only">${day.day.slice(1)}</span></th>`)}</tr></thead>
           <tbody>${(["nutrition", "activity", "mindset"] as const).map(pillar => html`<tr><th scope="row">${pillar}</th>
@@ -110,15 +107,15 @@ export function scorecardView(state: ScorecardState, actions: ScorecardActions) 
           <a class="sc-training-button text-center" href="/training" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>${state.complete.training ? "Complete" : "Start"}</a></div>
         ${metricTile("steps", "Steps", "", state, actions)}
       </div></section>
-      <section class="px-5 pb-3" aria-label="Mindset">${sectionHeader("Mindset", state, actions)}<div class="sc-tile-grid">
+      <section class="px-5 pb-3" aria-label="Mindset">${sectionHeader("Mindset", state, actions)}<div class="sc-tile-grid sc-mindset-grid">
         <div class="sc-tile ${state.complete.map ? "sc-tile-done" : "sc-map-tile"}" data-testid="tile-map"><p class="sc-label">Map</p>
           <a class="sc-check-button" aria-label="Read your Neural Map" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>${state.complete.map ? icon("check") : "Read"}</a>
           <p class="sc-target">${state.complete.map ? "✓ Complete" : "Not yet"}</p></div>
         <button class="sc-tile text-left ${state.complete.ltr ? "sc-tile-done" : ""}" aria-label="Open L to R" @click=${() => actions.openPanel({ panel: "ltr" })}>
           <span class="sc-label">L to R${state.complete.ltr ? " ✓" : ""}</span><span class="sc-ltr-summary">${state.day.brainDump || state.day.goals.length ? html`${state.day.brainDump.trim() ? "Thoughts captured" : "Empty your head"}<br>${state.day.goals.length} ${state.day.goals.length === 1 ? "goal" : "goals"}` : "Empty your head. Set today’s goals."}</span></button>
-        <div class="sc-tile ${state.complete.focus ? "sc-tile-done" : state.priority ? "sc-map-tile" : ""}" data-testid="tile-focus"><p class="sc-label">Focus</p>
+        <div class="sc-tile sc-focus-tile ${state.complete.focus ? "sc-tile-done" : state.priority ? "sc-map-tile" : ""}" data-testid="tile-focus"><p class="sc-label">Focus</p>
           <button class="sc-check-button" aria-label="Mark Focus complete" aria-pressed=${state.day.checks.focus} @click=${() => actions.toggleCheck({ check: "focus" })}>${state.complete.focus ? icon("check") : "○"}</button>
-          <p class="sc-target">${state.complete.focus ? "✓ Complete" : "Not yet"}</p><p class="break-words text-xs" title=${state.priority}>${state.priority ? `★ ${state.priority}` : "30 min priority"}</p></div>
+          <p class="sc-target">${state.complete.focus ? "✓ Complete" : "Not yet"}</p><p class="sc-focus-priority break-words text-xs" title=${state.priority}>${state.priority ? `★ ${state.priority}` : "30 min priority"}</p></div>
       </div></section></div>
       ${state.allDone ? html`<p role="status" class="px-5 text-center text-xs font-medium text-sc-ink">One card. Three pillars. Day complete.</p>` : nothing}
     </div>

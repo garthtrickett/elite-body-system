@@ -12,6 +12,7 @@
     "lint": "node scripts/check-conventions.ts",
     "test": "node --test --test-concurrency=1 test/*.test.ts",
     "test:browser": "playwright test",
+    "audit:visual": "node test/visual-audit.ts",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
     "db:generate": "node --env-file-if-exists=.env node_modules/kanel/bin/kanel --config .kanelrc.cjs",
     "account:provision": "node --env-file-if-exists=.env scripts/provision-account.ts",

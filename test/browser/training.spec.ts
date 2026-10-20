@@ -31,9 +31,11 @@ test("set logs, instructions, history and timers survive refresh, then a complet
   await signIn(page);
   await page.goto(`${app.origin}/training?date=${monday(-7)}`);
   await expect(page.getByRole("heading", { name: "Compound Day", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true })).toHaveText("○");
   await page.getByLabel("Weighted Pull-up set 1 weight").fill("15"); await page.getByLabel("Weighted Pull-up set 1 weight").press("Enter");
   await page.getByLabel("Weighted Pull-up set 1 reps").fill("5"); await page.getByLabel("Weighted Pull-up set 1 reps").press("Enter");
   await page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true })).toHaveText("✓");
   await expect(page.getByLabel("Rest remaining")).toContainText(/4:|5:/);
   await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
   await page.reload();

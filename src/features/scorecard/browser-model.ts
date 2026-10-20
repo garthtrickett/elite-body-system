@@ -165,11 +165,16 @@ export function representScorecard(model: ScorecardModel) {
   const profile = model.profile.profile;
   const dated = [...model.history.filter(day => day.date !== model.date), { date: model.date, scorecard: model.day, revision: model.dayRevision }].sort((a, b) => a.date.localeCompare(b.date));
   const weightDays = dated.filter(day => day.scorecard.values.weight !== undefined);
-  const weights = weightDays.map(day => day.scorecard.values.weight ?? 0);
-  if (!weights.length) weights.push(profile.startingWeight ?? 0);
+  const series = weightDays.map(day => ({ date: day.date, weight: day.scorecard.values.weight ?? 0 }));
+  const samples = profile.startingWeight !== undefined && !series.some(day => day.date === profile.startDate)
+    ? [{ date: profile.startDate, weight: profile.startingWeight }, ...series].sort((a, b) => a.date.localeCompare(b.date)) : series;
+  const weights = samples.map(day => day.weight);
   const startWeight = profile.startingWeight ?? weights[0] ?? 0;
   const min = Math.min(...weights), max = Math.max(...weights), range = max - min || 1;
-  const points = weights.map((weight, i) => `${(i / Math.max(1, weights.length - 1) * 310).toFixed(1)},${((max - weight) / range * 70 + 5).toFixed(1)}`).join(" ");
+  const first = samples[0], last = samples.at(-1);
+  const timeRange = first && last ? Date.parse(last.date) - Date.parse(first.date) || 1 : 1;
+  const points = samples.map(day => `${((Date.parse(day.date) - Date.parse(first?.date ?? day.date)) / timeRange * 310).toFixed(1)},${((max - day.weight) / range * 70 + 5).toFixed(1)}`).join(" ");
+  const programDayFor = (date: string | undefined) => Math.max(1, Math.round((Date.parse(date ?? profile.startDate) - Date.parse(profile.startDate)) / 86400000) + 1);
   const difference = startWeight - (model.day.values.weight ?? startWeight);
   const history = Array.from({ length: 7 }, (_, i) => {
     const date = new Date(`${model.date || profile.startDate}T12:00:00Z`); date.setUTCDate(date.getUTCDate() - (6 - i));
@@ -190,7 +195,8 @@ export function representScorecard(model: ScorecardModel) {
   const programDay = Math.max(1, Math.round((Date.parse(model.date || profile.startDate) - Date.parse(profile.startDate)) / 86400000) + 1);
   const tracked = history.reduce((sum, day) => sum + day.nutrition + day.activity + day.mindset, 0);
   return { ...model, ...representDay(model.day, profile.targets), weightDelta: Math.abs(difference).toFixed(1), weightDown: difference >= 0,
-    trendPoints: points, hasWeightTrend: weights.length > 1, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
+    trendPoints: points, hasWeightData: weights.length > 0, hasWeightTrend: weights.length > 1,
+    trendStartDay: programDayFor(first?.date), trendEndDay: programDayFor(last?.date), trendStartWeight: first?.weight, trendEndWeight: last?.weight, consistency: Math.round(tracked / 63 * 100), startWeight, programDay, streak, trackingHistory: history,
     rolloverNotice: !!model.observedDate && model.observedDate !== model.date,
     saving: model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile", targets: profile.targets } as const;
 }
