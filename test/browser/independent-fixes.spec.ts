@@ -9,14 +9,14 @@ import { createProfiles, createPostgresProfileStore } from "../../src/features/p
 let app: Awaited<ReturnType<typeof startTestApp>>;
 test.beforeAll(async () => { app = await startTestApp(); });
 test.afterAll(async () => { await app.close(); });
-async function signIn(page: Page) {
+async function signIn(page: Page, complete = true) {
   const email = `independent-fixes-${randomUUID()}@example.test`, account = await app.auth.provisionAccount({ email });
   if (!account.ok) throw new Error("Fixture account unavailable");
   const db = createDatabase(testDatabaseUrl());
   try {
     const profiles = createProfiles({ store: createPostgresProfileStore(db) });
     expect((await profiles.save({ accountId: account.value.id, revision: 0,
-      profile: completedProfile({ startDate: new Date().toISOString().slice(0, 10) }) })).ok).toBe(true);
+      profile: completedProfile({ startDate: new Date().toISOString().slice(0, 10), completed: complete }) })).ok).toBe(true);
   } finally { await db.destroy(); }
   await app.auth.requestLink({ email, clientKey: randomUUID() });
   const session = await app.auth.redeemLink({ token: new URL(await app.readLink(email)).hash.slice(1) });
@@ -126,6 +126,12 @@ test("mobile locked courses retain guidance and landscape review leaves room for
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeInViewport();
   await expect(page.getByLabel("Meal name", { exact: true })).toBeInViewport();
   await page.screenshot({ path: info.outputPath("landscape-review.png") });
+  await page.getByRole("button", { name: "Cancel review", exact: true }).click();
+  await signIn(page, false); await page.goto(app.origin + "/courses/nutrition");
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(page.getByRole("link", { name: /Complete.*setup/ })).toHaveCount(1);
+  }
 });
 
 test("profile exit is secondary and Map teaching paragraphs have a readable measure", async ({ page }, info) => {

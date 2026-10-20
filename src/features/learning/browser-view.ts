@@ -48,7 +48,6 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
       <div class="sc-course-list-heading"><p class="sc-eyebrow">${pillar} course · Week ${snapshot.week}</p><h1 class="sc-display mt-2 text-[40px] leading-[1.1]">${titles[pillar]}</h1>
         <p class="sc-copy mt-3">One episode every three weeks, alongside the other two pillars.</p></div>
       ${!episode ? welcomeCard("sc-course-next") : nothing}
-      ${!snapshot.setupComplete ? html`<p class="sc-copy">Complete Day 1 setup to unlock your first lesson.</p><a class="sc-secondary" href="/?panel=setup">Complete your setup</a>` : nothing}
       ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>Neural Map · Five-part build ›</a>` : nothing}
       ${EPISODES.filter(item => item.pillar === pillar).map(item => {
         const status = episodeStatus({ episode: item, snapshot });
