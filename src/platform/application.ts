@@ -9,7 +9,7 @@ import { createClientHttp } from "./client-http.ts";
 export function createApplication(config: Config) {
   const db = createDatabase(config.databaseUrl);
   const auth = createAuth({ store: createPostgresAuthStore(db), deliverLink: createLinkDelivery(config.delivery),
-    publicOrigin: config.publicOrigin, rateKey: config.rateKey });
+    publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
   const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin });
   const handleClient = createClientHttp({ auth, db, publicOrigin: config.publicOrigin, ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });
   const assets = new Map([

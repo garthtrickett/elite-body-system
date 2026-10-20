@@ -57,3 +57,10 @@ test("convention enforcement detects class expressions and feature-internal impo
     assert.deepEqual(await checkConventions(root), []);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test("Harry preview access is explicit and defaults off", () => {
+  const base = readConfig(env); assert.ok(base.ok); assert.equal(base.value.harryPreview, false);
+  const enabled = readConfig({ ...env, AUTH_HARRY_PREVIEW: "true" }); assert.ok(enabled.ok); assert.equal(enabled.value.harryPreview, true);
+  assert.equal(readConfig({ ...env, AUTH_HARRY_PREVIEW: "yes" }).ok, false);
+});

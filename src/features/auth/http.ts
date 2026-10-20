@@ -106,7 +106,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${path === "/training" ? "training" : path === "/meals" ? "meals" : path === "/mindset/map" ? "map" : path.startsWith("/courses/") ? path.slice(9) : "scorecard"}" data-mode="${signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
       return;
     }
-    const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out"];
+    const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out", "/api/auth/harry-preview"];
     if (request.method !== "POST" || !actions.includes(path)) { failure(response, 404, "invalid_input"); return; }
     if (request.headers.origin !== publicOrigin || request.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") {
       failure(response, 403, "invalid_input"); return;
@@ -119,7 +119,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
     let body: Record<string, unknown>;
     try { body = await readBody(request); }
     catch { failure(response, 400, "invalid_input"); return; }
-    const expected = path.endsWith("request-link") ? "email" : path.endsWith("sign-out") ? "" : "token";
+    const expected = path.endsWith("harry-preview") ? "alias" : path.endsWith("request-link") ? "email" : path.endsWith("sign-out") ? "" : "token";
     if (Object.keys(body).sort().join(",") !== expected) { failure(response, 400, "invalid_input"); return; }
     if (path.endsWith("request-link")) {
       const result = await auth.requestLink({ email: body.email, clientKey: request.socket.remoteAddress ?? "unknown" });
@@ -134,7 +134,9 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       if (result.ok) response.setHeader("Set-Cookie", setCookie(names.session, "", 0));
       json(response, result.ok ? 200 : 503, result); return;
     }
-    const result = await auth.redeemLink({ token: body.token });
+    const result = path.endsWith("harry-preview")
+      ? await auth.signInHarryPreview({ alias: body.alias, clientKey: request.socket.remoteAddress ?? "unknown" })
+      : await auth.redeemLink({ token: body.token });
     if (!result.ok) { failure(response, result.error.code === "unavailable" ? 503 : 400, result.error.code); return; }
     response.setHeader("Set-Cookie", [setCookie(names.session, result.value.sessionToken, 28_800), setCookie(names.csrf, "", 0)]);
     // Browser sessions only travel in HttpOnly cookies, never JSON or localStorage.

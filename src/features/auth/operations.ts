@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { err, ok } from "../../shared/result.ts";
 import { normalizeEmail } from "./email.ts";
-import { LINK_ACKNOWLEDGEMENT } from "./contracts.ts";
+import { LINK_ACKNOWLEDGEMENT, HARRY_PREVIEW_EMAIL, isHarryPreviewAlias } from "./contracts.ts";
 import type { Account, AuthResult, AuthStore, DeliverLink, LinkAcknowledgement } from "./contracts.ts";
 
 export const digestToken = (token: string): string => createHash("sha256").update(token).digest("hex");
@@ -13,6 +13,7 @@ export function validToken(value: unknown): value is string {
 
 export type Auth = Readonly<{
   provisionAccount: (input: Readonly<{ email: unknown }>) => Promise<AuthResult<Account>>;
+  signInHarryPreview: (input: Readonly<{ alias: unknown; clientKey: string }>) => Promise<AuthResult<Readonly<{ account: Account; sessionToken: string }>>>;
   requestLink: (input: Readonly<{ email: unknown; clientKey: string }>) => Promise<AuthResult<LinkAcknowledgement>>;
   inspectLink: (input: Readonly<{ token: unknown }>) => Promise<AuthResult<Account>>;
   redeemLink: (input: Readonly<{ token: unknown }>) => Promise<AuthResult<Readonly<{ account: Account; sessionToken: string }>>>;
@@ -22,7 +23,7 @@ export type Auth = Readonly<{
 
 /** Trusted composition: configuration is validated before creating this module. */
 export function createAuth(config: Readonly<{
-  store: AuthStore; deliverLink: DeliverLink; publicOrigin: string; rateKey: string;
+  store: AuthStore; deliverLink: DeliverLink; publicOrigin: string; rateKey: string; harryPreview?: boolean;
 }>): Auth {
   const { store, deliverLink, publicOrigin, rateKey } = config;
   const rateDigest = (kind: string, value: string): string => createHmac("sha256", rateKey)
@@ -35,6 +36,21 @@ export function createAuth(config: Readonly<{
       if (!email) return err({ code: "invalid_input" });
       try { return ok(await store.provision({ email })); }
       catch { return unavailable(); }
+    },
+    async signInHarryPreview({ alias, clientKey }) {
+      if (!config.harryPreview) return err({ code: "unauthenticated" });
+      if (!isHarryPreviewAlias(alias) || !clientKey || clientKey.length > 256) return err({ code: "invalid_input" });
+      try {
+        const allowed = await store.reserve({ global: rateDigest("global", "all"), client: rateDigest("client", clientKey), recipient: rateDigest("recipient", HARRY_PREVIEW_EMAIL) });
+        if (!allowed) return err({ code: "unauthenticated" });
+        // Provisioned explicitly by the operator; browser input cannot choose an account.
+        const account = await store.findAccount({ email: HARRY_PREVIEW_EMAIL });
+        if (!account) return err({ code: "unauthenticated" });
+        const digest = digestToken(newToken()), sessionToken = newToken();
+        await store.issue({ digest, accountId: account.id });
+        const signedIn = await store.redeem({ digest, sessionDigest: digestToken(sessionToken) });
+        return signedIn ? ok({ account: signedIn, sessionToken }) : unavailable();
+      } catch { return unavailable(); }
     },
     async requestLink({ email: input, clientKey }) {
       const email = normalizeEmail(input);
@@ -78,7 +94,7 @@ export function createAuth(config: Readonly<{
       if (!validToken(sessionToken)) return err({ code: "unauthenticated" });
       try {
         const account = await store.session({ digest: digestToken(sessionToken) });
-        return account ? ok(account) : err({ code: "unauthenticated" });
+        return account && (account.email !== HARRY_PREVIEW_EMAIL || config.harryPreview) ? ok(account) : err({ code: "unauthenticated" });
       } catch { return unavailable(); }
     },
     async signOut({ sessionToken }) {

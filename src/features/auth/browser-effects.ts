@@ -37,6 +37,7 @@ export function createAuthUiEffects(config: Readonly<{
     switch (effect.kind) {
       case "request": return { kind: "requestCompleted", id: effect.id, result: await call("/api/auth/request-link", { email: effect.email },
         (value): value is LinkAcknowledgement => record(value) && value.message === LINK_ACKNOWLEDGEMENT) };
+      case "harryPreview": return { kind: "previewCompleted", id: effect.id, result: await call("/api/auth/harry-preview", { alias: "harrybaldwin" }, isAccount) };
       case "inspect": return { kind: "inspectionCompleted", id: effect.id,
         result: await call("/api/auth/inspect-link", { token: config.token }, isAccount) };
       case "redeem": return { kind: "redemptionCompleted", id: effect.id,

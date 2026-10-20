@@ -1,3 +1,4 @@
+import { isHarryPreviewAlias } from "./contracts.ts";
 import { html } from "lit-html";
 import type { AuthUiState } from "./browser-model.ts";
 
@@ -11,6 +12,7 @@ export type AuthUiActions = Readonly<{
 const button = "sc-primary w-full";
 export function authView(state: AuthUiState, actions: AuthUiActions) {
   const { mode, email, busy, busyLabel, account, message, problem } = state;
+  const preview = isHarryPreviewAlias(email);
   return html`
       <div class="sc-app"><div class="sc-auth">
         <aside class="sc-auth-aside" aria-label="Elite Body System">
@@ -29,13 +31,13 @@ export function authView(state: AuthUiState, actions: AuthUiActions) {
               <p class="sc-copy mt-4">Enter your email and we’ll send you a secure sign-in link. No password needed.</p>
               <form class="mt-8 space-y-5" @submit=${(event: Event) => { event.preventDefault(); actions.requestLink(); }}>
                 <div><label for="email" class="sc-label mb-2 block">Email address</label>
-                  <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required maxlength="254"
+                  <input id="email" name="email" type=${preview ? "text" : "email"} autocomplete="email" autocapitalize="none" spellcheck="false" inputmode="email" required maxlength="254"
                     class="sc-textarea"
                     placeholder="you@example.com" .value=${email} ?disabled=${busy}
                     @input=${(event: Event) => { actions.setEmail({ email: (event.target as HTMLInputElement).value }); }}></div>
-                <button class=${button} type="submit" ?disabled=${busy}>${busy ? busyLabel : "Email me a sign-in link"}</button>
+                <button class=${button} type="submit" ?disabled=${busy}>${busy ? busyLabel : preview ? "Sign in" : "Email me a sign-in link"}</button>
               </form>
-              <p class="sc-copy mt-5 text-xs">Use the email associated with your account. Links expire after 10 minutes.</p>
+              <p class="sc-copy mt-5 text-xs">${preview ? "Temporary access to Harry’s preview account." : "Use the email associated with your account. Links expire after 10 minutes."}</p>
             ` : mode === "confirm" ? html`
               ${busy ? html`<p class="sc-copy mt-5" role="status">${busyLabel}</p>` : account ? html`
                 <p class="sc-copy mt-4">Continue as <strong class="font-medium text-sc-ink">${account.email}</strong>?</p>
@@ -50,7 +52,7 @@ export function authView(state: AuthUiState, actions: AuthUiActions) {
             <div aria-live="polite" aria-atomic="true">${message ? html`<p class="sc-auth-message" role="status">${message}</p>` : ""}</div>
             ${problem ? html`<p class="sc-error mt-6" role="alert">${problem}</p>` : ""}
           </div>
-          <p class="sc-copy text-center text-xs">Secure access · Email magic link</p>
+          <p class="sc-copy text-center text-xs">${preview ? "Temporary preview access" : "Secure access · Email magic link"}</p>
         </section>
       </div></div>`;
 }
