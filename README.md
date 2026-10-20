@@ -1,27 +1,60 @@
 # Elite Body System
 
 Elite Body System uses TypeScript, PostgreSQL, Kysely, Kanel, SAM with lit-html,
-Tailwind CSS, and email magic-link authentication. The signed-in home now contains
-the first port of Harry’s client scorecard. No Abby product functionality or
-history is included. The extraction and current product scope are in [PLAN.md](PLAN.md).
+Tailwind CSS, and email magic-link authentication. Harry’s client workflows are
+ported as typed operations and safe browser views with account-scoped PostgreSQL
+storage. No Abby product functionality or history is included.
 
-## Scorecard preview
+## Client workflows
 
-Sign in and open `/` to review Harry’s dark, phone-width shell, weight/trend/
-consistency cards, and three-pillar daily scorecard. Enter metrics and press Enter
-or move focus to commit them; Escape cancels an edit. Goal tiles fill at the
-prototype’s targets. L to R supports a brain dump, goals, and a starred priority;
-Map, Focus, and sample workout completion update the same pure SAM model.
+Sign in at `/` for the daily scorecard, real weight history, seven-day tracking,
+L to R goals, and configurable nutrition/activity targets. Changes are saved to
+the signed-in account; cross-tab revision conflicts require a reload rather than
+overwriting another tab’s work. The client’s time zone determines today’s date.
 
-This is explicitly a **sample Day 12**. Weight history, consistency, targets,
-the Map, and the training plan are fixtures. Changes live in memory and reset on
-refresh; no fitness data is written to PostgreSQL or browser storage. Account
-authentication and sign-out still use the real auth operations. Profile includes
-a sample reset and sign-out. The other navigation destinations explain their
-upcoming iterations: full onboarding, training logging, courses, and meal analysis.
+Day 1 setup contains Harry’s 34-step flow: training schedule, equipment, story,
+health answers, emergency contact, draft acknowledgement, starting weight,
+identity and first daily priority. Drafts resume across devices. Profile allows
+target changes and reviewing setup. Health flags hold training until the client
+self-confirms doctor clearance. Screening and consent are explicitly **draft-v1**;
+final approved wording is still needed.
 
-The fonts are served locally with their OFL licenses in `src/assets/fonts`.
-There are no external font, AI, WhatsApp, or video requests in this preview.
+`/training` follows the chosen four training days, two recovery days and rest day.
+It supports exercise alternatives, instructions, set/weight/repetition logging,
+notes, previous completed sessions, personal records, a stopwatch, deadline-based
+rest timers, cardio and mobility. Finished sessions update the scorecard.
+`?date=YYYY-MM-DD` opens a specific day; future days are read-only.
+
+`/mindset/map` includes the full Neural Map teaching/build/read flow.
+`/courses/mindset`, `/courses/nutrition` and `/courses/activity` include all twelve
+lesson overviews/tasks, saved answers and server-enforced program-week unlocking.
+Videos are configurable; unavailable media is labelled clearly.
+
+`/meals` accepts descriptions and photos for OpenAI `gpt-6-luna` analysis.
+Set the app’s own `OPENAI_API_KEY` server variable to enable analysis. Photos are
+resized locally to at most 1600 pixels and 1 MiB each (four maximum), sent only
+when analysing, and never stored in PostgreSQL. Requests set `store: false`.
+Clients review estimated ingredients, edit portions/nutrients, then explicitly
+log calories and protein to their scorecard. Unknown micronutrients stay unknown;
+there is no claimed food database verification. Keyboard dictation can supply
+spoken descriptions. Manual entry and reusable My Meals work without AI.
+Meal logging/removal and daily totals are transactional, with idempotent retries.
+
+The fonts are served locally with OFL licenses in `src/assets/fonts`. There is
+no configured WhatsApp integration and no final video URLs yet.
+
+## Configuring videos
+
+Use a direct HTTPS video URL playable by the browser (not a YouTube watch page):
+
+```sh
+npm run content:video -- course:m1 https://media.example.com/lesson.mp4
+npm run content:video -- exercise:wpullup https://media.example.com/pullup.mp4
+npm run content:video -- course:m1 -
+```
+
+This trusted administrative command uses `DATABASE_URL`. There is no public media
+write API. Keys are the IDs in `learning/courses.ts` and `training/catalog.ts`.
 
 ## Local setup
 
@@ -143,6 +176,7 @@ PORT=3000
 EMAIL_MODE=resend
 EMAIL_FROM=onboarding@resend.dev
 RESEND_API_KEY=<your own sending key>
+OPENAI_API_KEY=<your own OpenAI key, optional for manual meals>
 ```
 
 The public domain must target the configured `PORT` (3000 in this example). Set

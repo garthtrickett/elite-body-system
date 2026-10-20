@@ -1,13 +1,15 @@
 # Extraction provenance
 
-The scorecard UI, coaching terminology, sample targets/tolerances, and sample
-exercise/course content were ported from the owner Harry’s `ebs-platform.zip`,
-provided by the operator on 20 October 2026. The source is a single-file vanilla
-JavaScript prototype. This implementation rewrites the shell/scorecard as typed
-functions, a pure SAM acceptor, safe lit-html templates, and Tailwind styles;
-it does not embed the original script or depend on its Claude artifact runtime.
-The archive itself and its later feature implementations are not copied into
-this repository. Preview Map/consistency fixtures are illustrative sample data.
+The scorecard UI, onboarding questions, training catalog/instructions, Neural Map
+teaching and twelve course episodes were ported from the owner Harry’s
+`ebs-platform.zip`, provided by the operator on 20 October 2026. The source is a
+single-file vanilla JavaScript prototype. This implementation uses typed
+functions, pure SAM acceptors, safe lit-html templates, and Tailwind styles;
+it does not embed the original runtime or depend on its Claude artifact APIs.
+Sample client records and preview panels have been replaced by PostgreSQL-backed
+workflows. Meal analysis is a separate OpenAI Responses integration using
+`gpt-6-luna`, as explicitly chosen by the operator. The archive and supplied API
+key are not included in this repository.
 
 The prototype’s Bebas Neue and Work Sans fonts are bundled from the
 [Google Fonts repository](https://github.com/google/fonts), with each font’s
@@ -43,3 +45,7 @@ External implementation references:
 - [Resend send-email interface](https://resend.com/docs/api-reference/emails/send-email)
 - [OWASP token lifecycle guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html)
 - [OWASP session guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+
+- [OpenAI GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna)
+- [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
+- [Image inputs](https://developers.openai.com/api/docs/guides/images-vision)

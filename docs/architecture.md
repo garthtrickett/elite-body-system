@@ -1,34 +1,88 @@
 # Architecture and operation contracts
 
-## Scorecard preview slice
+## Client workflows and persistence
 
-`src/features/scorecard` owns the newly authorized product preview. `index.ts`
-exports immutable data types and typed `Result` operations (`setMetric`,
-`setDailyCheck`, `addGoal`, `selectPriority`) plus `representDay`. Target values
-and tolerances are authoritative in `operations.ts`; representation and UI labels
-use the same constants. `sample.ts` contains explicitly fictional Day 12 data.
+Each vertical slice exports its server contract through `index.ts` and its
+browser contract through `browser.ts`. All operations take typed, named inputs,
+return immutable data or a `Result` with stable codes, and derive identity from
+the authenticated session at the HTTP boundary. Accounts have no access to each
+other’s fitness records. This increment has no coach/administrator web UI.
 
-The browser interface is `browser.ts`. Typed proposals pass through
-`acceptScorecardProposal`; `representScorecard` derives tile completion and
-progress views. Draft inputs are separate from committed values, so invalid
-edits cannot corrupt the scorecard. Enter/blur commits and Escape restores the
-committed value. The native-dialog next-action predicate runs after acceptance
-and render, with duplicate dialog intents suppressed. The browser owns dialog
-focus trapping and restoration. There are no network or storage effects in this
-preview, and therefore no asynchronous scorecard completions to correlate.
+| Slice | Core interface | Durable records |
+| --- | --- | --- |
+| profile | `createProfiles().get/save` | client_profiles, revisioned JSON |
+| scorecard | pure metric/check/goal operations; `createScorecards().get/save/history/ensureStarted`; `adjustNutrition` | daily_scorecards, account/day + revision |
+| training | `createTraining().get/save`, program scheduling and workout validation | workout_sessions, account/day + revision |
+| learning | `createLearning().get/saveMap/readMap/hasRead/saveEpisode` | neural_maps, course_progress, map_reads |
+| content | `createContentMedia().list/setVideo` (trusted writes only) | content_media, HTTPS direct media URLs |
+| meals | `createMeals().get/analyze/log/remove/removeFavorite` | meal_entries, saved_meals, meal_analysis_limits |
 
-`src/browser.ts` composes auth and scorecard through their public browser entry
-points. Auth’s optional `presentHome` adapter receives only its renderable state
-and sign-out action after session resolution. It mounts the scorecard once and
-updates account/busy/error state thereafter without resetting scorecard edits.
-Sign-out continues through the existing correlated auth SAM effects, including
-error feedback and retry. No bearer values enter the scorecard.
+Migrations 002–005 define these tables; Kanel generates the Kysely types from the
+actual schema. External JSON is validated and reconstructed. Drafts are bounded.
+Profile, scorecard, workouts, maps and lesson progress use compare-and-swap
+revisions; a stale writer gets `conflict`, never silent last-write-wins. Initial
+setup completion atomically records the server-owned start date and first daily
+win. Acknowledgement timestamps are server-owned and preserved. The stored consent
+version remains explicitly `draft-v1`; it is not an approved legal document.
 
-Server authentication still gates `/`. There are no fitness HTTP endpoints or
-schema changes. Every refresh reconstructs the labeled sample. Navigation to
-later features opens explicit preview panels rather than claiming to submit or
-save client information. Font assets are allowlisted individually and served
-from the same origin under `font-src 'self'`; inline scripts/styles remain blocked.
+`platform/client-http.ts` adapts the same operations under `/api/client/*`.
+`createAuthenticatedHttp` checks the session, exact Origin, JSON content type and
+CSRF header/cookie before invoking POST handlers. Clients cannot select their
+account identity. Bodies are bounded to 256 KiB, or 6 MiB for meal analysis, with
+eight simultaneous authenticated handlers per instance. Auth keeps its separate
+4 KiB limit. Pages at `/`, `/training`, `/mindset/map`, `/courses/{pillar}` and
+`/meals` require a session. CSP permits self-hosted scripts/styles/fonts and HTTPS
+video, while blocking inline HTML/script execution.
+
+The scorecard derives completion and targets from its saved profile and day.
+Training and Map-read flags are canonical server data; a daily save cannot forge
+them. Training enforces setup/health holds and future-day read-only rules. It
+retains server-owned start/finish timestamps. Rest timers store a deadline, so
+refresh/suspension does not extend the timer. History/PRs compare earlier completed
+sessions of the same exercise. Course unlocking checks program week and completed
+earlier weeks on the server, and completed tasks must have answers.
+
+Browser behavior follows SAM: pure proposal acceptance, derived representation,
+safe lit-html templates, and a once-per-ID effect dispatcher after rendering.
+Every network result correlates both effect ID and kind; newer edits survive
+in-flight saves and stale results are ignored. CSRF values live in transport
+closures, never application models. Native dialogs trap/restore focus. Unsaved
+writes block accidental page exit, and tab restoration refreshes server state.
+
+## Independent meal integration
+
+`createOpenAiMealAnalyzer` is the external-provider seam. It uses a fixed HTTPS
+OpenAI Responses endpoint and `gpt-6-luna`, low reasoning effort, a strict JSON
+schema, a 45-second timeout, bounded output, and `store: false`. Only the meal
+description and selected photos are sent; profile, health answers and account
+identity are excluded. API credentials remain in the server closure. Provider
+payloads, URLs containing secrets and raw provider errors are never logged or
+returned to clients. Missing configuration returns `not_configured`; manual meals
+and saved meals continue to work.
+
+The server validates photo signatures and base64, permits four JPEG/PNG/WebP
+images of at most 1 MiB each, and accepts no remote image URLs. The browser resizes
+and re-encodes selected photos, stripping file metadata. No photos or meal input
+prompts are persisted. Output is validated again after JSON Schema parsing.
+Ingredient nutrition is per 100 grams, portions are editable, and unknown
+micronutrients remain null. AI values are labelled estimates with no claimed USDA
+verification. The client must explicitly approve a review before logging.
+
+Database reservations allow 10 attempts per client and 100 globally per 15-minute
+window, with one active analysis per client and two globally. A global-first row
+lock serializes reservations across replicas; a 60-second lease expires after a
+crash, and release correlates its UUID so an old response cannot clear a new lease.
+Provider throttling returns `rate_limited`; other temporary failures are sanitized.
+
+Logging uses a client-generated UUID retained across retries. One transaction
+inserts the account-scoped meal, optionally saves it to My Meals, and calls the
+public scorecard nutrition adjustment with a locked day row. Duplicate identical
+requests succeed without adding twice; reuse with different data conflicts.
+Removing a meal subtracts its rounded contribution once. Removed entries retain
+a tombstone so a late log retry cannot resurrect them. A failed daily limit check
+rolls the whole meal transaction back. Manual scorecard edits use revisions, so
+a stale tab cannot silently overwrite a newly logged meal. Snapshot responses
+show up to 100 entries for a day and the 30 most recently saved meals.
 
 ## Layout
 
@@ -183,13 +237,12 @@ with structured JSON output; it has no public HTTP endpoint.
 - Expired auth rows are pruned on new link issuance; old rate rows are pruned
   during budget reservation. No general background job or retention framework.
 
-## Limits of the boilerplate
+## Operational limits
 
-Authentication establishes an account, not application authorization. Add actual
-product permissions when there are product operations to protect. There is no
-multi-tenant model, account management UI, email-change flow, session dashboard,
-or persisted fitness domain. The scorecard described above is an in-memory
-product preview. There is also no distributed email outbox/retry worker: a link
+Account ownership authorizes the client operations above. There is no coach role,
+account management UI, email-change flow or session dashboard. Final screening/
+consent copy and videos remain unconfigured. There is no distributed email
+outbox/retry worker: a link
 request is acknowledged without promising successful provider delivery. Failed
 delivery revokes its challenge. Remote provider tests are stubbed; actual email
 delivery is unverified until separately configured and checked.

@@ -1,24 +1,36 @@
 # Elite Body System — extraction and implementation plan
 
-## Current authorized product increment
+## Active client-platform goal
 
-On 20 October 2026, the operator supplied Harry’s `ebs-platform.zip` prototype
-and requested its shell and scorecard inside the existing app, closely matching
-the design and using sample data for review. This expands the original
-boilerplate-only scope below. It does not authorize a wholesale app migration.
+The operator has now authorized completing onboarding/profile with per-client
+PostgreSQL storage and configurable targets, training with logs/history/timers,
+mindset and courses, and meal analysis as a separate integration. Harry’s archive
+is the product reference. Final videos and approved screening/consent wording are
+not available; media must remain configurable and the existing wording must be
+identified as draft. The operator chose OpenAI GPT-6 Luna (`gpt-6-luna`) for
+meal analysis, replacing the prototype’s Claude dependency. Credentials remain
+server-only; the supplied EBS OpenAI key was configured in its Railway app
+service without triggering a deployment.
 
-The signed-in home is the integration point. This increment includes Harry’s
-dark 430px shell, local Bebas Neue/Work Sans fonts, nine scorecard tiles, editable
-numeric metrics and completion rules, weight/trend/consistency cards, bottom
-navigation, L to R goal entry, and daily Map/Focus/sample workout checks. Explicit
-preview panels keep navigation reviewable without suggesting that later flows
-are complete. Authentication and revocation remain real. Fitness state and
-history are sample data, held in memory and reset on refresh.
+Implemented locally: authenticated profile/daily-scorecard storage, the full
+34-step setup and configurable targets, real scorecard history, training logs,
+exercise instructions/alternatives/history/timers, Neural Map teaching/build/read,
+all twelve course episodes with saved tasks and server unlocking, configurable
+media, and an independent meal integration with review, manual entry, My Meals,
+idempotent logging and transactional daily nutrition updates. Focused live Luna
+checks passed for text and a synthetic food-label photo. Full isolated verification passed: 59 server/model tests and 16 Chromium tests,
+plus the production Docker smoke check (migrations, unprivileged runtime, database
+health, HTTPS cookies, assets and private paths). Exact-commit CI is also required
+before merge. Final videos and approved wording remain explicitly unconfigured.
 
-Full onboarding, coach access, configurable per-client targets, fitness database
-persistence, workout logging/timers, course media/progress, and meal analysis
-remain later increments. The original extraction plan and evidence are retained
-below as history.
+## Earlier scorecard increment (historical)
+
+The initial sample scorecard port was merged and deployed before this client
+platform goal. It used fictional Day 12 data and preview panels. The current
+increment replaces those fixtures with durable per-account workflows. Coach
+access, WhatsApp messaging, final course/exercise videos and approved consent
+wording are outside this increment. The original extraction plan and evidence
+are retained below as history.
 
 ## Goal and scope
 
@@ -153,9 +165,10 @@ and [push CI](https://github.com/garthtrickett/elite-body-system/actions/runs/39
 on retry after the authorized visibility change. The final documentation head is
 also checked before merge; its exact-head runs are linked from PR #1.
 
-## Known limits
+## Original foundation limits (historical)
 
-This work creates and verifies boilerplate, not a deployed product. Sending real
+The original extraction phase created and verified boilerplate. Later increments
+added the deployed scorecard and the client workflows described above. Sending real
 email requires the new project's own sender configuration and credentials. Local
 outbox delivery demonstrates the full flow without claiming external delivery.
 Agent-native means the typed operations are callable without UI interaction; it

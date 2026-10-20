@@ -1,20 +1,20 @@
+import { clientDay } from "../profile/browser.ts";
 import { render } from "lit-html";
-import { acceptScorecardProposal, initialScorecardModel, nextScorecardAction, representScorecard } from "./browser-model.ts";
-import type { AccountState, ScorecardProposal } from "./browser-model.ts";
+import type { AccountState, ScorecardProposal, ScorecardState } from "./browser-model.ts";
+import { createScorecardRuntime } from "./browser-runtime.ts";
+import { createScorecardEffects } from "./browser-effects.ts";
 import type { ScorecardActions } from "./browser-actions.ts";
 import { scorecardView } from "./browser-view.ts";
 
 export { acceptScorecardProposal, initialScorecardModel, representScorecard, nextScorecardAction } from "./browser-model.ts";
 export type { ScorecardModel, ScorecardProposal, ScorecardState } from "./browser-model.ts";
+export { createScorecardRuntime } from "./browser-runtime.ts";
 
-export function mountScorecard(root: HTMLElement, config: Readonly<{ account: AccountState; signOut: () => void }>) {
-  let model = initialScorecardModel(config.account);
-  let disposed = false;
-  let shownPanel: typeof model.panel;
-  function present(): void {
-    render(scorecardView(representScorecard(model), actions), root);
-    const effect = nextScorecardAction(model);
-    const panel = effect.kind === "showPanel" ? effect.panel : undefined;
+export function mountScorecard(root: HTMLElement, config: Readonly<{ account: AccountState; signOut: () => void; csrf: string }>) {
+  let shownPanel: ScorecardState["panel"];
+  function present(state: ScorecardState): void {
+    render(scorecardView(state, actions), root);
+    const panel = state.panel;
     if (shownPanel === panel) return;
     shownPanel = panel;
     // Synchronous DOM effects run once after acceptance and rendering. Native dialogs
@@ -24,9 +24,8 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     else if (!panel && dialog?.open) dialog.close();
   }
   function propose(proposal: ScorecardProposal): void {
-    if (disposed) return;
-    model = acceptScorecardProposal(model, proposal);
-    present();
+    observeDay();
+    runtime.propose(proposal);
   }
   const actions: ScorecardActions = {
     changeMetric: input => propose({ kind: "metricChanged", ...input }),
@@ -43,12 +42,34 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     addGoal: () => propose({ kind: "goalAdded" }),
     selectPriority: input => propose({ kind: "prioritySelected", ...input }),
     removeGoal: input => propose({ kind: "goalRemoved", ...input }),
-    resetSample: () => propose({ kind: "sampleReset" }),
+    proposeProfile: proposal => propose({ kind: "profileProposed", proposal }),
+    retrySync: () => propose({ kind: "retrySync" }),
+    reloadClient: () => propose({ kind: "reloadClient" }),
     signOut: config.signOut,
   };
-  present();
+  const runtime = createScorecardRuntime({ account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }) });
+  runtime.propose({ kind: "started" });
+  const keepDialogFocus = (event: KeyboardEvent) => {
+    if (event.key !== "Tab") return;
+    const dialog = root.querySelector<HTMLDialogElement>("dialog[open]"); if (!dialog) return;
+    const controls = Array.from(dialog.querySelectorAll<HTMLElement>("button, input, textarea, select, a[href], [tabindex]"))
+      .filter(element => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0);
+    const first = controls[0], last = controls.at(-1);
+    if (!first || !last) { event.preventDefault(); dialog.focus(); return; }
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first.focus(); }
+  };
+  root.addEventListener("keydown", keepDialogFocus);
+  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.generation > model.savedGeneration || model.profileUi.requestedSave || model.pending?.kind === "saveProfile") event.preventDefault(); };
+  const observeDay = () => { const model = runtime.getModel(); if (model.loaded) runtime.propose({ kind: "dayObserved", date: clientDay({ timezone: model.profile.profile.timezone, now: new Date() }) }); };
+  const dayTimer = window.setInterval(observeDay, 15000);
+  const onVisible = () => { if (document.visibilityState === "visible") observeDay(); };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("beforeunload", protectUnsaved);
   return {
     updateAccount: (input: Readonly<{ account: AccountState }>) => propose({ kind: "accountChanged", account: input.account }),
-    dispose: () => { disposed = true; root.querySelector<HTMLDialogElement>("dialog")?.close(); },
+    dispose: () => { root.removeEventListener("keydown", keepDialogFocus); window.clearInterval(dayTimer); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("beforeunload", protectUnsaved); runtime.dispose(); root.querySelector<HTMLDialogElement>("dialog")?.close(); },
   } as const;
 }
+
+export type { SyncEffect, SyncProposal } from "./browser-sync.ts";

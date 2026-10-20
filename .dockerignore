@@ -9,3 +9,4 @@
 !scripts/build.ts
 !scripts/migrate.ts
 !scripts/provision-account.ts
+!scripts/set-video.ts

@@ -73,6 +73,7 @@ body { margin: 0; }
   .sc-cell-full, .sc-cell-partial { @apply block h-3 rounded-[3px]; }
   .sc-cell-full { @apply bg-accent; }
   .sc-cell-partial { @apply bg-accent/50; }
+  .sc-cell-empty { @apply block h-3 rounded-[3px] bg-white/10; }
   .sc-dialog { @apply fixed inset-0 m-auto h-dvh max-h-dvh w-full max-w-[430px] border-0 bg-sc-bg p-0 text-white; font-family: "Work Sans", system-ui, sans-serif; color-scheme: dark; }
   .sc-dialog::backdrop { @apply bg-black/75; }
   .sc-panel-body { @apply flex min-h-dvh flex-col gap-4 px-5 py-4; padding-top: max(16px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
@@ -85,6 +86,9 @@ body { margin: 0; }
   .sc-icon-button svg { @apply size-5; }
   .sc-icon-button[aria-pressed="true"] svg { fill: currentColor; }
   .sc-textarea { @apply w-full rounded-xl border border-white/15 bg-sc-card p-3 text-base text-white placeholder:text-[#8e8e96]; }
+  .sc-form-field { @apply flex min-w-0 flex-col gap-2; }
+  .sc-choice { @apply rounded-full border border-white/25 px-4 py-2.5 text-sm; }
+  .sc-choice-selected { @apply border-accent bg-accent text-sc-bg; }
   .sc-goal { @apply flex items-center gap-1 rounded-xl bg-sc-card pr-1; }
   .sc-error { @apply text-xs leading-snug text-[#ffaaa5]; }
   .sc-app button { @apply cursor-pointer; }

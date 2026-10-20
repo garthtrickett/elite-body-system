@@ -15,6 +15,7 @@
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.ts",
     "db:generate": "node --env-file-if-exists=.env node_modules/kanel/bin/kanel --config .kanelrc.cjs",
     "account:provision": "node --env-file-if-exists=.env scripts/provision-account.ts",
+    "content:video": "node --env-file-if-exists=.env scripts/set-video.ts",
     "verify": "npm run db:migrate && npm run db:generate && npm run lint && npm run typecheck && npm run build && npm test && npm run test:browser"
   },
   "dependencies": {

@@ -15,7 +15,7 @@ export function mountAuth(root: HTMLElement, config: Readonly<{
   const mode = root.dataset.mode === "home" ? "home" : root.dataset.mode === "confirm" ? "confirm" : "request";
   // Bearer tokens stay in this effect closure, never the SAM model or view state.
   const token = location.hash.slice(1);
-  history.replaceState(null, "", location.pathname);
+  history.replaceState(null, "", location.pathname + location.search);
   const changedLink = () => { if (location.hash) location.reload(); };
   window.addEventListener("hashchange", changedLink);
   const actions: AuthUiActions = {

@@ -1,9 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { addGoal, representDay, selectPriority, setMetric } from "../src/features/scorecard/index.ts";
+import { addGoal, representDay, selectPriority, setMetric, emptyScorecard } from "../src/features/scorecard/index.ts";
+import { completedProfile } from "./support/client.ts";
 import { acceptScorecardProposal, initialScorecardModel, nextScorecardAction, representScorecard } from "../src/features/scorecard/browser.ts";
 
-const initial = () => initialScorecardModel({ email: "preview@example.test", busy: false, problem: "" });
+const initial = () => {
+  const model = acceptScorecardProposal(initialScorecardModel({ email: "preview@example.test", busy: false, problem: "" }), { kind: "started" });
+  return acceptScorecardProposal(model, { kind: "clientLoaded", id: model.pending!.id, result: { ok: true, value: {
+    profile: { profile: completedProfile(), revision: 1 }, day: { date: new Date().toISOString().slice(0, 10), scorecard: { ...emptyScorecard(), values: { ...emptyScorecard().values, weight: 77.5 } }, revision: 0 }, history: [],
+  } } });
+};
 
 test("scorecard operations preserve sample target boundaries and reject invalid numbers without mutating inputs", () => {
   const original = initial().day;
@@ -65,20 +71,19 @@ test("L to R requires a brain dump and one priority; selecting and removing prio
   assert.equal(addGoal({ scorecard: day, text: " " }).ok, false);
 });
 
-test("carousel bounds, dialog intents, sample reset and account changes preserve their separate state", () => {
+test("carousel bounds, dialog intents and account updates preserve scorecard edits", () => {
   const first = initial();
   assert.equal(acceptScorecardProposal(first, { kind: "cardSelected", card: 3 }), first);
   let model = acceptScorecardProposal(first, { kind: "touchStarted", x: 200 });
   model = acceptScorecardProposal(model, { kind: "touchEnded", x: 60 });
   assert.equal(model.card, 1);
-  model = acceptScorecardProposal(model, { kind: "panelOpened", panel: "training" });
-  assert.deepEqual(nextScorecardAction(model), { kind: "showPanel", panel: "training" });
+  model = acceptScorecardProposal(model, { kind: "panelOpened", panel: "profile" });
+  assert.deepEqual(nextScorecardAction(model), { kind: "showPanel", panel: "profile" });
   model = acceptScorecardProposal(model, { kind: "checkToggled", check: "training" });
   const account = { email: "preview@example.test", busy: true, problem: "Sign out failed" };
   model = acceptScorecardProposal(model, { kind: "accountChanged", account });
   assert.equal(model.day.checks.training, true);
-  model = acceptScorecardProposal(model, { kind: "sampleReset" });
-  assert.equal(model.day.checks.training, false);
+  assert.equal(model.day.checks.training, true);
   assert.equal(model.account, account);
   model = acceptScorecardProposal(model, { kind: "panelClosed" });
   assert.deepEqual(nextScorecardAction(model), { kind: "closePanel" });
