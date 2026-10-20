@@ -16,17 +16,25 @@ export const isUuid = (value: unknown): value is string => typeof value === "str
 export const emptyNutrients = (): Nutrients => ({ energy: 0, protein: 0, carbs: 0, fat: 0, fibre: null, iron: null, potassium: null, vitaminC: null });
 export const emptyMeal = (): Meal => ({ name: "My meal", note: "", items: [{ name: "Meal", grams: 100, per100: emptyNutrients(), source: "manual" }] });
 const within = (value: unknown, max: number): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= max;
+export type MealNumberField = "grams" | Macro | Micro;
+/** Shared limits for server validation and field-level review feedback. */
+export function mealNumberProblem(input: Readonly<{ field: MealNumberField; value: unknown }>): string | null {
+  const { field, value } = input;
+  if (MICROS.includes(field as Micro) && value === null) return null;
+  const max = field === "grams" ? 10000 : field === "potassium" ? 100000 : field === "energy" || MICROS.includes(field as Micro) ? 1000 : 100;
+  return within(value, max) ? null : `Enter a number between 0 and ${max.toLocaleString("en-GB")}.`;
+}
 
 export function parseMeal(value: unknown): ClientResult<Meal> {
   const fail = () => err({ code: "invalid_input", message: "Check the meal name, portions and nutrition values." } as const);
   if (!isRecord(value) || !isText(value.name, 100) || !value.name.trim() || !isText(value.note, 2000) || !Array.isArray(value.items) || value.items.length < 1 || value.items.length > 12) return fail();
   const items: Ingredient[] = [];
   for (const item of value.items) {
-    if (!isRecord(item) || !isText(item.name, 120) || !item.name.trim() || !within(item.grams, 10000) || !isRecord(item.per100) || (item.source !== "ai_estimate" && item.source !== "manual")) return fail();
+    if (!isRecord(item) || !isText(item.name, 120) || !item.name.trim() || mealNumberProblem({ field: "grams", value: item.grams }) || !isRecord(item.per100) || (item.source !== "ai_estimate" && item.source !== "manual")) return fail();
     const n = item.per100;
-    if (!within(n.energy, 1000) || ![n.protein, n.carbs, n.fat].every(x => within(x, 100)) || !MICROS.every(key => n[key] === null || within(n[key], key === "potassium" ? 100000 : 1000))) return fail();
-    items.push({ name: item.name.trim(), grams: item.grams, source: item.source,
-      per100: { energy: n.energy, protein: n.protein as number, carbs: n.carbs as number, fat: n.fat as number, fibre: n.fibre as number | null, iron: n.iron as number | null, potassium: n.potassium as number | null, vitaminC: n.vitaminC as number | null } });
+    if ([...MACROS, ...MICROS].some(field => mealNumberProblem({ field, value: n[field] }))) return fail();
+    items.push({ name: item.name.trim(), grams: item.grams as number, source: item.source,
+      per100: { energy: n.energy as number, protein: n.protein as number, carbs: n.carbs as number, fat: n.fat as number, fibre: n.fibre as number | null, iron: n.iron as number | null, potassium: n.potassium as number | null, vitaminC: n.vitaminC as number | null } });
   }
   const meal = { name: value.name.trim(), note: value.note, items };
   const totals = mealTotals(meal);

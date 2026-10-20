@@ -33,7 +33,7 @@ function panelContent(state: ScorecardState, actions: ScorecardActions) {
     case "ltr": return ltrPanel(state, actions);
     case "profile": return html`<p class="sc-copy break-words">${state.account.email}</p>
       ${profileView(state.profileUi, { propose: actions.proposeProfile, close: actions.closePanel }, state.pending?.kind === "saveProfile")}
-      <button class="sc-primary" ?disabled=${state.account.busy} @click=${actions.signOut}>${state.account.busy ? "Signing out…" : "Sign out"}</button>
+      <button class="sc-secondary sc-sign-out" ?disabled=${state.account.busy} @click=${actions.signOut}>${state.account.busy ? "Signing out…" : "Sign out"}</button>
       ${state.account.problem ? html`<p role="alert" class="sc-error">${state.account.problem}</p>` : nothing}`;
     case "setup": return onboardingView(state.profileUi, { propose: actions.proposeProfile, close: actions.closePanel }, state.pending?.kind === "saveProfile");
     default: return nothing;

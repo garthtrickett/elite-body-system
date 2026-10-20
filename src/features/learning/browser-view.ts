@@ -41,10 +41,13 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
   const nextStatus = next ? episodeStatus({ episode: next, snapshot }) : undefined;
   const done = episode ? !!snapshot.progress.done[episode.id] : false;
   const url = episode ? snapshot.videoUrls[`course:${episode.id}`] : undefined;
+  const welcomeCard = (className: string) => html`<section class=${`${className} sc-panel-card`}><p class="sc-eyebrow">${!snapshot.setupComplete ? "Start here" : next ? "Your next lesson" : "Course complete"}</p><h2 class="sc-display mt-3 text-3xl">${!snapshot.setupComplete ? "Set up your program" : next?.title ?? "Keep putting it into practice."}</h2><p class="sc-copy mt-3">${!snapshot.setupComplete ? "Complete Day 1 setup to unlock your lessons." : nextStatus === "scheduled" ? `Unlocks in week ${next?.week}. You’re in week ${snapshot.week}. Keep building your daily rhythm while you wait.` : nextStatus === "blocked" ? "Complete the earlier lesson to unlock this one." : available ? "Read the overview and work through the tasks. Your answers are saved as you go." : "Review your completed lessons whenever you need a reminder."}</p>
+        ${!snapshot.setupComplete ? html`<a class="sc-primary mt-4" href="/?panel=setup">Complete setup</a>` : next && nextStatus === "open" ? html`<button class="sc-primary mt-4" @click=${() => propose({ kind: "episodeSelected", id: next.id })}>Start lesson</button>` : html`<a class="sc-secondary mt-4" href="/">Go to today’s scorecard</a>`}</section>`;
   return html`<div class="sc-course-layout">
     <div class="sc-course-list ${episode ? "sc-course-list-concealed" : ""}">
       <div class="sc-course-list-heading"><p class="sc-eyebrow">${pillar} course · Week ${snapshot.week}</p><h1 class="sc-display mt-2 text-[40px] leading-[1.1]">${titles[pillar]}</h1>
         <p class="sc-copy mt-3">One episode every three weeks, alongside the other two pillars.</p></div>
+      ${!episode ? welcomeCard("sc-course-next") : nothing}
       ${!snapshot.setupComplete ? html`<p class="sc-copy">Complete Day 1 setup to unlock your first lesson.</p><a class="sc-secondary" href="/?panel=setup">Complete your setup</a>` : nothing}
       ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>Neural Map · Five-part build ›</a>` : nothing}
       ${EPISODES.filter(item => item.pillar === pillar).map(item => {
@@ -66,8 +69,7 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
             @input=${(event: Event) => propose({ kind: "answerChanged", index, value: (event.target as HTMLTextAreaElement).value })}></textarea></label>`)}
         <button class="sc-primary" ?disabled=${state.saving || done} @click=${() => propose({ kind: "episodeCompleted" })}>${done ? "✓ Lesson complete" : "Mark lesson complete"}</button>
       </div>
-    </article>` : html`<section class="sc-course-welcome sc-panel-card"><p class="sc-eyebrow">${!snapshot.setupComplete ? "Start here" : next ? "Your next lesson" : "Course complete"}</p><h2 class="sc-display mt-3 text-3xl">${!snapshot.setupComplete ? "Set up your program" : next?.title ?? "Keep putting it into practice."}</h2><p class="sc-copy mt-3">${!snapshot.setupComplete ? "Complete Day 1 setup to unlock your lessons." : nextStatus === "scheduled" ? `Unlocks in week ${next?.week}. You’re in week ${snapshot.week}. Keep building your daily rhythm while you wait.` : nextStatus === "blocked" ? "Complete the earlier lesson to unlock this one." : available ? "Read the overview and work through the tasks. Your answers are saved as you go." : "Review your completed lessons whenever you need a reminder."}</p>
-        ${!snapshot.setupComplete ? html`<a class="sc-primary mt-4" href="/?panel=setup">Complete setup</a>` : next && nextStatus === "open" ? html`<button class="sc-primary mt-4" @click=${() => propose({ kind: "episodeSelected", id: next.id })}>Start lesson</button>` : html`<a class="sc-secondary mt-4" href="/">Go to today’s scorecard</a>`}</section>`}
+    </article>` : html`${welcomeCard("sc-course-welcome")}`}
   </div>`;
 }
 

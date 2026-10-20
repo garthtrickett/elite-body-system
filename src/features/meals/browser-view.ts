@@ -7,22 +7,25 @@ import type { Macro, Micro } from "./data.ts";
 type Actions = Readonly<{ propose: (proposal: MealProposal) => void; photos: (files: FileList | null) => void; log: () => void }>;
 const names: Readonly<Record<Macro | Micro, string>> = { energy: "Calories", protein: "Protein", carbs: "Carbs", fat: "Fat", fibre: "Fibre", iron: "Iron", potassium: "Potassium", vitaminC: "Vitamin C" };
 const unit = (key: Macro | Micro) => key === "energy" ? "kcal" : key === "iron" || key === "potassium" || key === "vitaminC" ? "mg" : "g";
+const errorId = (key: string) => `meal-error-${key.replace(":", "-")}`;
+const fieldError = (state: MealState, key: string) => state.fieldErrors[key] ? html`<span id=${errorId(key)} class="sc-field-error" role="alert">${state.fieldErrors[key]}</span>` : nothing;
 const displayDate = (date: string | undefined) => date ? new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)) : "selected day";
 function reviewView(state: MealState, actions: Actions) {
   const meal = state.draft; if (!meal) return nothing;
-  return html`<p class="sc-eyebrow">Review before logging</p><h1 class="sc-display text-[42px] leading-[1.1]">Make it yours.</h1>
+  return html`<p class="sc-eyebrow">Review before logging</p><h1 class="sc-display sc-review-title text-[42px] leading-[1.1]" tabindex="-1">Make it yours.</h1>
     <p class="sc-copy">Check portions and ingredients, including oils and sauces. ${meal.items.some(item => item.source === "ai_estimate") ? "Photo portions and AI nutrition are estimates. No food database lookup has been performed." : "Enter nutrition from your label or known meal totals."}</p>
     <fieldset class="contents" ?disabled=${state.locked}>
-      <label class="sc-form-field"><span class="sc-label">Meal name</span><input class="sc-textarea" maxlength="100" .value=${live(meal.name)} @input=${(e: Event) => actions.propose({ kind: "draftNamed", value: (e.target as HTMLInputElement).value })}></label>
+      <label class="sc-form-field"><span class="sc-label">Meal name</span><input class="sc-textarea" aria-invalid=${!!state.fieldErrors.name} aria-describedby=${state.fieldErrors.name ? errorId("name") : nothing} maxlength="100" .value=${live(meal.name)} @input=${(e: Event) => actions.propose({ kind: "draftNamed", value: (e.target as HTMLInputElement).value })}>${fieldError(state, "name")}</label>
       <details class="sc-meal-notes"><summary class="sc-copy">Notes and assumptions <span class="text-xs">${meal.note ? "(added)" : "(optional)"}</span></summary><label class="sc-form-field"><span class="sr-only">Notes and assumptions</span><textarea class="sc-textarea" rows="2" maxlength="2000" .value=${live(meal.note)} @input=${(e: Event) => actions.propose({ kind: "draftNoted", value: (e.target as HTMLTextAreaElement).value })}></textarea></label></details>
       ${meal.items.map((item, index) => {
         const nutrient = (field: Macro | Micro) => html`<label class="sc-form-field"><span class="text-xs text-sc-muted">${names[field]} (${unit(field)})</span><input class="sc-textarea min-w-0" inputmode="decimal" aria-label=${`${names[field]} per 100g for ingredient ${index + 1}`}
+          aria-invalid=${!!state.fieldErrors[`${index}:${field}`]} aria-describedby=${state.fieldErrors[`${index}:${field}`] ? errorId(`${index}:${field}`) : nothing}
           .value=${live(state.fields[`${index}:${field}`] ?? (item.per100[field] === null ? "" : String(item.per100[field])))}
-          @input=${(e: Event) => actions.propose({ kind: "fieldChanged", index, field, value: (e.target as HTMLInputElement).value })} @change=${() => actions.propose({ kind: "fieldCommitted", index, field })}></label>`;
+          @input=${(e: Event) => actions.propose({ kind: "fieldChanged", index, field, value: (e.target as HTMLInputElement).value })} @change=${() => actions.propose({ kind: "fieldCommitted", index, field })}>${fieldError(state, `${index}:${field}`)}</label>`;
         return html`<section class="sc-panel-card space-y-3"><div class="flex items-center justify-between gap-3"><h2 class="sc-label">Ingredient ${index + 1}</h2><button class="sc-text-action sc-copy text-xs underline" ?disabled=${meal.items.length === 1} @click=${() => actions.propose({ kind: "ingredientRemoved", index })}>Remove ingredient ${index + 1}</button></div>
-          <label class="sc-form-field"><span class="sr-only">Ingredient ${index + 1} name</span><input class="sc-textarea" aria-label=${`Ingredient ${index + 1} name`} maxlength="120" .value=${live(item.name)} @input=${(e: Event) => actions.propose({ kind: "ingredientNamed", index, value: (e.target as HTMLInputElement).value })}></label>
-          <label class="sc-form-field"><span class="sc-label">Portion (g)</span><input class="sc-textarea" inputmode="decimal" aria-label=${`Portion for ingredient ${index + 1}`} .value=${live(state.fields[`${index}:grams`] ?? String(item.grams))}
-            @input=${(e: Event) => actions.propose({ kind: "fieldChanged", index, field: "grams", value: (e.target as HTMLInputElement).value })} @change=${() => actions.propose({ kind: "fieldCommitted", index, field: "grams" })}></label>
+          <label class="sc-form-field"><span class="sr-only">Ingredient ${index + 1} name</span><input class="sc-textarea" aria-label=${`Ingredient ${index + 1} name`} aria-invalid=${!!state.fieldErrors[`${index}:name`]} aria-describedby=${state.fieldErrors[`${index}:name`] ? errorId(`${index}:name`) : nothing} maxlength="120" .value=${live(item.name)} @input=${(e: Event) => actions.propose({ kind: "ingredientNamed", index, value: (e.target as HTMLInputElement).value })}>${fieldError(state, `${index}:name`)}</label>
+          <label class="sc-form-field"><span class="sc-label">Portion (g)</span><input class="sc-textarea" inputmode="decimal" aria-label=${`Portion for ingredient ${index + 1}`} aria-invalid=${!!state.fieldErrors[`${index}:grams`]} aria-describedby=${state.fieldErrors[`${index}:grams`] ? errorId(`${index}:grams`) : nothing} .value=${live(state.fields[`${index}:grams`] ?? String(item.grams))}
+            @input=${(e: Event) => actions.propose({ kind: "fieldChanged", index, field: "grams", value: (e.target as HTMLInputElement).value })} @change=${() => actions.propose({ kind: "fieldCommitted", index, field: "grams" })}>${fieldError(state, `${index}:grams`)}</label>
           <p class="sc-label text-xs">Nutrition per 100 g · ${item.source === "ai_estimate" ? "AI estimate" : "Entered manually"}</p><div class="grid grid-cols-2 gap-3">${MACROS.map(nutrient)}</div>
           <details><summary class="sc-copy cursor-pointer py-2 text-xs">Fibre and micronutrients</summary><p class="sc-copy mb-3 text-xs">Leave unknown values blank.</p><div class="grid grid-cols-2 gap-3">${MICROS.map(nutrient)}</div></details></section>`;
       })}
@@ -31,10 +34,11 @@ function reviewView(state: MealState, actions: Actions) {
 }
 function reviewSummary(state: MealState, actions: Actions) {
   return html`<fieldset class="sc-meal-summary" ?disabled=${state.locked}>
-    ${state.totals ? html`<section class="sc-panel-card border border-sc-border" aria-label="Meal totals"><h2 class="sc-label">Meal totals</h2><div class="mt-3 grid grid-cols-2 gap-3">${MACROS.map(key => html`<p class="sc-copy text-xs">${names[key]}<strong class="mt-1 block text-lg text-sc-ink">${state.totals?.[key]} ${unit(key)}</strong></p>`)}</div>
+    ${state.totals ? html`<section class="sc-panel-card sc-desktop-totals border border-sc-border" aria-label="Meal totals"><h2 class="sc-label">Meal totals</h2><div class="mt-3 grid grid-cols-2 gap-3">${MACROS.map(key => html`<p class="sc-copy text-xs">${names[key]}<strong class="mt-1 block text-lg text-sc-ink">${state.totals?.[key]} ${unit(key)}</strong></p>`)}</div>
         <p class="sc-copy mt-3 text-xs">${MICROS.map(key => `${names[key]} ${state.totals?.[key] === null ? "unknown" : `${state.totals?.[key]} ${unit(key)}`}`).join(" · ")}</p></section>` : nothing}
+      ${state.totals ? html`<details class="sc-mobile-nutrients"><summary class="sc-copy">Nutrition breakdown</summary><div class="sc-copy mt-2 text-xs">${(["carbs", "fat", ...MICROS] as const).map(key => html`<p>${names[key]}: ${state.totals?.[key] === null ? "unknown" : `${state.totals?.[key]} ${unit(key)}`}</p>`)}</div></details>` : nothing}
       <label class="sc-copy flex items-center gap-3"><input type="checkbox" .checked=${state.favorite} @change=${(e: Event) => actions.propose({ kind: "favoriteChanged", value: (e.target as HTMLInputElement).checked })}>Save to My Meals for next time</label>
-      <button class="sc-primary sc-review-log-full" @click=${actions.log}>Log meal for ${displayDate(state.snapshot?.date)}</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "draftCancelled" })}>Cancel review</button>
+      <button class="sc-primary sc-review-log-full" ?disabled=${!state.canLog} @click=${actions.log}>Log meal for ${displayDate(state.snapshot?.date)}</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "draftCancelled" })}>Cancel review</button>
   </fieldset>`;
 }
 function captureView(state: MealState, actions: Actions) {
@@ -59,10 +63,14 @@ function favoritesView(state: MealState, actions: Actions) {
 </fieldset>`;
 }
 export function mealsView(state: MealState, actions: Actions) {
-  return workspace({ page: "meals", navigationDisabled: state.locked,
-    mobileFooter: state.draft ? html`<div class="sc-meal-quick-log"><div><p class="sc-label">Meal totals</p><p class="sc-copy text-xs" aria-live="polite">${state.totals?.energy ?? "—"} kcal · ${state.totals?.protein ?? "—"} g protein</p></div><button class="sc-primary" ?disabled=${state.locked} @click=${actions.log}>Log meal for ${displayDate(state.snapshot?.date)}</button></div>` : undefined,
-    content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: Event) => { if (state.locked) e.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
-    ${state.error ? html`<p class="sc-error" role="alert">${state.error}</p>${state.retry ? html`<button class="sc-secondary" @click=${() => actions.propose({ kind: "retry" })}>Retry same action</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "reload" })}>Reload saved meals</button>` : nothing}` : nothing}
+  return workspace({ page: "meals", navigationDisabled: state.locked, navigate: href => actions.propose({ kind: "navigationRequested", href }),
+    mobileFooter: state.draft ? html`<div class="sc-meal-quick-log"><div><p class="sc-label">Meal totals</p><p class="sc-copy sc-meal-footer-status text-xs" aria-live="polite">${Object.keys(state.fieldErrors).length ? "Check highlighted fields" : !state.totals ? "Check meal details" : `${state.totals.energy} kcal · ${state.totals.protein} g protein`}</p></div><button class="sc-primary" ?disabled=${state.locked || !state.canLog} aria-label=${`Log meal for ${displayDate(state.snapshot?.date)}`} @click=${actions.log}>Log meal</button></div>` : undefined,
+    content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: MouseEvent) => {
+      if (state.locked) { e.preventDefault(); return; }
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault(); actions.propose({ kind: "navigationRequested", href: "/" });
+    }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+    ${state.error && !Object.keys(state.fieldErrors).length ? html`<p class="sc-error sc-meal-error" tabindex="-1" role="alert">${state.error}</p>${state.retry ? html`<button class="sc-secondary" @click=${() => actions.propose({ kind: "retry" })}>Retry same action</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "reload" })}>Reload saved meals</button>` : nothing}` : nothing}
     ${state.busy ? html`<p class="sc-copy" role="status">${state.pending?.kind === "analyze" ? "Analysing your meal…" : state.pending?.kind === "preparePhotos" ? "Preparing your photos…" : state.pending?.kind === "load" ? "Loading your meals…" : "Saving your meal…"}</p>` : nothing}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
     ${state.snapshot ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Meal date</span><input class="sc-textarea" type="date" aria-label="Meal date" ?disabled=${state.locked} .value=${live(state.snapshot.date)} @change=${(e: Event) => actions.propose({ kind: "dateChanged", value: (e.target as HTMLInputElement).value })}></label>

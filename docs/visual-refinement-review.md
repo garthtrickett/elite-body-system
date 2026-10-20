@@ -129,3 +129,39 @@ wide widths, setup now scrolls as one dialog with its close header retained.
 A dedicated 844×390 long-health-form check covers both ends of that dialog.
 The preview-login tests close their browser page before stopping their owned
 HTTP server, fixing a CI teardown hang without changing login assertions.
+
+## Independent review follow-up: 11 findings
+
+The operator requested implementing all findings from the second, independent
+live audit of `042feff`, then merging and deploying the result. This increment
+keeps the existing data schema and provider contracts. Meal review feedback uses
+the same numeric limits as server parsing; navigation confirmation is a correlated
+SAM effect, and DOM focus/scroll effects follow accepted state.
+
+| # | Before | After | Why |
+| --- | --- | --- | --- |
+| 1 | Meal navigation silently discarded unfinished work | Explicit discard confirmation for workspace/back links, plus browser Back/refresh protection | Let users cancel departure and retain the exact draft |
+| 2 | Invalid meal values lacked nearby feedback and Log stayed available | Named, described inline errors; correction status in the persistent summary; Log disabled until valid | Identify the problem without losing the input |
+| 3 | Review inherited capture's scroll offset | Focus and reveal the review heading once on entry | Establish the new state and meal name without moving users during edits |
+| 4 | Exercise arrows left the selected card outside its strip | Reveal the accepted selection horizontally without vertical page movement | Keep list and detail connected, including under reduced motion |
+| 5 | Mobile locked courses omitted the next step | Reuse the next-lesson explanation and action after the mobile course heading | Offer the same useful guidance on phones and tablets |
+| 6 | More destinations had no visible active location | Active More indicator and highlighted current destination | Preserve navigation context in both states |
+| 7 | More overlay required manually toggling its trigger | Native automatic popover with Escape and outside dismissal | Provide predictable keyboard and pointer dismissal |
+| 8 | Landscape footer/navigation consumed 130px | Compact short-height controls and review header | Leave at least 286px for a 390px-high task viewport |
+| 9 | Mobile repeated full totals and persistent totals | Concise persistent energy/protein; optional remaining nutrient breakdown | Retain detail without duplicate primary totals |
+| 10 | Sign out looked like the primary task action | Separate, compact secondary action | Reduce exit prominence relative to saving |
+| 11 | Map teaching prose spanned long card lines | Paragraph measure capped at 65ch inside the existing layout | Keep explanatory reading comfortable |
+
+`test/independent-fixes-sam.test.ts` checks numeric feedback, draft retention,
+correlated navigation decisions, unsafe destinations and uncertain-write guards.
+`test/browser/independent-fixes.spec.ts` exercises real discard/cancel decisions,
+browser Back, meal validation/recovery, review entry focus, carousel geometry,
+More state/dismissal, mobile locked courses, short landscape space, secondary
+sign-out and the rendered prose measure. Existing logging/retry tests still verify
+that saved meal totals and idempotency survive the UI changes.
+
+Local full isolated verification passed 69 server/model tests and 42 Chromium
+tests, with conventions, strict typechecking, build, migrations and generated
+schema types unchanged. The broad screenshot sweep and exact-commit CI remain
+release gates; final deployment and live acceptance evidence are recorded in the
+pull request.

@@ -68,7 +68,9 @@ try {
   value(await training.save({ accountId: mature.id, revision: 0, workout: { ...history.workout, sets: { wpullup: [{ kg: 12, reps: 5, done: true }] }, notes: { wpullup: "Controlled reps with a full range." } }, finish: true }));
   for (const viewport of [{ name: "desktop", width: 1440, height: 1000 }, { name: "mobile", width: 390, height: 844 }, { name: "compact-desktop", width: 1024, height: 768, edge: true }, { name: "small-mobile", width: 320, height: 568, edge: true }, { name: "tablet", width: 768, height: 1024, edge: true }, { name: "landscape", width: 844, height: 390, edge: true }]) {
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: "reduce", hasTouch: viewport.width < 1024 });
-    const page = await context.newPage(); page.on("pageerror", error => errors.push(`${viewport.name}: ${error.message}`));
+    const page = await context.newPage();
+    page.on("dialog", async dialog => { if (dialog.type() === "beforeunload") await dialog.accept(); });
+    page.on("pageerror", error => errors.push(`${viewport.name}: ${error.message}`));
     const directory = resolve(output, viewport.name); await mkdir(directory, { recursive: true });
     async function capture(name: string) {
       await page.evaluate(async () => { await document.fonts.ready; window.scrollTo(0, 0); document.querySelector(".sc-workspace-body")?.scrollTo(0, 0); await new Promise(requestAnimationFrame); });
