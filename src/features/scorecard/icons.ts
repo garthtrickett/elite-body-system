@@ -1,6 +1,6 @@
 import { svg } from "lit-html";
 
-export type IconName = "nutrition" | "activity" | "mindset" | "flag" | "scorecard" | "profile" | "check" | "flame" | "back" | "plus" | "star";
+export type IconName = "nutrition" | "activity" | "mindset" | "flag" | "scorecard" | "profile" | "check" | "back" | "plus" | "star";
 export function icon(name: IconName) {
   const paths = {
     nutrition: svg`<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>`,
@@ -10,7 +10,6 @@ export function icon(name: IconName) {
     scorecard: svg`<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>`,
     profile: svg`<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>`,
     check: svg`<path d="M20 6L9 17l-5-5"/>`,
-    flame: svg`<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a6.5 6.5 0 1 1-13 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>`,
     back: svg`<path d="M15 18l-6-6 6-6"/>`,
     plus: svg`<path d="M12 5v14M5 12h14"/>`,
     star: svg`<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>`,

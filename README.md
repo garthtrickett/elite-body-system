@@ -40,7 +40,9 @@ there is no claimed food database verification. Keyboard dictation can supply
 spoken descriptions. Manual entry and reusable My Meals work without AI.
 Meal logging/removal and daily totals are transactional, with idempotent retries.
 
-The fonts are served locally with OFL licenses in `src/assets/fonts`. There is
+The app follows Harry's [brand implementation plan](docs/brand/brand-implementation-plan.md):
+self-hosted Instrument Serif and Geist, warm monochrome surfaces and restrained
+olive details. Fonts and OFL licences are in `src/assets/fonts`. There is
 no configured WhatsApp integration and no final video URLs yet.
 
 ## Configuring videos

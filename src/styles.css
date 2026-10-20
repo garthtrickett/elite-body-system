@@ -1,109 +1,156 @@
 @import "tailwindcss";
 @source "./features/**/*.ts";
 
+/* Source palette: Brand Foundations pp. 14–15. Other neutrals are UI roles. */
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --color-accent: #d8ff3d;
-  --color-sc-bg: #0a0a0a;
-  --color-sc-card: #161616;
-  --color-sc-muted: #a0a0a6;
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --color-brand-black: #11100e;
+  --color-brand-white: #f3f0ea;
+  --color-brand-grey: #86827b;
+  --color-accent: #6a6c4b;
+  --color-sc-bg: var(--color-brand-black);
+  --color-sc-ink: var(--color-brand-white);
+  --color-sc-card: #1a1916;
+  --color-sc-selected: #27251f;
+  --color-sc-muted: #a6a095;
+  --color-sc-copy: #c8c2b8;
+  --color-sc-border: #767168;
+  --color-sc-problem: #f3f0ea;
 }
 
-body { margin: 0; }
-
 @font-face {
-  font-family: "Bebas Neue";
+  font-family: "Instrument Serif";
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/assets/fonts/bebas-neue.ttf") format("truetype");
+  src: url("/assets/fonts/instrument-serif-regular.woff2") format("woff2");
 }
 @font-face {
-  font-family: "Work Sans";
-  font-style: normal;
-  font-weight: 100 900;
+  font-family: "Instrument Serif";
+  font-style: italic;
+  font-weight: 400;
   font-display: swap;
-  src: url("/assets/fonts/work-sans.ttf") format("truetype");
+  src: url("/assets/fonts/instrument-serif-italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Geist";
+  font-style: normal;
+  font-weight: 400 500;
+  font-display: swap;
+  src: url("/assets/fonts/geist.woff2") format("woff2");
 }
 
+html { scroll-padding-block-end: 7rem; }
+body { margin: 0; background: var(--color-sc-bg); color: var(--color-sc-ink); font-family: var(--font-sans); font-synthesis: none; color-scheme: dark; }
+strong, b { font-weight: 500; }
+
 @layer components {
-  .sc-app { @apply min-h-dvh bg-sc-bg text-white; color-scheme: dark; font-family: "Work Sans", system-ui, sans-serif; }
+  .sc-app { @apply min-h-dvh bg-sc-bg text-sc-ink; }
   .sc-shell { @apply relative mx-auto flex min-h-dvh w-full max-w-[430px] flex-col; padding-top: env(safe-area-inset-top, 0px); }
-  .sc-display { font-family: "Bebas Neue", "Arial Narrow", sans-serif; letter-spacing: 0.5px; }
-  .sc-content { @apply flex flex-1 flex-col gap-[13px] pt-[13px]; }
-  .sc-streak { @apply flex items-center gap-[5px] rounded-full bg-white/[0.08] px-[11px] py-[5px] text-xs font-bold; }
-  .sc-label { @apply text-[10px] leading-[14px] font-bold tracking-[1px] text-[#b4b4ba] uppercase; }
-  .sc-progress-card { @apply min-h-[164px] rounded-[20px] border border-white/[0.06] bg-sc-card p-[13px]; }
-  .sc-tile-grid { @apply grid grid-cols-3 gap-1.5; }
-  .sc-tile { @apply flex min-h-[100px] min-w-0 flex-col gap-[5px] rounded-[14px] border-[1.5px] border-transparent bg-sc-card px-2.5 py-[11px]; transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; }
-  .sc-tile-done { @apply border-accent bg-accent text-sc-bg; }
-  .sc-tile-done .sc-label, .sc-tile-done .sc-target, .sc-tile-done .sc-unit, .sc-tile-done .sc-ltr-summary { color: #343b16; }
-  .sc-tile-done .sc-number, .sc-tile-done .sc-check-button, .sc-tile-done .sc-training-mark { @apply text-sc-bg; }
-  .sc-tile-done .sc-target { @apply font-extrabold; }
-  .sc-number { @apply min-w-0 w-full border-0 border-b-2 border-transparent bg-transparent p-0 text-[26px] leading-none text-white placeholder:text-[#72727a]; height: 30px; font-family: "Bebas Neue", "Arial Narrow", sans-serif; border-radius: 0; }
-  .sc-number:focus { @apply border-current outline-none; }
-  .sc-number[aria-invalid="true"] { @apply border-[#ffaaa5]; }
-  .sc-weight-input { @apply w-[3.8ch] text-[56px]; height: 56px; }
-  .sc-with-unit { width: 3.2ch; }
-  .sc-unit { @apply shrink-0 text-sm text-sc-muted; font-family: "Bebas Neue", "Arial Narrow", sans-serif; }
-  .sc-target { @apply text-[10px] leading-[14px] text-sc-muted; }
-  .sc-section-heading { @apply mb-[7px] flex min-h-[28px] items-center gap-[7px]; }
-  .sc-section-button { @apply flex items-center py-1 text-xs font-bold tracking-[1px] uppercase; }
-  .sc-log-button { @apply ml-auto flex items-center gap-1 rounded-full border-[1.5px] border-accent/55 px-2.5 py-1 text-[11px] leading-none font-extrabold text-accent; }
-  .sc-training-tile { @apply border-dashed border-white/25; }
-  .sc-training-mark { @apply flex h-6 w-6 items-center text-[23px] leading-none text-sc-muted; font-family: "Bebas Neue", "Arial Narrow", sans-serif; }
-  .sc-training-button { @apply mt-auto w-full rounded-full bg-accent py-1.5 text-xs font-extrabold text-sc-bg; }
-  .sc-tile-done .sc-training-button { @apply bg-black/15; }
-  .sc-map-tile { @apply border-dashed border-accent; }
-  .sc-check-button { @apply -my-1 -ml-1 flex size-8 items-center justify-center p-1 text-white; }
-  .sc-check-button svg { @apply size-6; stroke-width: 3; }
-  .sc-ltr-summary { @apply my-auto text-[11px] leading-[1.35] text-[#e6e6ea]; }
-  .sc-dot-button { @apply flex h-6 w-8 items-center justify-center; }
-  .sc-dot, .sc-dot-active { @apply block h-1 rounded-full; }
-  .sc-dot { @apply w-1 bg-white/25; }
-  .sc-dot-active { @apply w-4 bg-accent; }
-  .sc-nav { @apply sticky bottom-0 z-10 mt-1 flex items-center justify-around border-t border-white/10 bg-sc-bg pt-1; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
-  .sc-nav-button { @apply relative flex size-11 items-center justify-center text-[#acacb2]; }
-  .sc-nav-button svg { @apply size-[21px]; }
-  .sc-nav-active { @apply text-accent; }
-  .sc-nav-active::after { @apply absolute bottom-0 h-1 w-1 rounded-full bg-accent; content: ""; }
-  .sc-consistency { @apply w-full table-fixed border-separate text-[9px]; border-spacing: 4px 3px; }
-  .sc-consistency th { @apply font-medium text-sc-muted; }
-  .sc-consistency th:first-child { @apply w-[65px] text-left text-[9px] uppercase; }
-  .sc-cell-full, .sc-cell-partial { @apply block h-3 rounded-[3px]; }
-  .sc-cell-full { @apply bg-accent; }
-  .sc-cell-partial { @apply bg-accent/50; }
-  .sc-cell-empty { @apply block h-3 rounded-[3px] bg-white/10; }
-  .sc-dialog { @apply fixed inset-0 m-auto h-dvh max-h-dvh w-full max-w-[430px] border-0 bg-sc-bg p-0 text-white; font-family: "Work Sans", system-ui, sans-serif; color-scheme: dark; }
-  .sc-dialog::backdrop { @apply bg-black/75; }
-  .sc-panel-body { @apply flex min-h-dvh flex-col gap-4 px-5 py-4; padding-top: max(16px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
-  .sc-copy { @apply text-sm leading-relaxed text-[#c8c8ce]; }
-  .sc-eyebrow { @apply text-xs font-bold tracking-[1px] text-accent uppercase; }
-  .sc-panel-card { @apply rounded-[14px] bg-sc-card p-4; }
-  .sc-primary { @apply rounded-full bg-accent px-5 py-3.5 text-sm font-extrabold text-sc-bg disabled:cursor-wait disabled:opacity-60; }
-  .sc-secondary { @apply rounded-xl border border-white/20 px-4 py-3 text-sm font-semibold; }
+  .sc-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.02em; line-height: 1.1; overflow-wrap: anywhere; }
+  .sc-data { font-family: var(--font-sans); font-variant-numeric: tabular-nums; font-weight: 400; }
+  .sc-content { @apply flex flex-1 flex-col gap-5 pt-6; }
+  .sc-brand { @apply text-xs leading-5 font-medium tracking-[0.12em] uppercase; }
+  .sc-streak { @apply text-xs leading-5 text-sc-muted; font-variant-numeric: tabular-nums; }
+  .sc-label { @apply text-xs leading-[1.5] font-medium tracking-[0.06em] text-sc-copy; }
+  .sc-progress-card { @apply min-h-[180px] rounded-xl border border-sc-ink/10 bg-sc-card p-4; }
+  .sc-tile-grid { @apply grid grid-cols-3 gap-2; }
+  .sc-tile { @apply flex min-h-[140px] min-w-0 flex-col gap-2 rounded-lg border border-sc-ink/15 bg-sc-card px-3 py-4; }
+  .sc-tile-done { @apply border-sc-border bg-sc-selected; }
+  .sc-tile-done .sc-target { @apply text-sc-ink; }
+  .sc-number { @apply min-h-11 min-w-0 w-full border-0 border-b border-sc-border bg-transparent p-0 text-[26px] leading-[1.4] text-sc-ink placeholder:text-sc-muted; font-family: var(--font-sans); font-variant-numeric: tabular-nums; border-radius: 0; }
+  .sc-number-compact { @apply text-[22px]; }
+  .sc-number[aria-invalid="true"] { border-bottom: 2px dashed var(--color-sc-problem); }
+  .sc-weight-input { @apply text-[44px]; width: 5ch; max-width: 100%; }
+  .sc-with-unit { width: 100%; }
+  .sc-unit { @apply shrink-0 text-sm text-sc-muted; font-variant-numeric: tabular-nums; }
+  .sc-target { @apply text-xs leading-[1.5] text-sc-muted; overflow-wrap: anywhere; }
+  .sc-section-heading { @apply mb-2 flex min-h-11 items-center gap-2; }
+  .sc-section-button { @apply flex min-h-11 items-center text-sm font-medium; }
+  .sc-log-button { @apply ml-auto flex min-h-11 items-center justify-center gap-1 rounded-full border border-sc-border px-3 text-xs font-medium; }
+  .sc-training-tile { @apply border-dashed border-sc-border; }
+  .sc-training-mark { @apply flex min-h-11 items-center text-2xl text-sc-muted; }
+  .sc-training-mark svg { @apply size-6 text-sc-ink; }
+  .sc-training-button { @apply mt-auto flex min-h-11 items-center justify-center rounded-full border border-sc-border px-1 text-xs font-medium text-sc-ink; }
+  .sc-map-tile { @apply border-sc-border; }
+  .sc-check-button { @apply flex size-11 items-center justify-center text-sc-ink; }
+  .sc-check-button svg { @apply size-6; stroke-width: 2; }
+  .sc-ltr-summary { @apply my-auto text-xs leading-relaxed text-sc-copy; overflow-wrap: anywhere; }
+  .sc-dot-button { @apply flex size-11 items-center justify-center; }
+  .sc-dot, .sc-dot-active { @apply block h-1.5 rounded-full; }
+  .sc-dot { @apply w-1.5 bg-sc-border; }
+  .sc-dot-active { @apply w-5 bg-sc-ink; }
+  .sc-card-caption { @apply text-center text-xs text-sc-muted; }
+  .sc-nav { @apply sticky bottom-0 z-10 mt-5 flex items-center justify-around border-t border-sc-border bg-sc-bg pt-2; padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .sc-nav-button { @apply relative flex min-h-14 min-w-14 flex-col items-center justify-center gap-1 px-2 text-sc-muted; }
+  .sc-nav-button svg { @apply size-5; }
+  .sc-nav-active { @apply text-sc-ink; }
+  .sc-nav-active::after { @apply absolute bottom-0 h-0.5 w-5 bg-accent; content: ""; }
+  .sc-nav-caption { @apply text-xs; }
+  .sc-consistency { @apply w-full table-fixed border-separate text-xs; border-spacing: 4px 6px; }
+  .sc-consistency th { @apply font-normal text-sc-muted; }
+  .sc-consistency th:first-child { @apply w-[78px] text-left text-xs; }
+  .sc-cell-full, .sc-cell-partial, .sc-cell-empty { @apply block h-3 rounded-xs border border-sc-border; }
+  .sc-cell-full { @apply bg-sc-ink; }
+  .sc-cell-partial { background: linear-gradient(90deg, var(--color-sc-ink) 50%, transparent 50%); }
+  .sc-cell-empty { @apply bg-transparent; }
+  .sc-dialog { @apply fixed inset-0 m-auto h-dvh max-h-dvh w-full max-w-[430px] border-0 bg-sc-bg p-0 text-sc-ink; }
+  .sc-dialog::backdrop { background: color-mix(in srgb, var(--color-sc-bg) 85%, transparent); }
+  .sc-panel-body { @apply flex min-h-dvh flex-col gap-5 px-5 py-5; padding-top: max(20px, env(safe-area-inset-top, 0px)); padding-bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
+  .sc-copy { @apply text-sm leading-relaxed text-sc-copy; overflow-wrap: anywhere; }
+  .sc-eyebrow { @apply text-xs leading-5 font-medium tracking-[0.08em] text-sc-muted; }
+  .sc-panel-card { @apply min-w-0 rounded-xl border border-sc-ink/10 bg-sc-card p-4; overflow-wrap: anywhere; }
+  .sc-primary { @apply flex min-h-12 items-center justify-center rounded-full border border-sc-ink bg-sc-ink px-5 py-3 text-center text-sm font-medium text-sc-bg; }
+  .sc-secondary { @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-sc-border px-4 py-3 text-center text-sm font-medium; }
   .sc-icon-button { @apply flex size-11 shrink-0 items-center justify-center; }
   .sc-icon-button svg { @apply size-5; }
   .sc-icon-button[aria-pressed="true"] svg { fill: currentColor; }
-  .sc-textarea { @apply w-full rounded-xl border border-white/15 bg-sc-card p-3 text-base text-white placeholder:text-[#8e8e96]; }
+  .sc-textarea { @apply min-h-12 min-w-0 w-full rounded-xl border border-sc-border bg-sc-card p-3 text-base leading-relaxed text-sc-ink placeholder:text-sc-muted; }
+  textarea.sc-textarea { resize: vertical; }
   .sc-form-field { @apply flex min-w-0 flex-col gap-2; }
-  .sc-choice { @apply rounded-full border border-white/25 px-4 py-2.5 text-sm; }
-  .sc-choice-selected { @apply border-accent bg-accent text-sc-bg; }
-  .sc-goal { @apply flex items-center gap-1 rounded-xl bg-sc-card pr-1; }
-  .sc-error { @apply text-xs leading-snug text-[#ffaaa5]; }
-  .sc-app button { @apply cursor-pointer; }
-  .sc-app button:disabled { @apply cursor-wait; }
-  .sc-app :is(button, input, textarea):focus-visible { outline: 2px solid #d8ff3d; outline-offset: 3px; }
-  .sc-tile-done :is(button, input):focus-visible { outline-color: #0a0a0a; }
-  .sc-app button:active { transform: scale(0.97); }
-  .sc-app button:focus-visible:active { transform: none; }
+  .sc-choice { @apply inline-flex min-h-11 max-w-full shrink-0 items-center justify-center gap-2 rounded-full border border-sc-border px-4 py-2.5 text-sm; overflow-wrap: normal; }
+  .sc-choice-selected { @apply border-sc-ink bg-sc-selected text-sc-ink; }
+  .sc-choice-selected::before { content: "✓" / ""; }
+  .sc-upload { @apply flex min-h-12 flex-col gap-3 rounded-xl border border-sc-border p-4 text-sm; }
+  .sc-upload input { @apply block min-w-0 w-full text-xs text-sc-copy; }
+  .sc-goal { @apply flex min-w-0 items-center gap-2 rounded-xl border border-sc-ink/10 bg-sc-card pr-1; }
+  .sc-error { @apply border-l-2 border-sc-problem pl-3 text-sm leading-relaxed text-sc-problem; overflow-wrap: anywhere; }
+  .sc-trend-line { stroke: var(--color-sc-ink); }
+  .sc-trend-area { fill: var(--color-sc-ink); opacity: 0.06; }
+  .sc-save-status { @apply text-xs leading-5 text-sc-muted; }
+  .sc-weight-row { @apply mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2; }
+  .sc-auth { @apply mx-auto grid min-h-dvh w-full max-w-[1440px] lg:grid-cols-2; }
+  .sc-auth-aside { @apply hidden flex-col justify-between border-r border-sc-ink/15 p-12 lg:flex xl:p-16; }
+  .sc-auth-content { @apply flex min-h-dvh min-w-0 flex-col px-6 py-8 sm:px-12 lg:px-16; }
+  .sc-auth-statement { @apply max-w-sm text-[64px]; }
+  .sc-auth-form { @apply mx-auto my-auto w-full max-w-sm py-16; }
+  .sc-auth-message { @apply mt-6 rounded-xl border border-sc-border bg-sc-card p-4 text-sm leading-relaxed; }
+  .sc-app :is(button, a, input, textarea, select, summary) { -webkit-tap-highlight-color: transparent; scroll-margin-block: 1rem 7rem; }
+  .sc-app :is(button, a, summary) { touch-action: manipulation; }
+  .sc-app button, .sc-app summary { cursor: pointer; }
+  .sc-app :is(button, input, textarea, select):disabled { cursor: not-allowed; }
+  .sc-app :is(button, input, textarea, select):disabled, .sc-app [aria-disabled="true"] { opacity: 0.6; }
+  .sc-app :is(button, a, input, textarea, select, summary):focus-visible { outline: 2px solid var(--color-sc-ink); outline-offset: 4px; }
+  .sc-app input:is([type="checkbox"], [type="radio"]) { accent-color: var(--color-sc-ink); width: 20px; height: 20px; flex-shrink: 0; }
+  .sc-app label:has(> input:is([type="checkbox"], [type="radio"])) { min-height: 44px; }
+  .sc-app summary { min-height: 44px; }
+  .sc-app header { min-width: 0; }
+  .sc-app header > * { min-width: 0; }
 }
 
 body:has(.sc-dialog[open]) { overflow: hidden; }
-@media (hover: hover) and (pointer: fine) {
-  .sc-app button:hover { filter: brightness(1.12); }
+@media (max-width: 379px) {
+  .sc-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sc-tile-grid > :last-child { grid-column: 1 / -1; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .sc-tile { transition: none; }
-  .sc-app button:active { transform: none; }
+/* Leave the whole short viewport available to the task, including at zoom. */
+@media (max-height: 600px) {
+  .sc-nav { position: static; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .sc-app :is(.sc-primary, .sc-secondary, .sc-choice, .sc-training-button):not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(0.9); }
+}
+@media (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .sc-app button:not(:disabled):not(:focus-visible):active { transform: scale(0.98); }
 }

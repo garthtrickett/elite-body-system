@@ -36,7 +36,7 @@ async function signIn(page: Page) {
   if (!redeemed.ok) throw new Error("Fixture sign-in failed");
   await page.context().addCookies([{ name: "ebs-session", value: redeemed.value.sessionToken, url: app.origin, httpOnly: true, sameSite: "Lax" }]);
   await page.goto(app.origin);
-  await expect(page.getByRole("heading", { name: "DAY 12", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Day 12", exact: true })).toBeVisible();
 }
 
 test("Harry’s shell fits phone and desktop, loads its own fonts under CSP, and exposes all progress cards", async ({ page }, info) => {
@@ -45,12 +45,25 @@ test("Harry’s shell fits phone and desktop, loads its own fonts under CSP, and
   page.on("console", message => { if (/Content Security Policy|Refused to/.test(message.text())) errors.push(message.text()); });
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
-  await page.evaluate(() => document.fonts.ready);
-  expect(await page.evaluate(() => document.fonts.check('400 36px "Bebas Neue"'))).toBe(true);
-  expect(await page.evaluate(() => document.fonts.check('700 12px "Work Sans"'))).toBe(true);
+  await page.evaluate(async () => {
+    await Promise.all([document.fonts.load('400 36px "Instrument Serif"'), document.fonts.load('italic 400 36px "Instrument Serif"'), document.fonts.load('500 16px "Geist"')]);
+    await document.fonts.ready;
+  });
+  expect(await page.evaluate(() => [...document.fonts].map(face => ({ family: face.family, status: face.status })))).toEqual(expect.arrayContaining([
+    { family: "Instrument Serif", status: "loaded" }, { family: "Geist", status: "loaded" },
+  ]));
+  for (const file of ["instrument-serif-regular.woff2", "instrument-serif-italic.woff2", "geist.woff2"]) {
+    const response = await page.request.get(`${app.origin}/assets/fonts/${file}`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toBe("font/woff2");
+  }
+  expect(await page.getByRole("heading", { name: "Day 12", exact: true }).evaluate(element => getComputedStyle(element).fontFamily)).toContain("Instrument Serif");
+  expect(await page.getByLabel("Calories eaten today").evaluate(element => getComputedStyle(element).fontFamily)).toContain("Geist");
+  expect(await page.evaluate(() => document.fonts.check('400 36px "Instrument Serif"'))).toBe(true);
+  expect(await page.evaluate(() => document.fonts.check('500 12px "Geist"'))).toBe(true);
   await expect(page.getByTestId("save-status")).toHaveText("Saved to your account");
-  expect(await page.locator(".sc-app").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(10, 10, 10)");
-  expect(await page.getByLabel("Body weight in kg").evaluate(element => getComputedStyle(element).fontSize)).toBe("56px");
+  expect(await page.locator(".sc-app").evaluate(element => getComputedStyle(element).backgroundColor)).toBe("rgb(17, 16, 14)");
+  expect(await page.getByLabel("Body weight in kg").evaluate(element => getComputedStyle(element).fontSize)).toBe("44px");
   expect(await page.getByLabel("Calories eaten today").evaluate(element => getComputedStyle(element).fontSize)).toBe("26px");
   await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeInViewport();
   await page.screenshot({ path: info.outputPath("scorecard-mobile.png"), fullPage: true });
@@ -61,7 +74,7 @@ test("Harry’s shell fits phone and desktop, loads its own fonts under CSP, and
   await expect(page.getByRole("table", { name: "Tracking over the last seven days" })).toBeVisible();
   await page.screenshot({ path: info.outputPath("scorecard-consistency.png"), fullPage: true });
   await page.getByRole("button", { name: "Show body weight" }).click();
-  for (const width of [320, 1440]) {
+  for (const width of [320, 390, 430, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(page.getByRole("button", { name: "Profile", exact: true })).toBeInViewport();
