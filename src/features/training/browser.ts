@@ -13,7 +13,7 @@ export { parseWorkout, emptyWorkout, planFor, workoutStats } from "./data.ts";
 export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string }>) {
   const call = createClientTransport({ csrf: config.csrf, send: fetch });
   const requestedDate = new URLSearchParams(location.search).get("date") ?? "";
-  let shownSelection = "";
+  let shownSelection = "", shownFieldErrors = "", shownRest = false;
   const alignSelection = () => {
     const strip = root.querySelector<HTMLElement>(".sc-workout-list"), selected = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
     if (!strip || !selected || strip.scrollWidth <= strip.clientWidth) return;
@@ -22,9 +22,18 @@ export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string
     if (adjustment) strip.scrollBy({ left: adjustment, behavior: "instant" });
   };
   const runtime = createSamRuntime<TrainingModel, TrainingProposal, TrainingState, TrainingEffect>({
-    initial: initialTrainingModel({ now: Date.now() }), accept: acceptTrainingProposal, represent: representTraining, next: model => model.pending,
+    initial: initialTrainingModel({ now: Date.now(), compact: window.innerWidth < 1024 }), accept: acceptTrainingProposal, represent: representTraining, next: model => model.pending,
     present: state => {
       render(trainingView(state, proposal => runtime.propose(proposal)), root);
+      if (state.remaining > 0 && !shownRest && state.compact && document.activeElement instanceof HTMLElement && root.contains(document.activeElement)) {
+        document.activeElement.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+      shownRest = state.remaining > 0;
+      const errors = JSON.stringify(state.fieldErrors);
+      if (errors !== shownFieldErrors && document.activeElement instanceof HTMLElement && document.activeElement.matches('[aria-invalid="true"]')) {
+        document.activeElement.closest("td")?.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+      shownFieldErrors = errors;
       const selection = `${state.workout?.date ?? ""}:${state.selected}`;
       if (selection !== shownSelection) { shownSelection = selection; alignSelection(); }
     },
@@ -36,7 +45,8 @@ export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string
   const tick = window.setInterval(() => runtime.propose({ kind: "clockTicked", now: Date.now() }), 1000);
   const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.generation > model.saved || model.finishRequested) event.preventDefault(); };
   window.addEventListener("beforeunload", protectUnsaved);
-  window.addEventListener("resize", alignSelection);
+  const resized = () => { runtime.propose({ kind: "viewportChanged", compact: window.innerWidth < 1024 }); alignSelection(); };
+  window.addEventListener("resize", resized);
   runtime.propose({ kind: "started" });
-  return { dispose: () => { clearInterval(tick); window.removeEventListener("beforeunload", protectUnsaved); window.removeEventListener("resize", alignSelection); runtime.dispose(); } } as const;
+  return { dispose: () => { clearInterval(tick); window.removeEventListener("beforeunload", protectUnsaved); window.removeEventListener("resize", resized); runtime.dispose(); } } as const;
 }

@@ -67,7 +67,7 @@ export function onboardingView(model: ProfileUiModel, actions: ProfileUiActions,
   const step = SETUP_STEPS[model.draft.setupStep];
   const sections = [ { label: "Your routine", start: 0, end: 12 }, { label: "Your story", start: 13, end: 23 }, { label: "Health & consent", start: 24, end: 28 }, { label: "Your starting point", start: 29, end: SETUP_STEPS.length - 1 } ] as const;
   const sectionIndex = sections.findIndex(section => model.draft.setupStep <= section.end);
-  return html`<div class="sc-setup-progress"><div class="flex flex-wrap justify-between gap-2"><p class="sc-label">${sections[sectionIndex]?.label}</p><p class="sc-copy text-xs">Step ${model.draft.setupStep + 1} of ${SETUP_STEPS.length}</p></div>
+  return html`<div class="sc-setup-progress" tabindex="-1" aria-label=${`Setup step ${model.draft.setupStep + 1}`}><div class="flex flex-wrap justify-between gap-2"><p class="sc-label">${sections[sectionIndex]?.label}</p><p class="sc-copy text-xs">Step ${model.draft.setupStep + 1} of ${SETUP_STEPS.length}</p></div>
     <progress class="sc-setup-progress-bar" aria-label="Setup progress" value=${model.draft.setupStep + 1} max=${SETUP_STEPS.length}></progress>
     <ol class="sc-setup-sections">${sections.map((section, index) => html`<li aria-current=${index === sectionIndex ? "step" : nothing}><span aria-hidden="true">${model.draft.setupStep > section.end ? "✓" : index + 1}.</span> ${section.label}</li>`)}</ol></div>
     <fieldset ?disabled=${busy} class="sc-setup-content flex flex-1 flex-col gap-4">${setupContent(model, actions)}
@@ -83,9 +83,9 @@ export function profileView(model: ProfileUiModel, actions: ProfileUiActions, bu
   return html`<h3 class="sc-display text-3xl">${d.name || "Your profile"}</h3><p class="sc-copy">${d.completed ? "Setup complete" : "Setup in progress"} · ${d.timezone}</p>
     <button class="sc-secondary" ?disabled=${busy} @click=${() => actions.propose({ kind: "editSetup" })}>${d.completed ? "Review setup" : "Resume setup"}</button>
     <div class="sc-profile-grid"><section class="sc-panel-card"><h3 class="sc-label">Daily targets</h3><p class="sc-copy my-2 text-xs">Adjust these to the targets agreed with your coach.</p><div class="grid grid-cols-2 gap-3">${(Object.keys(d.targets) as (keyof Targets)[]).map(key => html`
-      <label class="sc-form-field"><span class="sc-label">${targetLabels[key]}</span><input class="sc-textarea" type="number" step=${key === "water" || key === "sleep" ? "0.1" : "1"} .value=${live(model.targetDrafts[key])} ?disabled=${busy}
-        @input=${(event: Event) => actions.propose({ kind: "targetChanged", field: key, value: (event.target as HTMLInputElement).value })}></label>`)}</div>
-      <button class="sc-primary mt-4 w-full" ?disabled=${busy} @click=${() => actions.propose({ kind: "save" })}>${busy ? "Saving…" : "Save targets"}</button></section>
+      <label class="sc-form-field"><span class="sc-label">${targetLabels[key]}</span><input class="sc-textarea" type="number" aria-label=${targetLabels[key]} aria-invalid=${!!model.targetErrors[key]} aria-describedby=${model.targetErrors[key] ? `target-error-${key}` : nothing} step=${key === "water" || key === "sleep" ? "0.1" : "1"} .value=${live(model.targetDrafts[key])} ?disabled=${busy}
+        @input=${(event: Event) => actions.propose({ kind: "targetChanged", field: key, value: (event.target as HTMLInputElement).value })}>${model.targetErrors[key] ? html`<span class="sc-field-error" role="alert" id=${`target-error-${key}`}>${model.targetErrors[key]}</span>` : nothing}</label>`)}</div>
+      <button class="sc-primary mt-4 w-full" ?disabled=${busy} @click=${() => actions.propose({ kind: "save" })}>${busy ? "Saving…" : "Save targets"}</button>${model.error ? html`<p class="sc-error mt-3" role="alert">${model.error}</p>` : nothing}</section>
     <section class="sc-panel-card"><h3 class="sc-label">Your plan</h3><dl class="sc-copy mt-3 space-y-3 text-sm">
       <div><dt class="sc-label">Training</dt><dd>${[1, 2, 3, 4, 5, 6, 0].filter(day => d.trainingDays.includes(day)).map(day => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][day]).join(" · ") || "Not chosen"}</dd></div>
       <div><dt class="sc-label">Rest day</dt><dd>${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.restDay]}</dd></div>
@@ -95,7 +95,6 @@ export function profileView(model: ProfileUiModel, actions: ProfileUiActions, bu
       <div><dt class="sc-label">Identity</dt><dd class="whitespace-pre-wrap break-words">${d.identity || "Not written yet"}</dd></div>
       <div><dt class="sc-label">Emergency contact</dt><dd class="break-words">${d.emergency.name || "Not recorded"} ${d.emergency.phone}</dd></div>
     </dl></section>
-    ${model.error ? html`<p class="sc-error" role="alert">${model.error}</p>` : nothing}
     <section class="sc-panel-card"><h3 class="sc-label">Health and consent</h3><p class="sc-copy mt-2">${d.health.answers.some(answer => answer === null) ? "Health screening incomplete" : d.health.answers.some(Boolean) ? d.health.clearance ? "Doctor clearance self-confirmed" : "Training on hold: clearance needed" : "No health concerns flagged"}</p>
       ${d.health.answers.some(Boolean) && !d.health.clearance ? html`<label class="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" @change=${(event: Event) => actions.propose({ kind: "clearanceChanged", value: (event.target as HTMLInputElement).checked })}>My doctor has cleared me to train</label><button class="sc-secondary mt-2" @click=${() => actions.propose({ kind: "save" })}>Save clearance confirmation</button>` : nothing}
       <p class="sc-copy mt-2 text-xs">${d.consent.accepted ? `Acknowledged draft-v1 as ${d.consent.signedName}` : "Draft consent not yet acknowledged"}</p></section>

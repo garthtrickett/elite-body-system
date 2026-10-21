@@ -29,6 +29,11 @@ export function exercisesFor(workout: Workout): readonly Exercise[] {
   return (PROGRAM[workout.planKey] ?? []).map(exercise => workout.swaps[exercise.id] && exercise.alt
     ? { ...exercise, id: exercise.alt.id, name: exercise.alt.name } : exercise);
 }
+export function setNumberProblem(input: Readonly<{ field: "kg" | "reps"; value: number; done: boolean }>): string {
+  const min = input.field === "reps" && input.done ? 1 : 0;
+  return !Number.isFinite(input.value) || input.value < min || input.value > 1000 || (input.field === "reps" && !Number.isInteger(input.value))
+    ? `${input.field === "reps" ? "Use whole-number reps" : "Use a weight in kg"} between ${min} and 1,000.` : "";
+}
 export function parseWorkout(value: unknown): ClientResult<Workout> {
   const fail = () => err({ code: "invalid_input", message: "Check the workout’s exercises, sets, weights and repetitions." } as const);
   if (!isRecord(value) || !isDay(value.date) || typeof value.planKey !== "number" || !WEEK[value.planKey] || !isRecord(value.sets) || !isRecord(value.cardio) || !isRecord(value.mobility) || !isRecord(value.notes) || !isRecord(value.swaps)) return fail();
@@ -44,7 +49,7 @@ export function parseWorkout(value: unknown): ClientResult<Workout> {
     if (!exercise?.sets || !Array.isArray(rows) || rows.length > exercise.sets) return fail();
     const parsed: LiftSet[] = [];
     for (const row of rows) {
-      if (!isRecord(row) || typeof row.kg !== "number" || !Number.isFinite(row.kg) || row.kg < 0 || row.kg > 1000 || typeof row.reps !== "number" || !Number.isInteger(row.reps) || row.reps < 0 || row.reps > 1000 || typeof row.done !== "boolean" || (row.done && row.reps === 0)) return fail();
+      if (!isRecord(row) || typeof row.kg !== "number" || typeof row.reps !== "number" || typeof row.done !== "boolean" || setNumberProblem({ field: "kg", value: row.kg, done: row.done }) || setNumberProblem({ field: "reps", value: row.reps, done: row.done })) return fail();
       parsed.push({ kg: row.kg, reps: row.reps, done: row.done });
     }
     sets[id] = parsed;

@@ -34,8 +34,25 @@ test("invalid repetitions do not corrupt a set and future/held workouts remain r
   let model = initial();
   model = acceptTrainingProposal(model, { kind: "setChanged", id: "dbpress", slot: 0, field: "reps", value: "-1" });
   model = acceptTrainingProposal(model, { kind: "setCommitted", id: "dbpress", slot: 0, field: "reps" });
-  assert.ok(model.error); assert.equal(model.workout?.sets.dbpress, undefined);
+  assert.match(representTraining(model).fieldErrors["dbpress:0:reps"] ?? "", /whole-number reps/); assert.equal(model.workout?.sets.dbpress, undefined);
+  assert.equal(model.pending, undefined); assert.equal(model.drafts["dbpress:0:reps"], "-1");
   let future = acceptTrainingProposal(initialTrainingModel({ now: 100000 }), { kind: "started" });
   future = acceptTrainingProposal(future, { kind: "loaded", id: 1, result: { ok: true, value: { ...snapshot(), readOnly: true } } });
   assert.equal(acceptTrainingProposal(future, { kind: "setToggled", id: "dbpress", slot: 0 }), future);
+});
+
+test("date loads reject edits and stale responses, restore the loaded date on failure, and retry the failed date", () => {
+  const first = initial();
+  let model = acceptTrainingProposal(first, { kind: "dateSelected", date: "2026-10-21" });
+  const pending = model.pending; assert.ok(pending?.kind === "load");
+  assert.equal(representTraining(model).loading, true);
+  assert.equal(acceptTrainingProposal(model, { kind: "noteChanged", id: "dbpress", value: "Wrong date" }), model);
+  assert.equal(acceptTrainingProposal(model, { kind: "loaded", id: pending.id - 1, result: { ok: true, value: snapshot() } }), model);
+  model = acceptTrainingProposal(model, { kind: "loaded", id: pending.id, result: { ok: false, error: { code: "unavailable", message: "Could not load day" } } });
+  assert.equal(model.workout?.date, first.workout?.date);
+  assert.equal(model.failedLoadDate, "2026-10-21");
+  model = acceptTrainingProposal(model, { kind: "retry" });
+  assert.ok(model.pending?.kind === "load"); assert.equal(model.pending.date, "2026-10-21");
+  model = acceptTrainingProposal(model, { kind: "loaded", id: model.pending.id, result: { ok: true, value: { ...snapshot(), workout: { ...snapshot().workout, date: "2026-10-21" } } } });
+  assert.equal(model.workout?.date, "2026-10-21"); assert.equal(model.failedLoadDate, undefined);
 });

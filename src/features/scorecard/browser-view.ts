@@ -35,7 +35,7 @@ function metricTile(metric: Exclude<Metric, "weight">, title: string, unit: stri
   return html`<div class="sc-tile ${done ? "sc-tile-done" : ""}" data-testid=${`tile-${metric}`}>
     <label for=${`sc-${metric}`} class="sc-label">${title}${metric === "energy" || metric === "sleep" ? ` (${unit})` : ""}</label>
     <div class="flex min-w-0 items-baseline gap-1">${metricInput(metric, state, actions)}${unit && metric !== "energy" && metric !== "sleep" ? html`<span class="sc-unit">${unit}</span>` : nothing}</div>
-    <p class="sc-target">${target}</p>${done ? html`<p class="sc-goal-met">✓ Goal met</p>` : state.day.values[metric] === undefined ? html`<p class="sc-entry-hint">Tap to enter</p>` : nothing}${metricError(metric, state)}</div>`;
+    <p class="sc-target">${target}</p>${done ? html`<p class="sc-goal-met">✓ Goal met</p>` : state.day.values[metric] === undefined ? html`<p class="sc-entry-hint">Tap to enter</p>` : nothing}${metricError(metric, state)}${state.syncError && state.generation > state.savedGeneration ? html`<p class="sc-field-error">Day changes not saved</p>` : nothing}</div>`;
 }
 
 function carousel(state: ScorecardState, actions: ScorecardActions) {
@@ -74,16 +74,19 @@ function sectionHeader(name: "Nutrition" | "Activity" | "Mindset", state: Scorec
     ${panel === "nutrition" ? html`<a class="sc-log-button" href="/meals" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}><span class="size-3">${icon("plus")}</span>Log meal</a>` : nothing}</div>`;
 }
 
+function syncFeedback(state: ScorecardState, actions: ScorecardActions) {
+  return html`<p class="sc-error" role="alert">${state.syncError}</p><div class="flex flex-wrap gap-2"><button class="sc-secondary" ?disabled=${state.saving} @click=${actions.retrySync}>Retry save</button><button class="sc-secondary" ?disabled=${state.saving} @click=${actions.reloadClient}>Reload saved version</button></div>`;
+}
 export function scorecardView(state: ScorecardState, actions: ScorecardActions) {
   if (!state.loaded) return workspace({ page: "scorecard", content: html`<div class="sc-page"><p class="sc-eyebrow">Elite Body System</p>
     ${state.syncError ? html`<p class="sc-error mt-6" role="alert">${state.syncError}</p><button class="sc-primary mt-4" @click=${actions.retrySync}>Try again</button><a class="sc-copy mt-4 underline" href="/sign-in">Sign in again</a>`
       : html`<p class="sc-copy mt-6" role="status">Loading your scorecard…</p>`}</div>` });
-  return workspace({ page: "scorecard", navigationDisabled: state.saving, openPanel: panel => actions.openPanel({ panel }), content: html`
+  return workspace({ page: "scorecard", mobileFooter: state.syncError && !state.panel ? html`<div class="sc-sync-footer">${syncFeedback(state, actions)}</div>` : undefined, navigationDisabled: state.saving, openPanel: panel => actions.openPanel({ panel }), content: html`
     <header class="sc-scorecard-header px-5 pt-6"><div class="flex flex-wrap items-center justify-between gap-2"><p class="sc-brand">Elite Body System</p>
       <span class="sc-streak" aria-label=${`${state.streak} day streak`}>${state.streak} day streak</span></div>
       <div class="mt-5 flex flex-wrap items-end justify-between gap-x-3 gap-y-2"><h1 class="sc-display text-[48px]">Day ${state.programDay}</h1><span class="sc-save-status" data-testid="save-status" aria-live="polite">${state.saving ? "Saving…" : state.generation > state.savedGeneration || state.syncError ? "Changes not saved" : "Saved to your account"}</span></div>
     </header>
-    ${state.syncError ? html`<div class="px-5 pt-4"><p class="sc-error" role="alert">${state.syncError}</p><div class="mt-2 flex gap-2"><button class="sc-secondary" @click=${actions.retrySync}>Retry save</button><button class="sc-secondary" @click=${actions.reloadClient}>Reload saved version</button></div></div>` : nothing}
+    ${state.syncError && !state.panel ? html`<div class="sc-sync-desktop">${syncFeedback(state, actions)}</div>` : nothing}
     <div class="sc-content">
       ${carousel(state, actions)}
       <div class="sc-pillar-grid"><section class="px-5" aria-label="Nutrition">${sectionHeader("Nutrition", state, actions)}<div class="sc-tile-grid">

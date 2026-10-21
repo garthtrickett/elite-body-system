@@ -12,9 +12,27 @@ export { createScorecardRuntime } from "./browser-runtime.ts";
 
 export function mountScorecard(root: HTMLElement, config: Readonly<{ account: AccountState; signOut: () => void; csrf: string }>) {
   let shownPanel: ScorecardState["panel"];
+  let shownStep: number | undefined, validationAttempt = 0, shownSyncError = "";
   function present(state: ScorecardState): void {
     render(scorecardView(state, actions), root);
     const panel = state.panel;
+    const step = panel === "setup" ? state.profileUi.draft.setupStep : undefined;
+    if (step !== shownStep) {
+      shownStep = step;
+      if (step !== undefined) {
+        root.querySelectorAll<HTMLElement>("dialog, .sc-panel-body, .sc-setup-content").forEach(element => { element.scrollTop = 0; });
+        root.querySelector<HTMLElement>(".sc-setup-progress")?.focus({ preventScroll: true });
+      }
+    }
+    if (state.profileUi.validationAttempt !== validationAttempt) {
+      validationAttempt = state.profileUi.validationAttempt;
+      const field = root.querySelector<HTMLElement>('dialog [aria-invalid="true"]');
+      field?.focus({ preventScroll: true }); field?.scrollIntoView({ block: "center", behavior: "instant" });
+    }
+    if (state.syncError && state.syncError !== shownSyncError && document.activeElement instanceof HTMLElement && root.contains(document.activeElement)) {
+      document.activeElement.scrollIntoView({ block: "center", behavior: "instant" });
+    }
+    shownSyncError = state.syncError;
     if (shownPanel === panel) return;
     shownPanel = panel;
     // Synchronous DOM effects run once after acceptance and rendering. Native dialogs
