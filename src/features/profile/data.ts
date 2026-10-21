@@ -27,11 +27,15 @@ export function emptyProfile(): ClientProfile {
     completed: false, setupStep: 0, targets: DEFAULT_TARGETS };
 }
 
+export const TARGET_BOUNDS = { energy: [500, 10000], protein: [10, 1000], water: [0.1, 20], sleep: [1, 24], steps: [100, 100000] } as const;
+export function targetProblem(input: Readonly<{ field: keyof Targets; value: number }>): string {
+  const [min, max] = TARGET_BOUNDS[input.field];
+  return !Number.isFinite(input.value) || input.value < min || input.value > max || ((input.field === "energy" || input.field === "steps") && !Number.isInteger(input.value))
+    ? `Enter ${input.field === "energy" || input.field === "steps" ? "a whole number" : "a number"} between ${min.toLocaleString("en-GB")} and ${max.toLocaleString("en-GB")}.` : "";
+}
 export function isTargets(value: unknown): value is Targets {
   if (!isRecord(value)) return false;
-  const bounds = { energy: [500, 10000], protein: [10, 1000], water: [0.1, 20], sleep: [1, 24], steps: [100, 100000] } as const;
-  return Object.entries(bounds).every(([key, [min, max]]) => typeof value[key] === "number" && Number.isFinite(value[key]) && value[key] >= min && value[key] <= max &&
-    ((key !== "energy" && key !== "steps") || Number.isInteger(value[key])));
+  return (Object.keys(TARGET_BOUNDS) as (keyof Targets)[]).every(key => typeof value[key] === "number" && !targetProblem({ field: key, value: value[key] }));
 }
 
 export function parseProfile(value: unknown): ClientResult<ClientProfile> {

@@ -16,7 +16,7 @@ export type LearningModel = Readonly<{
   episode: string | undefined; answers: Readonly<Record<string, readonly string[]>>;
   mapGeneration: number; mapSaved: number; episodeGeneration: number; episodeSaved: number;
   finishMap: boolean; completeEpisode: boolean; readRequested: boolean; dirtyEpisode: string | undefined;
-  sequence: number; pending: LearningEffect | undefined; error: string; message: string;
+  completionAttempt: number; sequence: number; pending: LearningEffect | undefined; error: string; message: string;
 }>;
 export type LearningProposal =
   | Readonly<{ kind: "started" | "retry" | "reload" | "editMap" | "mapNext" | "mapBack" | "mapFinished" | "mapRead" | "episodeBack" | "episodeCompleted" }>
@@ -28,7 +28,7 @@ export type LearningProposal =
 
 export function initialLearningModel(): LearningModel {
   return { snapshot: undefined, map: undefined, editingMap: false, episode: undefined, answers: {}, mapGeneration: 0, mapSaved: 0, episodeGeneration: 0, episodeSaved: 0,
-    finishMap: false, completeEpisode: false, readRequested: false, dirtyEpisode: undefined, sequence: 0, pending: undefined, error: "", message: "" };
+    finishMap: false, completeEpisode: false, readRequested: false, dirtyEpisode: undefined, completionAttempt: 0, sequence: 0, pending: undefined, error: "", message: "" };
 }
 function schedule(model: LearningModel, intent: Omit<Extract<LearningEffect, { kind: "load" | "readMap" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveMap" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveEpisode" }>, "id">): LearningModel {
   const id = model.sequence + 1;
@@ -78,7 +78,7 @@ export function acceptLearningProposal(model: LearningModel, proposal: LearningP
       const episode = EPISODES.find(item => item.id === proposal.id);
       if (!episode) return model;
       const status = episodeStatus({ episode, snapshot: model.snapshot });
-      return status === "open" || status === "done" ? { ...model, episode: episode.id, error: "" } : { ...model, error: "Complete earlier weeks and wait for this lesson’s scheduled week." };
+      return status === "open" || status === "done" ? { ...model, episode: episode.id, completionAttempt: 0, error: "" } : { ...model, error: "Complete earlier weeks and wait for this lesson’s scheduled week." };
     }
     case "episodeBack": return model.pending || model.episodeGeneration > model.episodeSaved ? model : { ...model, episode: undefined, error: "", message: "" };
     case "answerChanged": {
@@ -89,13 +89,15 @@ export function acceptLearningProposal(model: LearningModel, proposal: LearningP
     }
     case "episodeCompleted": {
       const episode = EPISODES.find(item => item.id === model.episode);
-      if (!episode || !episode.tasks.every((_, index) => model.answers[episode.id]?.[index]?.trim())) return { ...model, error: "Answer every task before completing the lesson." };
+      if (!episode || !episode.tasks.every((_, index) => model.answers[episode.id]?.[index]?.trim())) return { ...model, completionAttempt: model.completionAttempt + 1, error: "Answer every task before completing the lesson." };
       return sync({ ...model, completeEpisode: true, dirtyEpisode: episode.id, error: "" });
     }
   }
 }
 export function representLearning(model: LearningModel) {
-  return { ...model, saving: model.pending !== undefined || model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved,
+  const episode = EPISODES.find(item => item.id === model.episode);
+  const missingAnswers = model.completionAttempt && episode ? episode.tasks.flatMap((_, index) => model.answers[episode.id]?.[index]?.trim() ? [] : [index]) : [];
+  return { ...model, missingAnswers, saving: model.pending !== undefined || model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved,
     written: model.map ? mapWritten(model.map) : false } as const;
 }
 export type LearningState = ReturnType<typeof representLearning>;

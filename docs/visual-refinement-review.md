@@ -165,3 +165,45 @@ tests, with conventions, strict typechecking, build, migrations and generated
 schema types unchanged. The broad screenshot sweep and exact-commit CI remain
 release gates; final deployment and live acceptance evidence are recorded in the
 pull request.
+
+## Paseo audit follow-up: 13 findings (21 October 2026)
+
+This increment addresses the thirteen reproducible defects in the independent
+Paseo report. Authenticated reproductions use disposable accounts and the real
+local API; induced failures are intercepted locally. Production client data is
+not used as a test fixture.
+
+| # | Before | After | Why |
+| --- | --- | --- | --- |
+| 1 | A new date could remain beside an editable old workout after a failed load | Hide stale controls while loading; restore the loaded date on failure; Retry requests the failed date | Keep the date and edited workout consistent |
+| 2 | Landscape setup retained the previous step's scroll | Reset dialog/editor scroll and focus step progress after accepted step changes | Reveal the new fields below the sticky header |
+| 3 | Opening lower lessons skipped the title and overview | Focus and reveal the lesson's beginning on selection | Establish the new lesson and its back action |
+| 4 | Map steps inherited the previous explanation's offset | Reveal the new title once per accepted step change | Preserve context without moving users during edits |
+| 5 | Invalid daily targets produced a distant generic error | Shared server/client bounds, described inline errors, correction summary beside Save, focus first invalid target | Identify the value and permitted range |
+| 6 | Invalid reps inserted a distant page-level error | Keep raw text, mark the specific set field, show its range nearby and retain focus in view | Make correction possible without a page jump |
+| 7 | Scorecard save failures appeared above the visible tile | Reserved phone feedback row, sticky desktop feedback and unsaved-day labels; retain the focused input in view | Distinguish local goal results from saved data and expose Retry |
+| 8 | Started rest remained above the viewport while Start rest looked inactive | Reserved mobile countdown/actions row; running feedback beside desktop sets; show Start only when rest is inactive | Expose the timer without covering the editable task |
+| 9 | Long meal history pulled desktop review totals and Log off-screen | Stick the summary independently beside the editor, with history below the review | Keep current totals and action independent of history length |
+| 10 | Add ingredient left focus after the inserted fields | Focus and reveal the added ingredient name; Tab continues through its fields | Follow the user's keyboard intent |
+| 11 | Incomplete lesson submission appeared to do nothing | Identify missing answers, focus the first, and place the completion error beside the action | Explain rejection at the task form |
+| 12 | Read-only future workouts offered a no-op Swap | Disable Swap consistently with future logging controls | Match visible availability to permitted actions |
+| 13 | Completed courses promised editable, autosaved tasks | Describe reviewing completed lessons and saved answers | Match guidance to read-only completion state |
+
+`test/browser/audit-13-fixes.spec.ts` reproduces these states at 320×568,
+390×844, 844×390, 1024×768 and 1440×900. It covers loading/failure/retry,
+accepted transitions, correction/recovery, keyboard focus, timer visibility,
+long meal history and truthful completed-course copy. Headless tests additionally
+cover stale date completions, edits rejected during date loads, shared target
+bounds and incremental missing-answer correction. Existing save/persistence
+and provider tests remain required.
+
+Final local acceptance passed `bash scripts/with-postgres.sh npm run verify`:
+72 server/model tests and 51 Chromium browser tests, including lint, strict
+typechecking, build, migrations and schema generation with no generated-type diff.
+The final broad sweep captured 260 states across desktop, laptop, phone, narrow
+phone, tablet and landscape, with zero browser errors, horizontal page overflow
+or enabled controls below its 40px check. Twenty-eight targeted screenshots cover
+the reproduced transitions, failures and corrections. Evidence is retained locally
+under `.data/thirteen-fixes-acceptance/` and
+`.data/visual-audit/thirteen-fixes-20261021/`. These are emulated browser checks;
+physical devices and Safari were not tested in this increment.

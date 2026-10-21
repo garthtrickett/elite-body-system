@@ -26,8 +26,8 @@ navigation and a single selected progress card. Desktop shows all three progress
 cards using the same inputs and model, without duplicate editable fields.
 
 Training separates exercise selection from its log/instructions/history. Courses
-keep the episode list beside the lesson and tasks. Meals place capture/review
-beside saved meals and day history. The Neural Map separates its guidance from
+keep the episode list beside the lesson and tasks. Meals place capture beside saved meals and day history; review places current
+totals beside ingredients, with history below. The Neural Map separates its guidance from
 writing, then presents reading sections in a grid. Profile and L to R use bounded,
 scrollable native dialogs with keyboard focus containment and restoration.
 
@@ -327,3 +327,24 @@ retry. Browser Back/refresh use native unload protection. No new local storage,
 account records or schema are introduced. The shared shell's More popover uses
 native dismissal/focus behaviour and derives active-route presentation from the
 workspace page.
+
+### Task transitions and feedback
+
+Accepted setup steps, lesson selection and Map steps trigger focus/scroll effects
+once after rendering; ordinary input and save completions retain editing context.
+Adding a meal ingredient reveals and focuses its name. These effects do not alter
+business state or perform network operations.
+
+Training date switches hide the previous workout during loading. A failed switch
+restores the loaded date in the picker and retains the requested date for Retry;
+load results still correlate by effect kind and ID. Training responsive state is
+accepted through a typed viewport proposal so there is one rendered rest timer:
+a reserved mobile footer, or controls beside the desktop set log. Future Swap
+respects the same read-only rule as logging.
+
+Profile targets and workout set numbers reuse their server validation limits for
+field feedback. Incomplete lesson submissions represent missing answer indices.
+Phone scorecard transport failures own a feedback row above navigation; desktop
+feedback remains sticky. Unsaved-day labels distinguish local completion from
+persisted data. The current meal review summary sticks independently of history;
+history follows the review grid, so its length cannot displace current actions.

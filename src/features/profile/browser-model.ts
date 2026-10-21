@@ -1,9 +1,9 @@
-import { parseProfile } from "./data.ts";
+import { parseProfile, targetProblem } from "./data.ts";
 import type { ClientProfile, StoryField, Targets } from "./data.ts";
 import { SETUP_STEPS, STORY_QUESTIONS } from "./onboarding-content.ts";
 
 export type ProfileField = "name" | "timezone" | "equipment" | "workaround" | "anchor" | "identity" | "emergencyName" | "emergencyPhone" | "healthDetails" | "signedName" | "startingWeight";
-export type ProfileUiModel = Readonly<{ draft: ClientProfile; targetDrafts: Readonly<Record<keyof Targets, string>>; error: string; requestedSave: boolean }>;
+export type ProfileUiModel = Readonly<{ draft: ClientProfile; targetDrafts: Readonly<Record<keyof Targets, string>>; error: string; targetErrors: Readonly<Partial<Record<keyof Targets, string>>>; validationAttempt: number; requestedSave: boolean }>;
 export type ProfileProposal =
   | Readonly<{ kind: "fieldChanged"; field: ProfileField; value: string }>
   | Readonly<{ kind: "storyChanged"; field: StoryField; value: string }>
@@ -17,7 +17,7 @@ export type ProfileProposal =
   | Readonly<{ kind: "next" | "back" | "save" | "complete" | "editSetup" | "saveHandled" }>;
 
 export function initialProfileUi(profile: ClientProfile): ProfileUiModel {
-  return { draft: profile, targetDrafts: { energy: String(profile.targets.energy), protein: String(profile.targets.protein), water: String(profile.targets.water), sleep: String(profile.targets.sleep), steps: String(profile.targets.steps) }, error: "", requestedSave: false };
+  return { draft: profile, targetDrafts: { energy: String(profile.targets.energy), protein: String(profile.targets.protein), water: String(profile.targets.water), sleep: String(profile.targets.sleep), steps: String(profile.targets.steps) }, error: "", targetErrors: {}, validationAttempt: 0, requestedSave: false };
 }
 
 function stepError(model: ProfileUiModel): string {
@@ -53,7 +53,8 @@ export function acceptProfileProposal(model: ProfileUiModel, proposal: ProfilePr
       return { ...model, draft, error: "" };
     }
     case "storyChanged": return { ...model, draft: { ...d, story: { ...d.story, [proposal.field]: proposal.value } }, error: "" };
-    case "targetChanged": return { ...model, targetDrafts: { ...model.targetDrafts, [proposal.field]: proposal.value }, error: "" };
+    case "targetChanged": return { ...model, targetDrafts: { ...model.targetDrafts, [proposal.field]: proposal.value },
+      targetErrors: { ...model.targetErrors, [proposal.field]: model.validationAttempt ? targetProblem({ field: proposal.field, value: Number(proposal.value) }) : "" }, error: "" };
     case "trainingDayToggled": {
       const days = d.trainingDays.includes(proposal.day) ? d.trainingDays.filter(day => day !== proposal.day) : d.trainingDays.length < 4 ? [...d.trainingDays, proposal.day] : d.trainingDays;
       return { ...model, draft: { ...d, trainingDays: days }, error: "" };
@@ -75,6 +76,11 @@ export function acceptProfileProposal(model: ProfileUiModel, proposal: ProfilePr
       return { ...model, draft: { ...d, setupStep }, requestedSave: true, error: "" };
     }
     case "save": case "complete": {
+      const targetErrors = Object.fromEntries(Object.entries(model.targetDrafts).flatMap(([field, raw]) => {
+        const problem = targetProblem({ field: field as keyof Targets, value: Number(raw) });
+        return problem ? [[field, problem]] : [];
+      }));
+      if (Object.keys(targetErrors).length) return { ...model, targetErrors, validationAttempt: model.validationAttempt + 1, error: "Check the highlighted daily targets." };
       const targets = Object.fromEntries(Object.entries(model.targetDrafts).map(([key, value]) => [key, Number(value)]));
       const parsed = parseProfile({ ...d, targets, completed: proposal.kind === "complete" ? true : d.completed, setupStep: proposal.kind === "complete" ? 33 : d.setupStep });
       return parsed.ok ? { ...model, draft: parsed.value, requestedSave: true, error: "" } : { ...model, error: parsed.error.message };

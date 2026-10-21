@@ -13,6 +13,7 @@ export type { Meal, MealSnapshot } from "./data.ts";
 
 export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>) {
   const call = createClientTransport({ csrf: config.csrf, send: fetch }), selections = new Map<number, readonly File[]>();
+  let ingredientCount = 0;
   let sequence = 0, reviewing = false, validationAttempt = 0, shownError: string | null = null;
   function present(state: MealState): void {
     render(mealsView(state, { propose: proposal => runtime.propose(proposal), log: () => runtime.propose({ kind: "logRequested", requestId: crypto.randomUUID() }), photos: files => {
@@ -24,6 +25,11 @@ export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>
       const heading = root.querySelector<HTMLElement>(".sc-review-title");
       heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: "start" });
     }
+    if (reviewing && state.draft && state.draft.items.length > ingredientCount) {
+      const field = root.querySelector<HTMLElement>(`[aria-label="Ingredient ${state.draft.items.length} name"]`);
+      field?.focus({ preventScroll: true }); field?.scrollIntoView({ block: "center", behavior: "instant" });
+    }
+    ingredientCount = state.draft?.items.length ?? 0;
     reviewing = state.draft !== null;
     if (state.error && state.error !== shownError && !Object.keys(state.fieldErrors).length) {
       const feedback = root.querySelector<HTMLElement>(".sc-meal-error");
