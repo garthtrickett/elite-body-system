@@ -196,3 +196,14 @@ long meal history and truthful completed-course copy. Headless tests additionall
 cover stale date completions, edits rejected during date loads, shared target
 bounds and incremental missing-answer correction. Existing save/persistence
 and provider tests remain required.
+
+Final local acceptance passed `bash scripts/with-postgres.sh npm run verify`:
+72 server/model tests and 51 Chromium browser tests, including lint, strict
+typechecking, build, migrations and schema generation with no generated-type diff.
+The final broad sweep captured 260 states across desktop, laptop, phone, narrow
+phone, tablet and landscape, with zero browser errors, horizontal page overflow
+or enabled controls below its 40px check. Twenty-eight targeted screenshots cover
+the reproduced transitions, failures and corrections. Evidence is retained locally
+under `.data/thirteen-fixes-acceptance/` and
+`.data/visual-audit/thirteen-fixes-20261021/`. These are emulated browser checks;
+physical devices and Safari were not tested in this increment.

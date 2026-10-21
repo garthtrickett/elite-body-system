@@ -26,8 +26,8 @@ navigation and a single selected progress card. Desktop shows all three progress
 cards using the same inputs and model, without duplicate editable fields.
 
 Training separates exercise selection from its log/instructions/history. Courses
-keep the episode list beside the lesson and tasks. Meals place capture/review
-beside saved meals and day history. The Neural Map separates its guidance from
+keep the episode list beside the lesson and tasks. Meals place capture beside saved meals and day history; review places current
+totals beside ingredients, with history below. The Neural Map separates its guidance from
 writing, then presents reading sections in a grid. Profile and L to R use bounded,
 scrollable native dialogs with keyboard focus containment and restoration.
 
