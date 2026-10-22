@@ -6,13 +6,18 @@ import type { default as NeuralMapsTable } from './NeuralMaps.js';
 import type { default as MealAnalysisLimitsTable } from './MealAnalysisLimits.js';
 import type { default as SavedMealsTable } from './SavedMeals.js';
 import type { default as AuthChallengesTable } from './AuthChallenges.js';
+import type { default as OnboardingRecordsTable } from './OnboardingRecords.js';
 import type { default as CourseProgressTable } from './CourseProgress.js';
 import type { default as AccountsTable } from './Accounts.js';
+import type { default as OnboardingSettingsTable } from './OnboardingSettings.js';
 import type { default as WorkoutSessionsTable } from './WorkoutSessions.js';
+import type { default as OnboardingResolutionsTable } from './OnboardingResolutions.js';
 import type { default as AuthRateLimitsTable } from './AuthRateLimits.js';
 import type { default as DailyScorecardsTable } from './DailyScorecards.js';
 import type { default as AuthSessionsTable } from './AuthSessions.js';
 import type { default as MealEntriesTable } from './MealEntries.js';
+import type { default as AssessmentMediaTable } from './AssessmentMedia.js';
+import type { default as OnboardingBookingsTable } from './OnboardingBookings.js';
 import type { default as ContentMediaTable } from './ContentMedia.js';
 
 export default interface PublicSchema {
@@ -28,11 +33,17 @@ export default interface PublicSchema {
 
   auth_challenges: AuthChallengesTable;
 
+  onboarding_records: OnboardingRecordsTable;
+
   course_progress: CourseProgressTable;
 
   accounts: AccountsTable;
 
+  onboarding_settings: OnboardingSettingsTable;
+
   workout_sessions: WorkoutSessionsTable;
+
+  onboarding_resolutions: OnboardingResolutionsTable;
 
   auth_rate_limits: AuthRateLimitsTable;
 
@@ -41,6 +52,10 @@ export default interface PublicSchema {
   auth_sessions: AuthSessionsTable;
 
   meal_entries: MealEntriesTable;
+
+  assessment_media: AssessmentMediaTable;
+
+  onboarding_bookings: OnboardingBookingsTable;
 
   content_media: ContentMediaTable;
 }

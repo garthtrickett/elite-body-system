@@ -22,6 +22,20 @@ test("configuration permits local outbox only on loopback and requires HTTPS/ema
     EMAIL_MODE: "resend", EMAIL_FROM: "access@example.test", RESEND_API_KEY: "test-placeholder" }).ok, true);
 });
 
+test("onboarding rollout defaults off and provider configuration is complete and server-side", () => {
+  const base = readConfig(env); assert.ok(base.ok); assert.equal(base.value.onboardingEnabled, false);
+  const enabled = readConfig({ ...env, ONBOARDING_ENABLED: "true" }); assert.ok(enabled.ok); assert.equal(enabled.value.onboardingEnabled, true);
+  assert.equal(readConfig({ ...env, ONBOARDING_ENABLED: "yes" }).ok, false);
+  assert.equal(readConfig({ ...env, ASSESSMENT_S3_BUCKET: "private" }).ok, false);
+  assert.equal(readConfig({ ...env, ONBOARDING_GOOGLE_CLIENT_ID: "test" }).ok, false);
+  const storage = { ASSESSMENT_S3_ENDPOINT: "https://s3.example.test", ASSESSMENT_S3_REGION: "test", ASSESSMENT_S3_BUCKET: "private", ASSESSMENT_S3_ACCESS_KEY_ID: "test", ASSESSMENT_S3_SECRET_ACCESS_KEY: "test" };
+  assert.equal(readConfig({ ...env, ...storage }).ok, true);
+  assert.equal(readConfig({ ...env, ...storage, ASSESSMENT_S3_FORCE_PATH_STYLE: "yes" }).ok, false);
+  const railway = readConfig({ ...env, ...storage, ASSESSMENT_S3_FORCE_PATH_STYLE: "false" });
+  assert.ok(railway.ok); assert.equal(railway.value.assessmentStorage?.forcePathStyle, false);
+  assert.equal(readConfig({ ...env, ...storage, ASSESSMENT_S3_ENDPOINT: "http://example.test" }).ok, false);
+});
+
 test("outbox permissions protect bearer links and provider failures do not leak response bodies", async () => {
   const directory = await mkdtemp(join(tmpdir(), "elite-body-system-delivery-"));
   try {

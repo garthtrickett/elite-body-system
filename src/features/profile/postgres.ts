@@ -18,7 +18,7 @@ export function createPostgresProfileStore(db: Kysely<Database>): ProfileStore {
       return { revision: row.revision, profile: { ...parsed.value, consent: { ...parsed.value.consent, signedAt } } };
     },
     async write({ accountId, revision, profile }) {
-      return db.transaction().execute(async transaction => {
+      const write = async (transaction: Kysely<Database>) => {
         const data = sql`cast(${JSON.stringify(profile)} as jsonb)`;
         const row = revision === 0
           ? await transaction.insertInto("client_profiles").values({ account_id: accountId as AccountsId, data }).onConflict(c => c.column("account_id").doNothing()).returning("revision").executeTakeFirst()
@@ -30,7 +30,8 @@ export function createPostgresProfileStore(db: Kysely<Database>): ProfileStore {
           if (!initialized.ok) throw new Error("Could not initialize first scorecard");
         }
         return row ? { profile, revision: row.revision } : undefined;
-      });
+      };
+      return db.isTransaction ? write(db) : db.transaction().execute(write);
     },
   };
 }

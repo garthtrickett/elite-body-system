@@ -21,6 +21,7 @@ export function createProfiles(config: Readonly<{ store: ProfileStore; now?: () 
       if (!parsed.ok) return parsed;
       try {
         const prior = await config.store.read({ accountId: input.accountId });
+        if (parsed.value.onboardingVersion !== prior?.profile.onboardingVersion || (prior?.profile.onboardingVersion === "harry-v2" && (parsed.value.completed !== prior.profile.completed || parsed.value.health.clearance !== prior.profile.health.clearance || JSON.stringify(parsed.value.health.answers) !== JSON.stringify(prior.profile.health.answers) || parsed.value.health.details !== prior.profile.health.details))) return err({ code: "forbidden", message: "Update your onboarding or contact Harry to change health clearance." });
         // The first completion date and signed-at timestamp cannot be forged by browser input.
         const profile = { ...parsed.value, startDate: prior?.profile.completed ? prior.profile.startDate : parsed.value.completed ? clientDay({ timezone: parsed.value.timezone, now: now() }) : parsed.value.startDate,
           consent: { ...parsed.value.consent, signedAt: parsed.value.completed ? prior?.profile.consent.signedAt ?? now().toISOString() : undefined } };

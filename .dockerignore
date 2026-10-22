@@ -10,3 +10,4 @@
 !scripts/migrate.ts
 !scripts/provision-account.ts
 !scripts/set-video.ts
+!scripts/onboarding-admin.ts

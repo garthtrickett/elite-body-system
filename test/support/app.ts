@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
 import { createApplication } from "../../src/platform/application.ts";
+import type { AssessmentStorage } from "../../src/features/onboarding/index.ts";
 
 export function testDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -11,7 +12,7 @@ export function testDatabaseUrl(): string {
   return url;
 }
 
-export async function startTestApp(options: Readonly<{ harryPreview?: boolean }> = {}) {
+export async function startTestApp(options: Readonly<{ harryPreview?: boolean; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage }> = {}) {
   const probe = createServer();
   probe.listen(0, "127.0.0.1");
   await once(probe, "listening");
@@ -22,7 +23,9 @@ export async function startTestApp(options: Readonly<{ harryPreview?: boolean }>
   const origin = `http://127.0.0.1:${port}`;
   const outbox = await mkdtemp(join(tmpdir(), "elite-body-system-outbox-"));
   const app = createApplication({ databaseUrl: testDatabaseUrl(), publicOrigin: origin,
-    rateKey: "a".repeat(64), harryPreview: options.harryPreview === true, host: "127.0.0.1", port, delivery: { mode: "outbox", directory: outbox } });
+    rateKey: "a".repeat(64), harryPreview: options.harryPreview === true, onboardingEnabled: options.onboardingEnabled === true,
+    ...(options.assessmentStorage ? { assessmentStorage: { endpoint: "https://uploads.example.test", region: "test", bucket: "test", accessKeyId: "test", secretAccessKey: "test" } } : {}),
+    host: "127.0.0.1", port, delivery: { mode: "outbox", directory: outbox } }, options.assessmentStorage ? { assessmentStorage: options.assessmentStorage } : {});
   app.server.listen(port, "127.0.0.1");
   await once(app.server, "listening");
   return {
