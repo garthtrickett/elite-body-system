@@ -91,7 +91,7 @@ export function acceptLearningProposal(model: LearningModel, proposal: LearningP
       const episode = EPISODES.find(item => item.id === model.episode);
       if (!episode || model.snapshot.progress.done[episode.id] || model.pending?.kind === "saveEpisode" && model.pending.complete || proposal.index < 0 || proposal.index >= episode.tasks.length || proposal.value.length > 5000) return model;
       const answers = episode.tasks.map((_, index) => index === proposal.index ? proposal.value : model.answers[episode.id]?.[index] ?? "");
-      return sync({ ...model, answers: { ...model.answers, [episode.id]: answers }, dirtyEpisode: episode.id, episodeGeneration: model.episodeGeneration + 1, error: "" });
+      return sync({ ...model, answers: { ...model.answers, [episode.id]: answers }, dirtyEpisode: episode.id, episodeGeneration: model.episodeGeneration + 1, completeEpisode: false, error: "" });
     }
     case "episodeCompleted": {
       const episode = EPISODES.find(item => item.id === model.episode);

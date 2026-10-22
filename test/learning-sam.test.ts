@@ -54,3 +54,12 @@ test("an irreversible lesson completion rejects newer task edits while its reque
   model = acceptLearningProposal(model, { kind: "episodeCompleted" }); assert.ok(model.pending?.kind === "saveEpisode"); assert.equal(model.pending.complete, true);
   assert.equal(acceptLearningProposal(model, { kind: "answerChanged", index: 0, value: "Unsavable newer answer" }), model);
 });
+
+test("editing after failed lesson completion cancels its old completion intent", () => {
+  let model = acceptLearningProposal(initialLearningModel(), { kind: "started" });
+  model = acceptLearningProposal(model, { kind: "completed", id: 1, effectKind: "load", result: { ok: true, value: { ...snapshot(), progress: { answers: { m1: ["Original", "Every morning"] }, done: {} } } } });
+  model = acceptLearningProposal(model, { kind: "episodeSelected", id: "m1" }); model = acceptLearningProposal(model, { kind: "episodeCompleted" });
+  model = acceptLearningProposal(model, { kind: "failed", id: model.pending!.id });
+  model = acceptLearningProposal(model, { kind: "answerChanged", index: 0, value: "A" });
+  assert.ok(model.pending?.kind === "saveEpisode"); assert.equal(model.pending.complete, false); assert.equal(model.completeEpisode, false);
+});

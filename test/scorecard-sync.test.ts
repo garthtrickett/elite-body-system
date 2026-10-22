@@ -131,3 +131,11 @@ test("day rollover keeps an unsaved profile draft until it can be saved", () => 
   const observed = acceptScorecardProposal(edited, { kind: "dayObserved", date: "2026-10-21" });
   assert.equal(observed.pending, undefined); assert.equal(observed.profileUi.targetDrafts.energy, "2417");
 });
+
+test("blurring a committed metric does not start a duplicate save or interrupt navigation", () => {
+  let model = acceptScorecardProposal(initial(), { kind: "metricChanged", metric: "steps", value: "5123" });
+  model = acceptScorecardProposal(model, { kind: "metricCommitted", metric: "steps" }); const effect = model.pending; assert.ok(effect?.kind === "saveDay");
+  model = acceptScorecardProposal(model, { kind: "daySaved", id: effect.id, result: { ok: true, value: { date: effect.date, scorecard: effect.scorecard, revision: 1 } } });
+  const blurred = acceptScorecardProposal(model, { kind: "metricCommitted", metric: "steps" });
+  assert.equal(blurred.pending, undefined); assert.equal(blurred.generation, model.generation);
+});

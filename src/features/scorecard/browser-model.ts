@@ -69,7 +69,7 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
     case "metricCommitted": {
       const result = setMetric({ scorecard: model.day, metric: proposal.metric, value: model.drafts[proposal.metric] });
       if (!result.ok) return { ...model, errors: { ...model.errors, [proposal.metric]: result.error.message } };
-      return { ...model, day: result.value, drafts: { ...model.drafts, [proposal.metric]: String(result.value.values[proposal.metric] ?? "") },
+      return { ...model, day: result.value.values[proposal.metric] === model.day.values[proposal.metric] ? model.day : result.value, drafts: { ...model.drafts, [proposal.metric]: String(result.value.values[proposal.metric] ?? "") },
         errors: { ...model.errors, [proposal.metric]: "" } };
     }
     case "checkToggled": {
