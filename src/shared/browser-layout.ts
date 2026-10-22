@@ -40,7 +40,7 @@ export function workspace(input: Readonly<{
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Your courses</p>${items(courses)}</div>
         <div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
           ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([panel, label]) => input.openPanel
-            ? html`<button class="sc-sidebar-link" @click=${() => input.openPanel?.(panel)}>${label}</button>`
+            ? html`<button class="sc-sidebar-link" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.(panel)}>${label}</button>`
             : html`<a class="sc-sidebar-link" href=${`/?panel=${panel}`} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>${label}</a>`)}
         </div>
       </nav>
@@ -49,10 +49,10 @@ export function workspace(input: Readonly<{
     <div class="sc-shell sc-workspace-body" id="workspace-content">${input.content}</div>
     ${input.mobileFooter ? html`<div class="sc-mobile-footer">${input.mobileFooter}</div>` : nothing}
     <nav class="sc-mobile-nav" aria-label="Main navigation">
-      ${input.openPanel ? html`<button class="sc-nav-button" aria-label="Day 1 setup" @click=${() => input.openPanel?.("setup")}>Setup</button>` : html`<a class="sc-nav-button" href="/?panel=setup" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Setup</a>`}
+      ${input.openPanel ? html`<button class="sc-nav-button" aria-label="Day 1 setup" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.("setup")}>Setup</button>` : html`<a class="sc-nav-button" href="/?panel=setup" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Setup</a>`}
       <a class="sc-nav-button ${input.page === "training" ? "sc-nav-active" : ""}" href="/training" aria-current=${input.page === "training" ? "page" : nothing} aria-label="Training" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Train</a>
       <a class="sc-nav-button ${input.page === "scorecard" ? "sc-nav-active" : ""}" href="/" aria-current=${input.page === "scorecard" ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Scorecard</a>
-      ${input.openPanel ? html`<button class="sc-nav-button" @click=${() => input.openPanel?.("profile")}>Profile</button>` : html`<a class="sc-nav-button" href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Profile</a>`}
+      ${input.openPanel ? html`<button class="sc-nav-button" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.("profile")}>Profile</button>` : html`<a class="sc-nav-button" href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Profile</a>`}
       <div class="sc-mobile-more"><button class="sc-nav-button ${input.page !== "scorecard" && input.page !== "training" ? "sc-nav-active" : ""}" aria-current=${input.page !== "scorecard" && input.page !== "training" ? "true" : nothing} aria-label="More navigation" popovertarget="workspace-more-menu">More <span aria-hidden="true">⌃</span></button>
         <div class="sc-mobile-menu" id="workspace-more-menu" popover="auto"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}
 

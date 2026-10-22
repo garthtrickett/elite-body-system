@@ -5,8 +5,9 @@ import { createScorecardRuntime } from "./browser-runtime.ts";
 import { createScorecardEffects } from "./browser-effects.ts";
 import type { ScorecardActions } from "./browser-actions.ts";
 import { scorecardView } from "./browser-view.ts";
+import { hasUnsavedScorecard } from "./browser-model.ts";
 
-export { acceptScorecardProposal, initialScorecardModel, representScorecard, nextScorecardAction } from "./browser-model.ts";
+export { acceptScorecardProposal, initialScorecardModel, representScorecard, nextScorecardAction, hasUnsavedScorecard } from "./browser-model.ts";
 export type { ScorecardModel, ScorecardProposal, ScorecardState } from "./browser-model.ts";
 export { createScorecardRuntime } from "./browser-runtime.ts";
 
@@ -63,11 +64,17 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     proposeProfile: proposal => propose({ kind: "profileProposed", proposal }),
     retrySync: () => propose({ kind: "retrySync" }),
     reloadClient: () => propose({ kind: "reloadClient" }),
-    signOut: config.signOut,
+    signOut: () => propose({ kind: "signOutRequested" }),
   };
   const panelQuery = new URLSearchParams(window.location.search).get("panel");
   const launchPanel = panelQuery === "profile" || panelQuery === "setup" ? panelQuery : undefined;
-  const runtime = createScorecardRuntime({ ...(launchPanel ? { launchPanel } : {}), account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }) });
+  const runtime = createScorecardRuntime({ ...(launchPanel ? { launchPanel } : {}), account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }), performUi: async effect => {
+    if (effect.kind === "navigate") { location.assign(effect.href); return { kind: "navigationHandled", id: effect.id }; }
+    if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload the saved version and discard your unsaved changes? Cancel to keep your draft and retry saving.") };
+    const accepted = !effect.confirm || window.confirm("Sign out and discard your unsaved changes? Cancel to keep your session and continue editing.");
+    if (accepted) config.signOut();
+    return { kind: "signOutConfirmed", id: effect.id, accepted };
+  } });
   runtime.propose({ kind: "started" });
   const keepDialogFocus = (event: KeyboardEvent) => {
     if (event.key !== "Tab") return;
@@ -80,7 +87,7 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first.focus(); }
   };
   root.addEventListener("keydown", keepDialogFocus);
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.generation > model.savedGeneration || model.profileUi.requestedSave || model.pending?.kind === "saveProfile") event.preventDefault(); };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (!model.exiting && hasUnsavedScorecard(model)) event.preventDefault(); };
   const observeDay = () => { const model = runtime.getModel(); if (model.loaded) runtime.propose({ kind: "dayObserved", date: clientDay({ timezone: model.profile.profile.timezone, now: new Date() }) }); };
   const dayTimer = window.setInterval(observeDay, 15000);
   const onVisible = () => { if (document.visibilityState === "visible") observeDay(); };
