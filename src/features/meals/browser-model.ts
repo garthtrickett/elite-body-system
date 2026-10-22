@@ -4,6 +4,7 @@ import { emptyMeal, emptyNutrients, parseMeal, mealTotals, mealNumberProblem, MA
 import type { Meal, MealSnapshot, Macro, Micro } from "./data.ts";
 import type { MealPhoto } from "./provider.ts";
 export type MealEffect =
+  | Readonly<{ kind: "confirmReload"; id: number }>
   | Readonly<{ kind: "confirmNavigation"; id: number; href: string }>
   | Readonly<{ kind: "navigate"; id: number; href: string }>
   | Readonly<{ kind: "load"; id: number; date?: string }>
@@ -18,6 +19,7 @@ export type MealModel = Readonly<{
 export type MealProposal =
   | Readonly<{ kind: "navigationRequested"; href: string }>
   | Readonly<{ kind: "navigationConfirmed"; id: number; leave: boolean }>
+  | Readonly<{ kind: "reloadConfirmed"; id: number; discard: boolean }>
   | Readonly<{ kind: "started" | "manualRequested" | "draftCancelled" | "analysisRequested" | "ingredientAdded" | "retry" | "reload" }>
   | Readonly<{ kind: "descriptionChanged"; value: string }>
   | Readonly<{ kind: "dateChanged"; value: string }>
@@ -71,6 +73,10 @@ function fieldProblems(model: MealModel): Readonly<Record<string, string>> {
 
 export function acceptMealProposal(model: MealModel, proposal: MealProposal): MealModel {
   const id = model.sequence + 1;
+  if (proposal.kind === "reloadConfirmed") {
+    if (model.pending?.kind !== "confirmReload" || model.pending.id !== proposal.id) return model;
+    return proposal.discard ? queue({ ...model, draft: null, fields: {}, retry: null }, { kind: "load", id, ...(model.snapshot ? { date: model.snapshot.date } : {}) }) : { ...model, pending: null };
+  }
   if (proposal.kind === "navigationConfirmed") {
     if (model.pending?.kind !== "confirmNavigation" || model.pending.id !== proposal.id) return model;
     return proposal.leave ? queue(model, { kind: "navigate", id, href: model.pending.href }) : { ...model, pending: null };
@@ -99,7 +105,7 @@ export function acceptMealProposal(model: MealModel, proposal: MealProposal): Me
   if (model.pending) return model;
   if (proposal.kind === "retry") return model.retry ? queue(model, { ...model.retry, id }) : model;
   // An uncertain write keeps its exact payload/request ID until confirmed or explicitly reloaded.
-  if (proposal.kind === "reload") return queue({ ...model, draft: null, fields: {}, retry: null }, { kind: "load", id, ...(model.snapshot ? { date: model.snapshot.date } : {}) });
+  if (proposal.kind === "reload") return model.draft ? { ...model, sequence: id, pending: { kind: "confirmReload", id } } : queue({ ...model, draft: null, fields: {}, retry: null }, { kind: "load", id, ...(model.snapshot ? { date: model.snapshot.date } : {}) });
   if (model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind)) return model;
   if (proposal.kind === "navigationRequested") {
     if (!proposal.href.startsWith("/") || proposal.href.startsWith("//") || proposal.href.includes("\\")) return model;

@@ -41,3 +41,17 @@ test("removing an invalid ingredient preserves and reindexes the remaining porti
   model = acceptMealProposal(model, { kind: "fieldCommitted", index: 1, field: "protein" });
   assert.equal(model.draft?.items[0]?.grams, 150); assert.equal(model.draft?.items[1]?.per100.protein, 33.7);
 });
+
+test("reloading after a failed meal log confirms discard and cancellation keeps the exact retry payload", () => {
+  let model = acceptMealProposal(initial(), { kind: "manualRequested" });
+  model = acceptMealProposal(model, { kind: "fieldChanged", index: 0, field: "energy", value: "200" });
+  model = acceptMealProposal(model, { kind: "logRequested", requestId }); const log = model.pending; assert.ok(log?.kind === "log");
+  model = acceptMealProposal(model, { kind: "completed", id: log.id, effectKind: "log", result: { ok: false, error: { code: "unavailable", message: "Not written" } } });
+  const confirming = acceptMealProposal(model, { kind: "reload" }); assert.ok(confirming.pending?.kind === "confirmReload");
+  assert.equal(acceptMealProposal(confirming, { kind: "reloadConfirmed", id: 999, discard: true }), confirming);
+  const kept = acceptMealProposal(confirming, { kind: "reloadConfirmed", id: confirming.pending.id, discard: false });
+  assert.deepEqual(kept.draft, log.meal); assert.equal(kept.error, "Not written"); assert.equal(kept.retry, log);
+  const second = acceptMealProposal(kept, { kind: "reload" });
+  const discarded = acceptMealProposal(second, { kind: "reloadConfirmed", id: second.pending!.id, discard: true });
+  assert.equal(discarded.draft, null); assert.equal(discarded.pending?.kind, "load"); assert.equal(discarded.retry, null);
+});

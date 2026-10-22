@@ -2,8 +2,8 @@
 
 A newly spawned agent audited merged commit
 `25b9b7ac4a33adf670e009fa4ac7c3d7a0655f64` after PR #14. It reproduced two P2
-training recovery/draft defects and two P3 usability defects. All four are
-addressed together. The refinement loop still requires a fresh audit after this
+training recovery/draft defects and two P3 usability defects. The candidate recheck also reproduced failed-meal reload loss and an exercise swap
+clearing unrelated set drafts. All six findings are addressed together. The refinement loop still requires a fresh audit after this
 round is merged.
 
 | Before | After | Why |
@@ -11,6 +11,8 @@ round is merged.
 | A failed workout save kept saying Saving workout, and Reload saved workout silently replaced the unsaved note. | Saving reflects an active request. Unsaved/error feedback remains truthful. Reload asks before discarding, Cancel retains the draft/error, Retry persists it, and explicit discard clears the old completion intent. | Recovery must not silently erase useful session notes. |
 | Invalid or uncommitted set text was absent from navigation/date guards and could disappear while status claimed it was saved. | One predicate includes raw set text for unload, date selection, reload and persistence feedback. Date changes retain the current workout until edits are corrected or explicitly discarded; unfinished set text cannot finish the workout. | Rejected input remains a client draft that needs correction. |
 | Enter followed by blur resaved an equal set value and blocked the first navigation click. | Equal numeric values preserve the same workout generation. | A completed save leaves navigation available immediately. |
+| Reload saved meals after a failed log silently removed the local review, even when nothing had been written. | Confirm discarding the review before reloading. Cancel preserves the error and exact idempotent retry payload. | An uncertain write must retain its recovery choice. |
+| Swapping one exercise cleared raw set text for every exercise. | Keep raw drafts across swaps, including the original movement when switching back. | An unrelated exercise change cannot discard client input. |
 | Removing an ingredient first validated that unwanted row, so a blank name or invalid number prevented removal. | Remove the selected row and its own raw fields directly; reindex and preserve every remaining raw edit. Validation remains authoritative when committing/logging. | Clients can discard an unwanted ingredient without inventing valid content for it. |
 
 ## Independent evidence

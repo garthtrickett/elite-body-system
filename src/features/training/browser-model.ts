@@ -106,7 +106,7 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
       return change(model, { ...withRow(workout, proposal.id, proposal.slot, { kg, reps, done: !current.done }),
         restUntil: !current.done && exercise.rest ? model.clock + exercise.rest * 1000 : workout.restUntil });
     }
-    case "swapToggled": return change({ ...model, drafts: {} }, { ...workout, swaps: { ...workout.swaps, [proposal.id]: !workout.swaps[proposal.id] } });
+    case "swapToggled": return change(model, { ...workout, swaps: { ...workout.swaps, [proposal.id]: !workout.swaps[proposal.id] } });
     case "noteChanged": return proposal.value.length <= 2000 ? change(model, { ...workout, notes: { ...workout.notes, [proposal.id]: proposal.value } }) : model;
     case "cardioChanged": {
       const minutes = Number(proposal.value);

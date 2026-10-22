@@ -49,6 +49,7 @@ export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>
     present,
     failed: effect => ({ kind: "failed", id: effect.id }),
     perform: async (effect): Promise<MealProposal> => {
+      if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload saved meals and discard this local review? Cancel to keep the review and retry the same action safely.") };
       if (effect.kind === "confirmNavigation" || effect.kind === "navigate") {
         const destination = new URL(effect.href, location.origin);
         const safe = destination.origin === location.origin;

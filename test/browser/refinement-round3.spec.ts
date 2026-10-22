@@ -75,3 +75,38 @@ test("an invalid meal ingredient can be removed while other raw portions remain 
   await page.getByLabel("Portion for ingredient 2", { exact: true }).fill("75"); await page.getByLabel("Portion for ingredient 2", { exact: true }).press("Tab");
   await expect(page.getByLabel("Portion for ingredient 1", { exact: true })).toHaveValue("150"); await expect(page.getByLabel("Portion for ingredient 2", { exact: true })).toHaveValue("75");
 });
+
+test("failed meal reload preserves cancellation and the exact retry, with discard requiring confirmation", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); await signIn(page); await page.goto(app.origin + "/meals");
+    const fail = () => page.route("**/api/client/meals/log", route => route.fulfill({ status: 503, json: { ok: false, error: { code: "unavailable", message: "Fixture log failed before write" } } }));
+    await page.getByRole("button", { name: "Enter nutrition manually", exact: true }).click();
+    await page.getByLabel("Meal name", { exact: true }).fill(`Retained lunch ${width}`);
+    await page.getByLabel("Calories per 100g for ingredient 1").fill("620"); await page.getByLabel("Protein per 100g for ingredient 1").fill("48");
+    await fail(); await page.getByRole("button", { name: /^Log meal for / }).click(); await expect(page.getByRole("alert")).toContainText("Fixture log failed before write");
+    let confirmations = 0; page.once("dialog", async dialog => { expect(dialog.type()).toBe("confirm"); confirmations++; await dialog.dismiss(); });
+    await page.getByRole("button", { name: "Reload saved meals", exact: true }).click(); await expect.poll(() => confirmations).toBe(1);
+    await expect(page.getByLabel("Meal name", { exact: true })).toHaveValue(`Retained lunch ${width}`);
+    await expect(page.getByRole("alert")).toContainText("Fixture log failed before write");
+    await page.unroute("**/api/client/meals/log"); await page.getByRole("button", { name: "Retry same action", exact: true }).click();
+    await expect(page.getByRole("status")).toHaveText("Meal added to your day’s calories and protein."); await page.reload();
+    await expect(page.getByRole("button", { name: `Remove Retained lunch ${width} from this day`, exact: true })).toHaveCount(1);
+    await page.getByRole("button", { name: "Enter nutrition manually", exact: true }).click(); await page.getByLabel("Meal name", { exact: true }).fill(`Discard meal ${width}`);
+    await page.getByLabel("Calories per 100g for ingredient 1").fill("100"); await fail(); await page.getByRole("button", { name: /^Log meal for / }).click();
+    await expect(page.getByRole("alert")).toContainText("Fixture log failed before write"); await page.unroute("**/api/client/meals/log");
+    page.once("dialog", async dialog => { expect(dialog.type()).toBe("confirm"); await dialog.accept(); });
+    await page.getByRole("button", { name: "Reload saved meals", exact: true }).click(); await expect(page.getByLabel("Meal name", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: `Remove Retained lunch ${width} from this day`, exact: true })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: `Remove Discard meal ${width} from this day`, exact: true })).toHaveCount(0);
+  }
+});
+
+test("swapping another exercise preserves the original raw set draft", async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 }); await signIn(page); await page.goto(`${app.origin}/training?date=${monday(-7)}`);
+  const reps = page.getByLabel("Weighted Pull-up set 1 reps"); await reps.fill("7.5");
+  await page.locator(".sc-workout-list button").filter({ hasText: "Weighted Dip" }).click();
+  await page.getByRole("button", { name: "Swap to Barbell Bench Press", exact: true }).click();
+  await expect(page.getByTestId("training-save-status")).toHaveText("Changes not saved");
+  await page.locator(".sc-workout-list button").filter({ hasText: "Weighted Pull-up" }).click();
+  await expect(reps).toHaveValue("7.5"); await page.screenshot({ path: info.outputPath("draft-after-unrelated-swap.png") });
+});

@@ -85,3 +85,9 @@ test("recommitting an unchanged set field after Enter does not queue another sav
   const blurred = acceptTrainingProposal(model, { kind: "setCommitted", id: "dbpress", slot: 0, field: "reps" });
   assert.equal(blurred.pending, undefined); assert.equal(blurred.generation, model.generation);
 });
+
+test("swapping one exercise preserves raw drafts for both its original movement and other exercises", () => {
+  let model = acceptTrainingProposal(initial(), { kind: "setChanged", id: "dbpress", slot: 0, field: "reps", value: "7.5" });
+  model = acceptTrainingProposal(model, { kind: "swapToggled", id: "lateral" }); assert.equal(model.drafts["dbpress:0:reps"], "7.5");
+  model = acceptTrainingProposal(model, { kind: "swapToggled", id: "dbpress" }); assert.equal(model.drafts["dbpress:0:reps"], "7.5");
+});
