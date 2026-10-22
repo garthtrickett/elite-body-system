@@ -89,7 +89,7 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
     case "setCommitted": {
       const exercise = exercises.find(e => e.id === proposal.id);
       if (!exercise?.sets || proposal.slot < 0 || proposal.slot >= exercise.sets) return model;
-      const raw = model.drafts[`${proposal.id}:${proposal.slot}:${proposal.field}`] ?? "", value = raw.trim() ? Number(raw.replace(",", ".")) : 0;
+      const raw = model.drafts[`${proposal.id}:${proposal.slot}:${proposal.field}`] ?? "", value = setDraftNumber(raw);
       if (setNumberProblem({ field: proposal.field, value, done: workout.sets[proposal.id]?.[proposal.slot]?.done ?? false })) return model;
       const row = workout.sets[proposal.id]?.[proposal.slot] ?? { kg: 0, reps: 0, done: false };
       return row[proposal.field] === value ? model : change(model, withRow(workout, proposal.id, proposal.slot, { ...row, [proposal.field]: value }));
@@ -98,13 +98,14 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
       const exercise = exercises.find(e => e.id === proposal.id);
       if (!exercise?.sets || proposal.slot < 0 || proposal.slot >= exercise.sets) return model;
       const previous = model.snapshot.history.filter(w => w.date !== workout.date && w.finishedAt).find(w => w.sets[proposal.id]?.[proposal.slot]?.done)?.sets[proposal.id]?.[proposal.slot];
-      const current = workout.sets[proposal.id]?.[proposal.slot] ?? { kg: 0, reps: 0, done: false };
+      const stored = workout.sets[proposal.id]?.[proposal.slot], current = stored ?? { kg: 0, reps: 0, done: false };
       const kgDraft = model.drafts[`${proposal.id}:${proposal.slot}:kg`], repsDraft = model.drafts[`${proposal.id}:${proposal.slot}:reps`];
-      const kg = kgDraft?.trim() ? Number(kgDraft.replace(",", ".")) : current.kg || previous?.kg || 0;
-      const reps = repsDraft?.trim() ? Number(repsDraft) : current.reps || previous?.reps || parseInt(exercise.reps ?? "1", 10);
+      const kg = kgDraft?.trim() ? setDraftNumber(kgDraft) : stored?.kg ?? previous?.kg ?? 0;
+      const reps = repsDraft?.trim() ? setDraftNumber(repsDraft) : current.reps || previous?.reps || parseInt(exercise.reps ?? "1", 10);
       if (setNumberProblem({ field: "kg", value: kg, done: true }) || setNumberProblem({ field: "reps", value: reps, done: true })) return { ...model, error: "Check the weight and reps before completing the set." };
-      return change(model, { ...withRow(workout, proposal.id, proposal.slot, { kg, reps, done: !current.done }),
-        restUntil: !current.done && exercise.rest ? model.clock + exercise.rest * 1000 : workout.restUntil });
+      return change({ ...model, drafts: { ...model.drafts, [`${proposal.id}:${proposal.slot}:kg`]: String(kg), [`${proposal.id}:${proposal.slot}:reps`]: String(reps) } },
+        { ...withRow(workout, proposal.id, proposal.slot, { kg, reps, done: !current.done }),
+          restUntil: !current.done && exercise.rest ? model.clock + exercise.rest * 1000 : workout.restUntil });
     }
     case "swapToggled": return change(model, { ...workout, swaps: { ...workout.swaps, [proposal.id]: !workout.swaps[proposal.id] } });
     case "noteChanged": return proposal.value.length <= 2000 ? change(model, { ...workout, notes: { ...workout.notes, [proposal.id]: proposal.value } }) : model;
@@ -123,11 +124,13 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
   }
 }
 
+function setDraftNumber(raw: string): number { return raw.trim() ? Number(raw.replace(",", ".")) : 0; }
+
 function hasUnsavedSetDrafts(model: TrainingModel): boolean {
   return Object.entries(model.drafts).some(([key, raw]) => {
     const [id, slot, field] = key.split(":");
     if (field !== "kg" && field !== "reps") return false;
-    const value = raw.trim() ? Number(raw.replace(",", ".")) : 0;
+    const value = setDraftNumber(raw);
     return !Number.isFinite(value) || value !== (model.workout?.sets[id ?? ""]?.[Number(slot)]?.[field] ?? 0);
   });
 }
@@ -140,7 +143,7 @@ export function representTraining(model: TrainingModel) {
   const fieldErrors = Object.fromEntries(Object.entries(model.drafts).flatMap(([key, raw]) => {
     const [id, slot, field] = key.split(":");
     if (field !== "kg" && field !== "reps") return [];
-    const error = setNumberProblem({ field, value: raw.trim() ? Number(raw.replace(",", ".")) : 0, done: workout?.sets[id ?? ""]?.[Number(slot)]?.done ?? false });
+    const error = setNumberProblem({ field, value: setDraftNumber(raw), done: workout?.sets[id ?? ""]?.[Number(slot)]?.done ?? false });
     return error ? [[key, error]] : [];
   }));
   return { ...model, fieldErrors, exercises: workout ? exercisesFor(workout) : [], stats: workout ? workoutStats({ workout, history: model.snapshot?.history ?? [] }) : { sets: 0, volume: 0, records: [], hasActivity: false },

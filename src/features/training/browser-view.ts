@@ -21,7 +21,7 @@ function setRows(state: TrainingState, exercise: Exercise, propose: Propose) {
           aria-label=${`${exercise.name} set ${slot + 1} ${field === "kg" ? "weight" : "reps"}`}
           aria-invalid=${!!state.fieldErrors[`${exercise.id}:${slot}:${field}`]} aria-describedby=${state.fieldErrors[`${exercise.id}:${slot}:${field}`] ? `set-error-${exercise.id}-${slot}-${field}` : nothing}
           placeholder=${String(previous?.[field] ?? (field === "reps" ? parseInt(exercise.reps ?? "1", 10) : 0))}
-          .value=${live(state.drafts[`${exercise.id}:${slot}:${field}`] ?? (set?.[field] ? String(set[field]) : ""))}
+          .value=${live(state.drafts[`${exercise.id}:${slot}:${field}`] ?? (set && (field === "kg" || set[field]) ? String(set[field]) : ""))}
           @input=${(event: Event) => propose({ kind: "setChanged", id: exercise.id, slot, field, value: (event.target as HTMLInputElement).value })}
           @blur=${() => { if (state.drafts[`${exercise.id}:${slot}:${field}`] !== undefined) propose({ kind: "setCommitted", id: exercise.id, slot, field }); }}
           @keydown=${(event: KeyboardEvent) => { if (event.key === "Enter") { event.preventDefault(); propose({ kind: "setCommitted", id: exercise.id, slot, field }); } }}>${state.fieldErrors[`${exercise.id}:${slot}:${field}`] ? html`<p class="sc-field-error" role="alert" id=${`set-error-${exercise.id}-${slot}-${field}`}>${state.fieldErrors[`${exercise.id}:${slot}:${field}`]}</p>` : nothing}</td>`)}

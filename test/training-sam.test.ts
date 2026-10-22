@@ -91,3 +91,47 @@ test("swapping one exercise preserves raw drafts for both its original movement 
   model = acceptTrainingProposal(model, { kind: "swapToggled", id: "lateral" }); assert.equal(model.drafts["dbpress:0:reps"], "7.5");
   model = acceptTrainingProposal(model, { kind: "swapToggled", id: "dbpress" }); assert.equal(model.drafts["dbpress:0:reps"], "7.5");
 });
+
+test("set completion reconciles blank drafts with prescribed reps and history weight, keeping unrelated drafts", () => {
+  const previous = { ...snapshot().workout, date: "2026-10-13", finishedAt: 90000, sets: { dbpress: [{ kg: 12, reps: 10, done: true }] } };
+  let model = acceptTrainingProposal(initialTrainingModel({ now: 100000 }), { kind: "started" });
+  model = acceptTrainingProposal(model, { kind: "loaded", id: 1, result: { ok: true, value: { ...snapshot(), history: [previous] } } });
+  for (const field of ["kg", "reps"] as const) model = acceptTrainingProposal(model, { kind: "setChanged", id: "dbpress", slot: 0, field, value: "" });
+  model = acceptTrainingProposal(model, { kind: "setChanged", id: "lateral", slot: 0, field: "reps", value: "7" });
+  model = acceptTrainingProposal(model, { kind: "setToggled", id: "dbpress", slot: 0 });
+  assert.equal(model.drafts["dbpress:0:kg"], "12"); assert.equal(model.drafts["dbpress:0:reps"], "10"); assert.equal(model.drafts["lateral:0:reps"], "7");
+  const effect = model.pending; assert.ok(effect?.kind === "save");
+  model = acceptTrainingProposal(model, { kind: "saved", id: effect.id, result: { ok: true, value: { ...snapshot(), revision: 1, workout: effect.workout } } });
+  assert.equal(representTraining(model).fieldErrors["dbpress:0:reps"], undefined);
+  model = acceptTrainingProposal(model, { kind: "setChanged", id: "lateral", slot: 0, field: "reps", value: "" });
+  assert.equal(representTraining(model).unsaved, false);
+  model = acceptTrainingProposal(model, { kind: "setToggled", id: "dbpress", slot: 0 }); assert.equal(model.workout?.sets.dbpress?.[0]?.done, false);
+});
+
+
+test("comma-form set numbers share commit, validation and completion semantics", () => {
+  let model = initial();
+  for (const [field, value] of [["kg", "12,5"], ["reps", "5,0"]] as const) {
+    model = acceptTrainingProposal(model, { kind: "setChanged", id: "dbpress", slot: 0, field, value });
+    model = acceptTrainingProposal(model, { kind: "setCommitted", id: "dbpress", slot: 0, field });
+    const effect = model.pending; assert.ok(effect?.kind === "save");
+    model = acceptTrainingProposal(model, { kind: "saved", id: effect.id, result: { ok: true, value: { ...snapshot(), revision: model.snapshot!.revision + 1, workout: effect.workout } } });
+  }
+  assert.deepEqual(representTraining(model).fieldErrors, {}); assert.equal(representTraining(model).unsaved, false);
+  model = acceptTrainingProposal(model, { kind: "setToggled", id: "dbpress", slot: 0 });
+  assert.equal(model.error, ""); assert.deepEqual(model.workout?.sets.dbpress?.[0], { kg: 12.5, reps: 5, done: true });
+  assert.equal(model.drafts["dbpress:0:kg"], "12.5"); assert.equal(model.drafts["dbpress:0:reps"], "5");
+});
+
+
+test("a saved zero weight remains authoritative over history when undoing and redoing completion", () => {
+  for (const done of [true, false]) {
+    const workout = { ...snapshot().workout, sets: { dbpress: [{ kg: 0, reps: 7, done }] } };
+    const previous = { ...workout, date: "2026-10-13", finishedAt: 90000, sets: { dbpress: [{ kg: 14.5, reps: 7, done: true }] } };
+    let model = acceptTrainingProposal(initialTrainingModel({ now: 100000 }), { kind: "started" });
+    model = acceptTrainingProposal(model, { kind: "loaded", id: 1, result: { ok: true, value: { ...snapshot(), workout, history: [previous] } } });
+    model = acceptTrainingProposal(model, { kind: "setToggled", id: "dbpress", slot: 0 });
+    assert.deepEqual(model.workout?.sets.dbpress?.[0], { kg: 0, reps: 7, done: !done });
+    assert.equal(model.drafts["dbpress:0:kg"], "0");
+  }
+});
