@@ -24,7 +24,7 @@ async function signIn(page: Page, modern = false) {
   return account.value.id;
 }
 
-test("profile targets and unadded goals warn before navigation and remain available when exit is cancelled", async ({ page }) => {
+test("profile targets warn before navigation and remain available when exit is cancelled", async ({ page }) => {
   await signIn(page); await page.goto(app.origin + "/?panel=profile");
   const energy = page.getByLabel("Energy (kcal)", { exact: true }); await energy.fill("2417");
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
@@ -88,6 +88,48 @@ test("an older finish response leaves newer incomplete Map edits in the builder"
     const field = page.getByLabel(/^Final statement/); await field.fill(""); release();
     await expect(page.getByTestId("learning-save-status")).toHaveText("Progress saved to your account");
     await expect(field).toBeVisible(); await expect(field).toHaveValue("");
+    await field.fill("A"); await expect(page.getByTestId("learning-save-status")).toHaveText("Progress saved to your account");
+    await expect(field).toBeVisible(); await field.fill("A full new statement");
+    await expect(page.getByTestId("learning-save-status")).toHaveText("Progress saved to your account");
+    await expect(field).toHaveValue("A full new statement");
     await expect(page.getByRole("heading", { name: "Your Neural Map", exact: true })).toHaveCount(0);
   } finally { release(); }
+});
+
+test("Setup and Profile wait for an active day save on desktop and phone", async ({ page }, info) => {
+  await signIn(page, true);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); await page.goto(app.origin);
+    let release: () => void = () => {}, reached: () => void = () => {};
+    const held = new Promise<void>(resolve => { release = resolve; }), saving = new Promise<void>(resolve => { reached = resolve; });
+    await page.route("**/api/client/day", async route => { reached(); await held; await route.continue(); });
+    try {
+      const steps = page.getByLabel("Steps today"); await steps.fill(String(5123 + width)); await steps.press("Enter"); await saving;
+      const setup = page.getByRole("button", { name: "Day 1 setup", exact: true }).filter({ visible: true });
+      await expect(setup).toBeDisabled(); await expect(page.getByRole("button", { name: "Profile", exact: true }).filter({ visible: true })).toBeDisabled();
+      await page.screenshot({ path: info.outputPath(`saving-navigation-${width}.png`) }); release();
+      await expect(page.getByTestId("save-status")).toHaveText("Saved to your account"); await expect(setup).toBeEnabled();
+      await page.unroute("**/api/client/day"); await setup.click(); await expect(page).toHaveURL(app.origin + "/onboarding");
+    } finally { release(); await page.unroute("**/api/client/day"); }
+  }
+});
+
+test("final lesson submission freezes task edits until durable completion", async ({ page }, info) => {
+  const accountId = await signIn(page), db = createDatabase(testDatabaseUrl());
+  const learning = createLearning({ db, profiles: createProfiles({ store: createPostgresProfileStore(db) }), media: createContentMedia(db) });
+  let release: () => void = () => {}, reached: () => void = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; }), completing = new Promise<void>(resolve => { reached = resolve; });
+  try {
+    expect((await learning.saveEpisode({ accountId, id: "m1", revision: 0, answers: ["Original saved answer", "Read every morning"], complete: false })).ok).toBe(true);
+    await page.goto(app.origin + "/courses/mindset"); await page.getByRole("button", { name: /Week 1 · The Neural Map/ }).click();
+    await page.route("**/api/client/learning/episode", async route => { if (route.request().postDataJSON().complete === true) { reached(); await held; } await route.continue(); });
+    await page.getByRole("button", { name: "Mark lesson complete", exact: true }).click(); await completing;
+    const answer = page.getByRole("textbox", { name: "Part 1: who are you becoming? Write it as an instruction.", exact: true });
+    await expect(answer).toBeDisabled(); await expect(answer).toHaveValue("Original saved answer");
+    await page.screenshot({ path: info.outputPath("lesson-final-submission.png") }); release();
+    await expect(page.getByRole("button", { name: "✓ Lesson complete", exact: true })).toBeVisible();
+    await expect(page.getByTestId("learning-save-status")).toHaveText("Progress saved to your account");
+    const stored = await learning.get({ accountId }); expect(stored.ok).toBe(true);
+    if (stored.ok) { expect(stored.value.progress.answers.m1?.[0]).toBe("Original saved answer"); expect(stored.value.progress.done.m1).toBe(true); }
+  } finally { release(); await db.destroy(); }
 });

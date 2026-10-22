@@ -71,7 +71,7 @@ export function acceptLearningProposal(model: LearningModel, proposal: LearningP
   if (!model.snapshot || !model.map || model.pending?.kind === "load") return model;
   switch (proposal.kind) {
     case "editMap": return { ...model, editingMap: true, error: "" };
-    case "mapChanged": return proposal.value.length <= 5000 ? sync({ ...model, map: { ...model.map, [proposal.key]: proposal.value }, mapGeneration: model.mapGeneration + 1, error: "" }) : model;
+    case "mapChanged": return proposal.value.length <= 5000 ? sync({ ...model, map: { ...model.map, [proposal.key]: proposal.value }, mapGeneration: model.mapGeneration + 1, finishMap: false, error: "" }) : model;
     case "mapNext": {
       const step = MAP_STEPS[model.map.step];
       if (step?.keys?.some(key => !model.map?.[key].trim())) return { ...model, error: "Write this part before continuing." };
@@ -89,7 +89,7 @@ export function acceptLearningProposal(model: LearningModel, proposal: LearningP
     case "episodeBack": return model.pending || model.episodeGeneration > model.episodeSaved ? model : { ...model, episode: undefined, error: "", message: "" };
     case "answerChanged": {
       const episode = EPISODES.find(item => item.id === model.episode);
-      if (!episode || model.snapshot.progress.done[episode.id] || proposal.index < 0 || proposal.index >= episode.tasks.length || proposal.value.length > 5000) return model;
+      if (!episode || model.snapshot.progress.done[episode.id] || model.pending?.kind === "saveEpisode" && model.pending.complete || proposal.index < 0 || proposal.index >= episode.tasks.length || proposal.value.length > 5000) return model;
       const answers = episode.tasks.map((_, index) => index === proposal.index ? proposal.value : model.answers[episode.id]?.[index] ?? "");
       return sync({ ...model, answers: { ...model.answers, [episode.id]: answers }, dirtyEpisode: episode.id, episodeGeneration: model.episodeGeneration + 1, error: "" });
     }

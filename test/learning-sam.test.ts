@@ -43,4 +43,14 @@ test("an old Map finish response cannot close newer incomplete edits or queue an
   const saving = model.pending;
   model = acceptLearningProposal(model, { kind: "completed", id: saving.id, effectKind: "saveMap", result: { ok: true, value: { ...snapshot(), map: saving.map, mapRevision: 3 } } });
   assert.equal(model.pending, undefined); assert.equal(model.editingMap, true);
+  model = acceptLearningProposal(model, { kind: "mapChanged", key: "final", value: "A" });
+  assert.ok(model.pending?.kind === "saveMap"); assert.equal(model.pending.finish, false); assert.equal(model.finishMap, false);
+});
+
+test("an irreversible lesson completion rejects newer task edits while its request is pending", () => {
+  let model = acceptLearningProposal(initialLearningModel(), { kind: "started" });
+  model = acceptLearningProposal(model, { kind: "completed", id: 1, effectKind: "load", result: { ok: true, value: { ...snapshot(), progress: { answers: { m1: ["Original", "Every morning"] }, done: {} } } } });
+  model = acceptLearningProposal(model, { kind: "episodeSelected", id: "m1" });
+  model = acceptLearningProposal(model, { kind: "episodeCompleted" }); assert.ok(model.pending?.kind === "saveEpisode"); assert.equal(model.pending.complete, true);
+  assert.equal(acceptLearningProposal(model, { kind: "answerChanged", index: 0, value: "Unsavable newer answer" }), model);
 });

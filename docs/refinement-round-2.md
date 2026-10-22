@@ -6,7 +6,8 @@ and merges until a fresh auditor finds no significant remaining problem.
 
 A fresh independent agent reproduced three P2 defects. Root reproduced two
 related learning defects and extended draft protection to scorecard reload and
-day rollover. No significant visual defect was found in this round's baseline
+day rollover. The candidate recheck exposed three related P2 races, fixed in the same PR.
+No significant visual defect was found in this round's baseline
 screenshots; the changes below address navigation, recovery and state feedback.
 
 | Before | After | Why |
@@ -15,7 +16,9 @@ screenshots; the changes below address navigation, recovery and state feedback.
 | Day 1 setup and `?panel=setup` sent completed new-flow clients into the obsolete 34-step dialog. | Both navigation paths select the saved eight-section onboarding. | Setup review matches the flow the client completed. |
 | Profile fields, target text, metric text and unadded goals were omitted from the exit guard. | One pure predicate protects all these drafts during navigation, reload and automatic day rollover. | Closing a dialog does not make its unsaved edits disposable. |
 | Reload saved version silently replaced unsaved scorecard or learning edits. | Reload asks before discarding; Cancel keeps the error and draft available for Retry. | Conflict recovery offers an explicit choice. |
-| An older Map finish response closed the editor even after the final statement had been cleared while saving. | Finish responses close only the generation they saved. Newer incomplete text remains in the builder and can save as a draft. | A response cannot present newer unfinished work as complete. |
+| An older Map finish response closed the editor even after the final statement had been cleared while saving. | Finish responses close only the generation they saved. Newer text cancels the previous finish intent, stays in the builder and saves as a draft until a fresh completion action. | A response cannot present newer unfinished work as complete. |
+| Setup buttons could replace a pending day-save effect, leaving the UI stale after a cancelled exit. | Account navigation waits for the save; model navigation cannot overwrite a pending effect. | A successful save must reconcile its generation and revision. |
+| Lesson task fields stayed editable during irreversible completion, stranding newer text after the server froze the old answers. | Task fields and proposals freeze only during final submission; ordinary autosave remains editable. | Displayed completed answers match the durable submission. |
 | Learning save status could say Saving while a failed draft was waiting for recovery. | Error feedback takes priority and says Changes not saved. | Status reflects persistence rather than local editing. |
 
 ## Evidence and verification

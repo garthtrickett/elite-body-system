@@ -83,7 +83,7 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
       const distance = model.touchX === undefined ? 0 : model.touchX - proposal.x;
       return { ...model, touchX: undefined, card: Math.max(0, Math.min(2, model.card + (Math.abs(distance) >= 40 ? Math.sign(distance) : 0))) };
     }
-    case "panelOpened": return proposal.panel === "setup" && model.profile.profile.onboardingVersion === "harry-v2" ? schedule(model, { kind: "navigate", href: "/onboarding" })
+    case "panelOpened": return proposal.panel === "setup" && model.profile.profile.onboardingVersion === "harry-v2" ? model.pending ? model : schedule(model, { kind: "navigate", href: "/onboarding" })
       : { ...model, panel: proposal.panel, message: "", profileUi: proposal.panel === "setup" && model.profile.profile.completed ? acceptProfileProposal(model.profileUi, { kind: "editSetup" }) : model.profileUi };
     case "panelClosed": return { ...model, panel: undefined, message: "" };
     case "goalDraftChanged": return { ...model, goalDraft: proposal.value, message: "" };
@@ -98,7 +98,7 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
     }
     case "goalRemoved": return { ...model, day: { ...model.day, goals: model.day.goals.filter(goal => goal.id !== proposal.id) } };
     case "profileProposed": {
-      if (proposal.proposal.kind === "editSetup" && model.profile.profile.onboardingVersion === "harry-v2") return schedule(model, { kind: "navigate", href: "/onboarding" });
+      if (proposal.proposal.kind === "editSetup" && model.profile.profile.onboardingVersion === "harry-v2") return model.pending ? model : schedule(model, { kind: "navigate", href: "/onboarding" });
       if (model.pending?.kind === "saveProfile") return model;
       const profileUi = acceptProfileProposal(model.profileUi, proposal.proposal);
       return { ...model, profileUi, panel: proposal.proposal.kind === "editSetup" ? "setup" : model.panel, syncError: "" };
