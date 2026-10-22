@@ -66,3 +66,23 @@ test("health holds are visible in the browser and cannot be bypassed by opening 
   await expect(page.getByRole("heading", { name: "Clearance first.", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Finish workout", exact: true })).toHaveCount(0);
 });
+
+test("completing cleared reps displays the prescribed value and remains saved, reversible and navigable", async ({ page }, info) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); await signIn(page); await page.goto(`${app.origin}/training?date=${monday(-7)}`);
+    const reps = page.getByLabel("Weighted Pull-up set 1 reps"), done = page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true });
+    await reps.fill("8"); await reps.fill(""); await done.click();
+    await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
+    await expect(reps).toHaveValue("5"); await expect(reps).toHaveAttribute("aria-invalid", "false"); await expect(done).toBeEnabled();
+    await page.screenshot({ path: info.outputPath(`completed-blank-reps-${width}.png`) });
+    await done.click(); await expect(done).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
+    await page.reload(); await expect(reps).toHaveValue("5"); await expect(done).toHaveAttribute("aria-pressed", "false");
+    await reps.fill("5,0"); await reps.press("Enter");
+    await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
+    await done.click(); await expect(done).toHaveAttribute("aria-pressed", "true"); await expect(reps).toHaveValue("5");
+    await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
+    await page.reload(); await expect(reps).toHaveValue("5"); await expect(done).toHaveAttribute("aria-pressed", "true");
+    await page.getByRole("link", { name: "‹ Scorecard", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/");
+  }
+});
