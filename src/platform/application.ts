@@ -5,13 +5,22 @@ import { createAuth, createAuthHttp, createLinkDelivery, createPostgresAuthStore
 import { createDatabase } from "./database/connection.ts";
 import type { Config } from "./config.ts";
 import { createClientHttp } from "./client-http.ts";
+import { createOnboarding, createS3AssessmentStorage, createGoogleBookingProvider, assessmentUploadOrigin } from "../features/onboarding/index.ts";
+import type { AssessmentStorage } from "../features/onboarding/index.ts";
 
-export function createApplication(config: Config) {
+export function createApplication(config: Config, dependencies: Readonly<{ assessmentStorage?: AssessmentStorage }> = {}) {
   const db = createDatabase(config.databaseUrl);
   const auth = createAuth({ store: createPostgresAuthStore(db), deliverLink: createLinkDelivery(config.delivery),
     publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
-  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin });
-  const handleClient = createClientHttp({ auth, db, publicOrigin: config.publicOrigin, ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });
+  const onboarding = createOnboarding({ db });
+  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), ...(config.onboardingEnabled ? { pageAccess: async ({ accountId, path }: Readonly<{ accountId: string; path: string }>) => {
+    if (path === "/onboarding") return { allowed: true };
+    const access = await onboarding.eligible({ accountId });
+    return access.ok ? { allowed: access.value.eligible } : { allowed: false, unavailable: true };
+  } } : {}) });
+  const handleClient = createClientHttp({ auth, db, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
+    ...(config.googleBooking ? { bookingProvider: createGoogleBookingProvider(config.googleBooking) } : {}),
+    ...(dependencies.assessmentStorage ? { assessmentStorage: dependencies.assessmentStorage } : config.assessmentStorage ? { assessmentStorage: createS3AssessmentStorage(config.assessmentStorage) } : {}), ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });
   const assets = new Map([
     ["/assets/app.js", { file: new URL("../../dist/app.js", import.meta.url), type: "text/javascript; charset=utf-8" }],
     ["/assets/app.css", { file: new URL("../../dist/app.css", import.meta.url), type: "text/css; charset=utf-8" }],

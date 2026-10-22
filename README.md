@@ -12,7 +12,18 @@ L to R goals, and configurable nutrition/activity targets. Changes are saved to
 the signed-in account; cross-tab revision conflicts require a reload rather than
 overwriting another tab’s work. The client’s time zone determines today’s date.
 
-Day 1 setup contains Harry’s 34-step flow: training schedule, equipment, story,
+The new `/onboarding` flow has eight sections: welcome, questionnaire, physical
+audit, communication, measurements/photos, lifestyle, rhythm and call booking.
+Set `ONBOARDING_ENABLED=true` only after content and integration acceptance:
+everyone then needs `harry-v2` completion, including clients who finished legacy
+setup. Confirmed Google Meet booking satisfies the call section. Private S3
+assessment storage and a read-only Google Calendar adapter are configurable;
+the actual scheduling service must provide verified account binding. See
+[onboarding operations](docs/onboarding-operations.md), the
+[implementation plan](docs/harry-onboarding-implementation-plan.md), and
+[validation record](docs/onboarding-validation.md). Rollout defaults off.
+
+While the new rollout is off, legacy Day 1 setup retains Harry’s 34-step flow: training schedule, equipment, story,
 health answers, emergency contact, draft acknowledgement, starting weight,
 identity and first daily priority. Drafts resume across devices. Profile allows
 target changes and reviewing setup. Health flags hold training until the client

@@ -13,6 +13,7 @@ await assert.rejects(import("typescript"), { code: "ERR_MODULE_NOT_FOUND" });
 const configuration = readConfig({ ...process.env,
   PUBLIC_ORIGIN: "https://container.example.test", AUTH_RATE_KEY: "a".repeat(64),
   EMAIL_MODE: "resend", EMAIL_FROM: "test@example.test", RESEND_API_KEY: "test-only-never-sent",
+  ONBOARDING_ENABLED: "true", AUTH_HARRY_PREVIEW: "true",
 });
 assert.equal(configuration.ok, true);
 const app = createApplication(configuration.value);
@@ -37,5 +38,13 @@ try {
     assert.equal(response.status, 404);
     await response.body.cancel();
   }
+  assert.equal(existsSync("scripts/onboarding-admin.ts"), true);
+  const provisioned = await app.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); assert.equal(provisioned.ok, true);
+  const preview = await app.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: "onboarding-production-smoke" }); assert.equal(preview.ok, true);
+  const headers = { Cookie: `__Host-ebs-session=${preview.value.sessionToken}` };
+  const gated = await fetch(origin, { headers, redirect: "manual" }); assert.equal(gated.status, 303); assert.equal(gated.headers.get("location"), "/onboarding"); await gated.body.cancel();
+  const onboarding = await fetch(`${origin}/onboarding`, { headers }); assert.equal(onboarding.status, 200); assert.match(await onboarding.text(), /data-page="onboarding"/);
+  const denied = await fetch(`${origin}/api/client/state`, { headers }); assert.equal(denied.status, 403); assert.equal((await denied.json()).error.reason, "onboarding_required");
   console.log("Production image passed: unprivileged runtime, database health, HTTPS cookies, assets, and private paths");
+  console.log("Onboarding production image passed: new migrations, admin tooling, authenticated route and API gate");
 } finally { await app.close(); }

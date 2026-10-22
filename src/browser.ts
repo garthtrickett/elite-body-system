@@ -3,6 +3,7 @@ import { mountScorecard } from "./features/scorecard/browser.ts";
 import { mountTraining } from "./features/training/browser.ts";
 import { mountMeals } from "./features/meals/browser.ts";
 import { mountLearning } from "./features/learning/browser.ts";
+import { mountOnboarding } from "./features/onboarding/browser.ts";
 
 const root = document.querySelector<HTMLElement>("#app");
 if (root) {
@@ -14,7 +15,7 @@ if (root) {
       if (scorecard) { if ("updateAccount" in scorecard) scorecard.updateAccount({ account }); }
       else {
         const csrf = root.dataset.csrf ?? "", page = root.dataset.page;
-        scorecard = page === "training" ? mountTraining(root, { csrf }) : page === "meals" ? mountMeals(root, { csrf }) : page === "map" || page === "nutrition" || page === "activity" || page === "mindset" ? mountLearning(root, { csrf, page }) : mountScorecard(root, { account, signOut: actions.signOut, csrf });
+        scorecard = page === "onboarding" ? mountOnboarding(root, { csrf, signOut: actions.signOut, account }) : page === "training" ? mountTraining(root, { csrf }) : page === "meals" ? mountMeals(root, { csrf }) : page === "map" || page === "nutrition" || page === "activity" || page === "mindset" ? mountLearning(root, { csrf, page }) : mountScorecard(root, { account, signOut: actions.signOut, csrf });
       }
     },
   });

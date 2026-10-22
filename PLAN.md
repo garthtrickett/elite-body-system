@@ -1,5 +1,9 @@
 # Elite Body System — extraction and implementation plan
 
+## Harry’s revised onboarding
+
+The operator authorized implementing the [eight-section onboarding plan](docs/harry-onboarding-implementation-plan.md). Confirmed decisions: all clients must complete the new flow, including clients who completed the old setup; a confirmed Google Meet booking satisfies the call section. Preserve existing program dates and history. The implementation uses a dedicated onboarding slice with versioned answers/content, private assessment media, booking confirmation and a rollout-controlled server gate. Approved videos/legal wording, the actual scheduling bridge and production storage/calendar configuration remain external launch dependencies. See [onboarding operations](docs/onboarding-operations.md) for configuration, review tools and release checks. Production rollout is not authorized by this implementation task.
+
 ## Active client-platform goal
 
 The operator has now authorized completing onboarding/profile with per-client

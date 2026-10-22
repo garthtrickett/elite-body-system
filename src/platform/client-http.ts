@@ -9,8 +9,12 @@ import { createTraining, trainingComplete } from "../features/training/index.ts"
 import { createLearning } from "../features/learning/index.ts";
 import { createContentMedia } from "../features/content/index.ts";
 import { createMeals, createOpenAiMealAnalyzer } from "../features/meals/index.ts";
+import { createOnboarding, createAssessmentMedia } from "../features/onboarding/index.ts";
+import type { AssessmentStorage, BookingProvider } from "../features/onboarding/index.ts";
 
-export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; publicOrigin: string; openAiApiKey?: string }>) {
+export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
+  const onboarding = createOnboarding({ db: config.db });
+  const assessmentMedia = createAssessmentMedia({ db: config.db, ...(config.assessmentStorage ? { storage: config.assessmentStorage } : {}) });
   const profiles = createProfiles({ store: createPostgresProfileStore(config.db) });
   const scorecards = createScorecards(config.db);
   const training = createTraining({ db: config.db, profiles });
@@ -21,6 +25,34 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
     function send(result: ClientResult<unknown>): void {
       const status = result.ok ? 200 : result.error.code === "conflict" ? 409 : result.error.code === "unavailable" || result.error.code === "not_configured" ? 503 : result.error.code === "rate_limited" ? 429 : result.error.code === "not_found" ? 404 : result.error.code === "forbidden" ? 403 : 400;
       json(response, status, result);
+    }
+    if (url.pathname === "/api/client/onboarding" && request.method === "GET") { send(await onboarding.get({ accountId: account.id })); return; }
+    if (url.pathname === "/api/client/onboarding/booking/refresh" && request.method === "POST") {
+      if (!config.bookingProvider) { send({ ok: false, error: { code: "not_configured", message: "Booking confirmation is not connected yet. Contact Harry after booking." } }); return; }
+      const current = await onboarding.get({ accountId: account.id }); if (!current.ok) { send(current); return; }
+      const verified = await config.bookingProvider.find({ accountId: account.id, previous: current.value.booking });
+      if (!verified.ok) { send(verified); return; }
+      send(verified.value ? await onboarding.recordBooking({ accountId: account.id, booking: verified.value }) : current); return;
+    }
+    if (url.pathname === "/api/client/onboarding/save" && request.method === "POST") { send(await onboarding.save({ accountId: account.id, revision: body.revision, contentVersion: body.contentVersion, answers: body.answers })); return; }
+    if (url.pathname === "/api/client/onboarding/complete" && request.method === "POST") {
+      if (config.bookingProvider) {
+        const current = await onboarding.get({ accountId: account.id }); if (!current.ok) { send(current); return; }
+        const verified = await config.bookingProvider.find({ accountId: account.id, previous: current.value.booking });
+        if (!verified.ok) { send(verified); return; }
+        if (!verified.value) { send({ ok: false, error: { code: "invalid_input", message: "A confirmed onboarding booking is required." } }); return; }
+        const recorded = await onboarding.recordBooking({ accountId: account.id, booking: verified.value }); if (!recorded.ok) { send(recorded); return; }
+      }
+      send(await onboarding.complete({ accountId: account.id, revision: body.revision })); return;
+    }
+    if (url.pathname === "/api/client/onboarding/media/request" && request.method === "POST") { send(await assessmentMedia.request({ accountId: account.id, slot: body.slot, mediaType: body.mediaType, size: body.size })); return; }
+    if (url.pathname === "/api/client/onboarding/media/finalize" && request.method === "POST") { send(await assessmentMedia.finalize({ accountId: account.id, id: body.id })); return; }
+    if (url.pathname === "/api/client/onboarding/media/remove" && request.method === "POST") { send(await assessmentMedia.remove({ accountId: account.id, id: body.id })); return; }
+    if (url.pathname === "/api/client/onboarding/media/read" && request.method === "POST") { send(await assessmentMedia.read({ accountId: account.id, id: body.id })); return; }
+    if (config.onboardingEnabled) {
+      const access = await onboarding.eligible({ accountId: account.id });
+      if (!access.ok) { send(access); return; }
+      if (!access.value.eligible) { json(response, 403, { ok: false, error: { code: "forbidden", reason: "onboarding_required", message: "Complete onboarding before opening your dashboard.", redirect: "/onboarding" } }); return; }
     }
     if (request.method === "GET" && url.pathname === "/api/client/state") {
       const profile = await profiles.get({ accountId: account.id });

@@ -1,12 +1,16 @@
 import { err, ok } from "../shared/result.ts";
 import type { Result } from "../shared/result.ts";
 import type { DeliveryConfig } from "../features/auth/index.ts";
+import type { AssessmentStorageConfig, GoogleBookingConfig } from "../features/onboarding/index.ts";
 
 export type Config = Readonly<{
   databaseUrl: string; publicOrigin: string; rateKey: string; host: string; port: number;
   delivery: DeliveryConfig;
   openAiApiKey?: string;
   harryPreview?: boolean;
+  onboardingEnabled?: boolean;
+  assessmentStorage?: AssessmentStorageConfig;
+  googleBooking?: GoogleBookingConfig;
 }>;
 
 export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Readonly<{ code: "invalid_configuration" }>> {
@@ -29,9 +33,19 @@ export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Rea
     if (mode !== "outbox" && mode !== "resend") return fail();
     if (mode === "resend" && (!env.RESEND_API_KEY || !env.EMAIL_FROM || /[\r\n]/.test(env.EMAIL_FROM))) return fail();
     if (env.AUTH_HARRY_PREVIEW !== undefined && !["true", "false"].includes(env.AUTH_HARRY_PREVIEW)) return fail();
+    if (env.ONBOARDING_ENABLED !== undefined && !["true", "false"].includes(env.ONBOARDING_ENABLED)) return fail();
+    const storageKeys = ["ASSESSMENT_S3_ENDPOINT", "ASSESSMENT_S3_REGION", "ASSESSMENT_S3_BUCKET", "ASSESSMENT_S3_ACCESS_KEY_ID", "ASSESSMENT_S3_SECRET_ACCESS_KEY"] as const;
+    const configuredStorage = storageKeys.some(key => !!env[key]);
+    if (env.ASSESSMENT_S3_FORCE_PATH_STYLE !== undefined && !["true", "false"].includes(env.ASSESSMENT_S3_FORCE_PATH_STYLE)) return fail();
+    if (configuredStorage && !storageKeys.every(key => !!env[key])) return fail();
+    if (configuredStorage) { const endpoint = new URL(env.ASSESSMENT_S3_ENDPOINT!); if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) return fail(); }
+    const assessmentStorage = configuredStorage ? { endpoint: env.ASSESSMENT_S3_ENDPOINT!, region: env.ASSESSMENT_S3_REGION!, bucket: env.ASSESSMENT_S3_BUCKET!, accessKeyId: env.ASSESSMENT_S3_ACCESS_KEY_ID!, secretAccessKey: env.ASSESSMENT_S3_SECRET_ACCESS_KEY!, forcePathStyle: env.ASSESSMENT_S3_FORCE_PATH_STYLE !== "false" } : undefined;
+    const googleKeys = ["ONBOARDING_GOOGLE_CALENDAR_ID", "ONBOARDING_GOOGLE_CLIENT_ID", "ONBOARDING_GOOGLE_CLIENT_SECRET", "ONBOARDING_GOOGLE_REFRESH_TOKEN"] as const;
+    if (googleKeys.some(key => !!env[key]) && !googleKeys.every(key => !!env[key])) return fail();
+    const googleBooking = googleKeys.every(key => !!env[key]) ? { calendarId: env.ONBOARDING_GOOGLE_CALENDAR_ID!, clientId: env.ONBOARDING_GOOGLE_CLIENT_ID!, clientSecret: env.ONBOARDING_GOOGLE_CLIENT_SECRET!, refreshToken: env.ONBOARDING_GOOGLE_REFRESH_TOKEN! } : undefined;
     const delivery: DeliveryConfig = mode === "outbox" ? { mode, directory: ".data/outbox" }
       : { mode, from: env.EMAIL_FROM!, apiKey: env.RESEND_API_KEY! };
     return ok({ databaseUrl: env.DATABASE_URL!, publicOrigin: origin.origin, rateKey: env.AUTH_RATE_KEY!,
-      host: env.HOST ?? "127.0.0.1", port, delivery, harryPreview: env.AUTH_HARRY_PREVIEW === "true", ...(env.OPENAI_API_KEY ? { openAiApiKey: env.OPENAI_API_KEY } : {}) });
+      host: env.HOST ?? "127.0.0.1", port, delivery, harryPreview: env.AUTH_HARRY_PREVIEW === "true", onboardingEnabled: env.ONBOARDING_ENABLED === "true", ...(googleBooking ? { googleBooking } : {}), ...(assessmentStorage ? { assessmentStorage } : {}), ...(env.OPENAI_API_KEY ? { openAiApiKey: env.OPENAI_API_KEY } : {}) });
   } catch { return fail(); }
 }

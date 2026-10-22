@@ -1,0 +1,21 @@
+{
+  "version": "harry-onboarding-draft-1",
+  "approved": false,
+  "welcomeText": "",
+  "communication": "",
+  "contactUrl": "",
+  "consentVersion": "",
+  "consentText": "",
+  "parqVersion": "",
+  "healthQuestions": [],
+  "welcomeVideo": "",
+  "strengthVideo": "",
+  "cardioVideo": "",
+  "measurementVideo": "",
+  "cardioInstructions": "",
+  "measurementInstructions": "",
+  "techniqueInstructions": "",
+  "rhythmText": "",
+  "mobility": [],
+  "bookingUrl": ""
+}

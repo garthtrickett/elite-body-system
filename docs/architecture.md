@@ -1,5 +1,42 @@
 # Architecture and operation contracts
 
+## Versioned onboarding
+
+`features/onboarding/index.ts` owns the `harry-v2` operations, private media
+lifecycle and verified appointment records. Its browser entry point composes
+the shared SAM runtime with typed, correlated load/save/upload/booking effects.
+File handles, upload authorization and OAuth secrets remain in effect closures;
+the model contains answers, progress and owned media IDs, not signed URLs.
+
+The server’s `eligible({ accountId })` checks the versioned completion record,
+not the legacy profile flag. When `ONBOARDING_ENABLED=true`, authenticated page
+routing redirects incomplete accounts to `/onboarding` and client HTTP dispatch
+denies normal workflows before reaching their operations. Auth/sign-out and the
+explicit onboarding endpoint set remain available. All legacy-complete clients
+are subject to this gate, as explicitly requested by the operator.
+
+Onboarding writes, finalized media, booking updates, resolutions and completion
+serialize on an account-row lock. Content is read under a shared lock and kept
+in immutable version archives. Completion revalidates the current answers and
+evidence, then writes completion, updates the compatible profile and initializes
+its first scorecard in one transaction. Existing dates/history are preserved.
+Concurrent deletion or booking cancellation cannot race a stale revision into an
+unlock. Later deletion does not undo the historical completion attestation.
+
+Consent acknowledgements include document versions, signed name, health answers
+and server timestamps. Medical audit alternatives are distinct from training
+clearance. A client profile save cannot forge the new completion version or
+change the server-owned clearance fields. Trusted review/resolution tools have
+no public client override endpoint.
+
+S3-compatible storage holds binary media outside PostgreSQL. Finalization checks
+metadata and media signatures against a separate immutable ready key; database
+metadata owns completion eligibility. Google Calendar confirmation requires a
+provider-verified account binding and a Meet link; opening the configured
+scheduling URL is not proof of booking. See
+[onboarding operations](onboarding-operations.md) for provider setup, approval
+prerequisites, limitations and rollout/rollback behavior.
+
 ## Brand presentation
 
 `src/styles.css` owns the brand palette, derived semantic neutrals, font faces,

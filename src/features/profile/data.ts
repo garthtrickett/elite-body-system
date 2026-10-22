@@ -15,6 +15,7 @@ export type ClientProfile = Readonly<{
   emergency: Readonly<{ name: string; phone: string }>;
   consent: Readonly<{ signedName: string; accepted: boolean; healthData: boolean; adult: boolean; version: "draft-v1"; signedAt: string | undefined }>;
   completed: boolean; setupStep: number; targets: Targets;
+  onboardingVersion?: "harry-v2";
 }>;
 export type ProfileSnapshot = Readonly<{ profile: ClientProfile; revision: number }>;
 
@@ -52,18 +53,18 @@ export function parseProfile(value: unknown): ClientResult<ClientProfile> {
   try { new Intl.DateTimeFormat("en", { timeZone: value.timezone }); } catch { return fail(); }
   const story = Object.fromEntries(STORY_FIELDS.map(key => [key, isRecord(value.story) ? value.story[key] : undefined]));
   if (!STORY_FIELDS.every(key => isText(story[key]))) return fail();
-  if (value.completed && (!value.name.trim() || !value.identity.trim() || !value.anchor.trim() || !value.startingWeight || value.trainingDays.length !== 4 || value.trainingDays.includes(value.restDay) || value.health.answers.some(a => a === null) ||
+  if (value.onboardingVersion !== undefined && value.onboardingVersion !== "harry-v2") return fail();
+  if (value.completed && (!value.name.trim() || !value.startingWeight || value.trainingDays.length !== 4 || value.trainingDays.includes(value.restDay) || value.health.answers.some(a => a === null) ||
       !value.emergency.name.trim() || value.emergency.phone.replace(/\D/g, "").length < 7 ||
-      !value.consent.signedName.trim() || !value.consent.accepted || !value.consent.healthData || !value.consent.adult ||
       (value.health.answers.some(Boolean) && !value.health.details.trim()) ||
-      !["want", "give", "matters", "never", "now", "why"].every(key => typeof story[key] === "string" && story[key].trim()))) return fail();
+      (value.onboardingVersion !== "harry-v2" && (!value.identity.trim() || !value.anchor.trim() || !value.consent.signedName.trim() || !value.consent.accepted || !value.consent.healthData || !value.consent.adult || !["want", "give", "matters", "never", "now", "why"].every(key => typeof story[key] === "string" && story[key].trim()))))) return fail();
   // Reconstruct rather than trusting extra external properties, including account IDs.
   return ok({ name: value.name.trim(), timezone: value.timezone, startDate: value.startDate, startingWeight: typeof value.startingWeight === "number" ? value.startingWeight : undefined,
     trainingDays: value.trainingDays as number[], restDay: value.restDay, equipment: value.equipment, workaround: value.workaround, anchor: value.anchor, identity: value.identity, firstThought: value.firstThought, firstGoal: value.firstGoal,
     story: story as Record<StoryField, string>, health: { answers: value.health.answers as (boolean | null)[], details: value.health.details, clearance: value.health.clearance },
     emergency: { name: value.emergency.name, phone: value.emergency.phone },
     consent: { signedName: value.consent.signedName, accepted: value.consent.accepted, healthData: value.consent.healthData, adult: value.consent.adult, version: "draft-v1", signedAt: undefined },
-    completed: value.completed, setupStep: value.setupStep, targets: { energy: value.targets.energy, protein: value.targets.protein, water: value.targets.water, sleep: value.targets.sleep, steps: value.targets.steps } });
+    completed: value.completed, setupStep: value.setupStep, targets: { energy: value.targets.energy, protein: value.targets.protein, water: value.targets.water, sleep: value.targets.sleep, steps: value.targets.steps }, ...(value.onboardingVersion === "harry-v2" ? { onboardingVersion: "harry-v2" as const } : {}) });
 }
 
 export function clientDay(input: Readonly<{ timezone: string; now: Date }>): string {
