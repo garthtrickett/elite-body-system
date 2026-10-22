@@ -56,3 +56,32 @@ test("date loads reject edits and stale responses, restore the loaded date on fa
   model = acceptTrainingProposal(model, { kind: "loaded", id: model.pending.id, result: { ok: true, value: { ...snapshot(), workout: { ...snapshot().workout, date: "2026-10-21" } } } });
   assert.equal(model.workout?.date, "2026-10-21"); assert.equal(model.failedLoadDate, undefined);
 });
+
+test("failed workout saves stop showing saving and require a discard decision before reload", () => {
+  let model = acceptTrainingProposal(initial(), { kind: "noteChanged", id: "dbpress", value: "Important unsaved note" });
+  model = acceptTrainingProposal(model, { kind: "failed", id: model.pending!.id });
+  assert.equal(representTraining(model).saving, false);
+  const confirming = acceptTrainingProposal(model, { kind: "reload" }); assert.ok(confirming.pending?.kind === "confirmReload");
+  assert.equal(acceptTrainingProposal(confirming, { kind: "reloadConfirmed", id: 999, discard: true }), confirming);
+  const kept = acceptTrainingProposal(confirming, { kind: "reloadConfirmed", id: confirming.pending.id, discard: false });
+  assert.equal(kept.workout?.notes.dbpress, "Important unsaved note"); assert.equal(kept.error, model.error);
+  const second = acceptTrainingProposal({ ...kept, finishRequested: true }, { kind: "reload" });
+  const loading = acceptTrainingProposal(second, { kind: "reloadConfirmed", id: second.pending!.id, discard: true }); assert.ok(loading.pending?.kind === "load");
+  const loaded = acceptTrainingProposal(loading, { kind: "loaded", id: loading.pending.id, result: { ok: true, value: snapshot() } });
+  assert.equal(loaded.finishRequested, false); assert.equal(loaded.workout?.notes.dbpress, undefined);
+});
+
+test("uncommitted invalid set drafts prevent date replacement", () => {
+  let model = acceptTrainingProposal(initial(), { kind: "setChanged", id: "dbpress", slot: 0, field: "reps", value: "-1" });
+  model = acceptTrainingProposal(model, { kind: "dateSelected", date: "2026-10-21" });
+  assert.equal(model.pending, undefined); assert.equal(model.drafts["dbpress:0:reps"], "-1");
+});
+
+test("recommitting an unchanged set field after Enter does not queue another save", () => {
+  let model = acceptTrainingProposal(initial(), { kind: "setChanged", id: "dbpress", slot: 0, field: "reps", value: "10" });
+  model = acceptTrainingProposal(model, { kind: "setCommitted", id: "dbpress", slot: 0, field: "reps" });
+  const effect = model.pending; assert.ok(effect?.kind === "save");
+  model = acceptTrainingProposal(model, { kind: "saved", id: effect.id, result: { ok: true, value: { ...snapshot(), revision: 1, workout: effect.workout } } });
+  const blurred = acceptTrainingProposal(model, { kind: "setCommitted", id: "dbpress", slot: 0, field: "reps" });
+  assert.equal(blurred.pending, undefined); assert.equal(blurred.generation, model.generation);
+});

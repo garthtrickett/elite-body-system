@@ -2,11 +2,11 @@ import { render } from "lit-html";
 import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
 import { parseTrainingSnapshot } from "./data.ts";
-import { initialTrainingModel, acceptTrainingProposal, representTraining } from "./browser-model.ts";
+import { initialTrainingModel, acceptTrainingProposal, representTraining, hasUnsavedTraining } from "./browser-model.ts";
 import type { TrainingProposal, TrainingEffect, TrainingModel, TrainingState } from "./browser-model.ts";
 import { trainingView } from "./browser-view.ts";
 
-export { initialTrainingModel, acceptTrainingProposal, representTraining } from "./browser-model.ts";
+export { initialTrainingModel, acceptTrainingProposal, representTraining, hasUnsavedTraining } from "./browser-model.ts";
 export type { TrainingProposal, TrainingEffect, TrainingModel, TrainingState } from "./browser-model.ts";
 export { parseWorkout, emptyWorkout, planFor, workoutStats } from "./data.ts";
 
@@ -38,12 +38,15 @@ export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string
       if (selection !== shownSelection) { shownSelection = selection; alignSelection(); }
     },
     failed: effect => ({ kind: "failed", id: effect.id }),
-    perform: async effect => effect.kind === "load"
-      ? { kind: "loaded", id: effect.id, result: await call({ path: `/api/client/training${effect.date || requestedDate ? `?date=${encodeURIComponent(effect.date || requestedDate)}` : ""}`, parse: parseTrainingSnapshot }) }
-      : { kind: "saved", id: effect.id, result: await call({ path: "/api/client/training", body: { revision: effect.revision, workout: effect.workout, finish: effect.finish }, parse: parseTrainingSnapshot }) },
+    perform: async effect => {
+      if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload the saved workout and discard your unsaved changes? Cancel to keep your workout and retry saving.") };
+      return effect.kind === "load"
+        ? { kind: "loaded", id: effect.id, result: await call({ path: `/api/client/training${effect.date || requestedDate ? `?date=${encodeURIComponent(effect.date || requestedDate)}` : ""}`, parse: parseTrainingSnapshot }) }
+        : { kind: "saved", id: effect.id, result: await call({ path: "/api/client/training", body: { revision: effect.revision, workout: effect.workout, finish: effect.finish }, parse: parseTrainingSnapshot }) };
+    },
   });
   const tick = window.setInterval(() => runtime.propose({ kind: "clockTicked", now: Date.now() }), 1000);
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.generation > model.saved || model.finishRequested) event.preventDefault(); };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (hasUnsavedTraining(model)) event.preventDefault(); };
   window.addEventListener("beforeunload", protectUnsaved);
   const resized = () => { runtime.propose({ kind: "viewportChanged", compact: window.innerWidth < 1024 }); alignSelection(); };
   window.addEventListener("resize", resized);

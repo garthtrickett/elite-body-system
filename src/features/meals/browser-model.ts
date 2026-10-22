@@ -133,8 +133,12 @@ export function acceptMealProposal(model: MealModel, proposal: MealProposal): Me
     return meal.value.items.length < 12 ? { ...model, draft: { ...meal.value, items: [...meal.value.items, { name: "Ingredient", grams: 100, per100: emptyNutrients(), source: "manual" }] }, fields: {} } : model;
   }
   if (proposal.kind === "ingredientRemoved") {
-    const meal = applyFields(model); if (!meal.ok) return { ...model, error: meal.error.message };
-    return meal.value.items.length > 1 ? { ...model, draft: { ...meal.value, items: meal.value.items.filter((_, index) => index !== proposal.index) }, fields: {} } : model;
+    if (model.draft.items.length <= 1 || !Number.isInteger(proposal.index) || !model.draft.items[proposal.index]) return model;
+    const fields = Object.fromEntries(Object.entries(model.fields).flatMap(([key, value]) => {
+      const [row, field] = key.split(":"), index = Number(row);
+      return index === proposal.index || !field ? [] : [[fieldKey(index > proposal.index ? index - 1 : index, field), value]];
+    }));
+    return { ...model, draft: { ...model.draft, items: model.draft.items.filter((_, index) => index !== proposal.index) }, fields, error: null };
   }
   if (proposal.kind === "logRequested") {
     if (!model.snapshot || !isUuid(proposal.requestId)) return model;

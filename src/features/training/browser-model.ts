@@ -6,6 +6,7 @@ import { isDay } from "../../shared/validation.ts";
 
 export type TrainingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "load"; date: string }>
+  | Readonly<{ kind: "confirmReload"; date: string }>
   | Readonly<{ kind: "save"; revision: number; workout: Workout; generation: number; finish: boolean }>
 );
 export type TrainingModel = Readonly<{
@@ -31,7 +32,8 @@ export type TrainingProposal =
   | Readonly<{ kind: "restStarted"; seconds: number }>
   | Readonly<{ kind: "restExtended"; seconds: number }>
   | Readonly<{ kind: "loaded" | "saved"; id: number; result: ClientResult<TrainingSnapshot> }>
-  | Readonly<{ kind: "failed"; id: number }>;
+  | Readonly<{ kind: "failed"; id: number }>
+  | Readonly<{ kind: "reloadConfirmed"; id: number; discard: boolean }>;
 
 export function initialTrainingModel(input: Readonly<{ now: number; compact?: boolean }>): TrainingModel {
   return { compact: input.compact ?? false, snapshot: undefined, workout: undefined, selected: undefined, tab: "log", drafts: {}, generation: 0, saved: 0, sequence: 0, pending: undefined, error: "", failedLoadDate: undefined, finishRequested: false, clock: input.now };
@@ -55,8 +57,9 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
   switch (proposal.kind) {
     case "started": return model.sequence ? model : load(model);
     case "retry": return model.pending ? model : model.failedLoadDate !== undefined ? load(model, model.failedLoadDate) : model.snapshot ? sync({ ...model, error: "" }) : load(model);
-    case "reload": return model.pending ? model : load(model, model.workout?.date);
-    case "dateSelected": return !model.pending && model.generation === model.saved && isDay(proposal.date) ? load(model, proposal.date) : { ...model, error: "Wait for your workout to save before changing days." };
+    case "reload": return model.pending ? model : hasUnsavedTraining(model) ? { ...model, sequence: model.sequence + 1, pending: { id: model.sequence + 1, kind: "confirmReload", date: model.workout?.date ?? "" } } : load(model, model.workout?.date);
+    case "reloadConfirmed": return model.pending?.kind !== "confirmReload" || model.pending.id !== proposal.id ? model : proposal.discard ? load(model, model.pending.date) : { ...model, pending: undefined };
+    case "dateSelected": return !model.pending && !hasUnsavedTraining(model) && isDay(proposal.date) ? load(model, proposal.date) : { ...model, error: "Save or correct your workout edits before changing days. Reload the saved workout to discard them." };
     case "viewportChanged": return { ...model, compact: proposal.compact };
     case "clockTicked": return { ...model, clock: proposal.now };
     case "exerciseSelected": return { ...model, selected: proposal.id, tab: "log" };
@@ -67,7 +70,7 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
     case "loaded": {
       if (model.pending?.kind !== "load" || model.pending.id !== proposal.id) return model;
       if (!proposal.result.ok) return { ...model, pending: undefined, failedLoadDate: model.pending.date, error: proposal.result.error.message };
-      return { ...model, failedLoadDate: undefined, snapshot: proposal.result.value, workout: proposal.result.value.workout, pending: undefined, generation: 0, saved: 0, drafts: {}, error: "", selected: PROGRAM[proposal.result.value.workout.planKey]?.[0]?.id };
+      return { ...model, failedLoadDate: undefined, snapshot: proposal.result.value, workout: proposal.result.value.workout, pending: undefined, generation: 0, saved: 0, finishRequested: false, drafts: {}, error: "", selected: PROGRAM[proposal.result.value.workout.planKey]?.[0]?.id };
     }
     case "saved": {
       if (model.pending?.kind !== "save" || model.pending.id !== proposal.id) return model;
@@ -89,7 +92,7 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
       const raw = model.drafts[`${proposal.id}:${proposal.slot}:${proposal.field}`] ?? "", value = raw.trim() ? Number(raw.replace(",", ".")) : 0;
       if (setNumberProblem({ field: proposal.field, value, done: workout.sets[proposal.id]?.[proposal.slot]?.done ?? false })) return model;
       const row = workout.sets[proposal.id]?.[proposal.slot] ?? { kg: 0, reps: 0, done: false };
-      return change(model, withRow(workout, proposal.id, proposal.slot, { ...row, [proposal.field]: value }));
+      return row[proposal.field] === value ? model : change(model, withRow(workout, proposal.id, proposal.slot, { ...row, [proposal.field]: value }));
     }
     case "setToggled": {
       const exercise = exercises.find(e => e.id === proposal.id);
@@ -116,8 +119,20 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
     case "restStarted": return proposal.seconds > 0 && proposal.seconds <= 3600 ? change(model, { ...workout, restUntil: model.clock + proposal.seconds * 1000 }) : model;
     case "restExtended": return workout.restUntil ? change(model, { ...workout, restUntil: workout.restUntil + proposal.seconds * 1000 }) : model;
     case "restSkipped": return change(model, { ...workout, restUntil: null });
-    case "finish": return workoutStats({ workout, history: model.snapshot.history }).hasActivity ? sync({ ...model, finishRequested: true, error: "" }) : { ...model, error: "Log at least one set or recovery activity before finishing." };
+    case "finish": return hasUnsavedSetDrafts(model) ? { ...model, error: "Correct or save your set entries before finishing your workout." } : workoutStats({ workout, history: model.snapshot.history }).hasActivity ? sync({ ...model, finishRequested: true, error: "" }) : { ...model, error: "Log at least one set or recovery activity before finishing." };
   }
+}
+
+function hasUnsavedSetDrafts(model: TrainingModel): boolean {
+  return Object.entries(model.drafts).some(([key, raw]) => {
+    const [id, slot, field] = key.split(":");
+    if (field !== "kg" && field !== "reps") return false;
+    const value = raw.trim() ? Number(raw.replace(",", ".")) : 0;
+    return !Number.isFinite(value) || value !== (model.workout?.sets[id ?? ""]?.[Number(slot)]?.[field] ?? 0);
+  });
+}
+export function hasUnsavedTraining(model: TrainingModel): boolean {
+  return model.generation > model.saved || model.finishRequested || hasUnsavedSetDrafts(model);
 }
 
 export function representTraining(model: TrainingModel) {
@@ -131,6 +146,6 @@ export function representTraining(model: TrainingModel) {
   return { ...model, fieldErrors, exercises: workout ? exercisesFor(workout) : [], stats: workout ? workoutStats({ workout, history: model.snapshot?.history ?? [] }) : { sets: 0, volume: 0, records: [], hasActivity: false },
     elapsed: workout?.startedAt ? Math.max(0, Math.floor(((workout.finishedAt ?? model.clock) - workout.startedAt) / 1000)) : 0,
     remaining: workout?.restUntil ? Math.max(0, Math.ceil((workout.restUntil - model.clock) / 1000)) : 0,
-    saving: model.pending?.kind === "save" || model.generation > model.saved, loading: model.pending?.kind === "load" } as const;
+    unsaved: hasUnsavedTraining(model), saving: model.pending?.kind === "save", loading: model.pending?.kind === "load" } as const;
 }
 export type TrainingState = ReturnType<typeof representTraining>;

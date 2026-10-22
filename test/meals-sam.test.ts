@@ -28,3 +28,16 @@ test("invalid portions do not corrupt nutrition and manual corrections change pr
   model = acceptMealProposal(model, { kind: "fieldChanged", index: 0, field: "energy", value: "200" });
   model = acceptMealProposal(model, { kind: "fieldCommitted", index: 0, field: "energy" }); assert.equal(model.draft?.items[0]?.grams, 150); assert.equal(model.draft?.items[0]?.source, "manual");
 });
+
+test("removing an invalid ingredient preserves and reindexes the remaining portion and nutrient drafts", () => {
+  let model = acceptMealProposal(initial(), { kind: "manualRequested" });
+  model = acceptMealProposal(model, { kind: "ingredientAdded" }); model = acceptMealProposal(model, { kind: "ingredientAdded" });
+  model = acceptMealProposal(model, { kind: "ingredientNamed", index: 1, value: "" });
+  model = acceptMealProposal(model, { kind: "fieldChanged", index: 0, field: "grams", value: "150" });
+  model = acceptMealProposal(model, { kind: "fieldChanged", index: 1, field: "energy", value: "-4" });
+  model = acceptMealProposal(model, { kind: "fieldChanged", index: 2, field: "protein", value: "33.7" });
+  model = acceptMealProposal(model, { kind: "ingredientRemoved", index: 1 });
+  assert.equal(model.draft?.items.length, 2); assert.equal(model.fields["0:grams"], "150"); assert.equal(model.fields["1:protein"], "33.7"); assert.equal(model.fields["1:energy"], undefined);
+  model = acceptMealProposal(model, { kind: "fieldCommitted", index: 1, field: "protein" });
+  assert.equal(model.draft?.items[0]?.grams, 150); assert.equal(model.draft?.items[1]?.per100.protein, 33.7);
+});
