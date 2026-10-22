@@ -46,7 +46,7 @@ export type Booking = Readonly<{ providerId: string; eventVersion: number; statu
 export type Resolution = Readonly<{ requirement: string; reason: string; resolvedBy: string; evidence: string }>;
 export type OnboardingSnapshot = Readonly<{
   version: "harry-v2"; revision: number; answers: OnboardingAnswers; content: OnboardingContent;
-  media: readonly MediaSummary[]; booking: Booking | null; resolutions: readonly Resolution[];
+  media: readonly MediaSummary[]; previousMedia?: readonly MediaSummary[]; booking: Booking | null; resolutions: readonly Resolution[];
   completedAt: string | null; consentSignedAt: string | null; missing: Readonly<Record<Section, readonly string[]>>;
 }>;
 
@@ -176,10 +176,11 @@ export function parseSnapshot(value: unknown): OnboardingSnapshot | undefined {
   if (!isRecord(value) || value.version !== "harry-v2" || typeof value.revision !== "number" || !Number.isSafeInteger(value.revision) || value.revision < 0 || !Array.isArray(value.media) || !Array.isArray(value.resolutions) || ![value.completedAt, value.consentSignedAt].every(date => date === null || (typeof date === "string" && Number.isFinite(Date.parse(date))))) return undefined;
   const answers = parseAnswers(value.answers), content = parseContent(value.content);
   if (!answers.ok || !content) return undefined;
-  const media: MediaSummary[] = [], resolutions: Resolution[] = [];
-  for (const item of value.media) {
+  if (value.previousMedia !== undefined && !Array.isArray(value.previousMedia)) return undefined;
+  const media: MediaSummary[] = [], previousMedia: MediaSummary[] = [], resolutions: Resolution[] = [];
+  for (const [items, target] of [[value.media, media], [value.previousMedia ?? [], previousMedia]] as const) for (const item of items) {
     if (!isRecord(item) || !isText(item.id, 100) || !isText(item.slot, 100) || !isText(item.mediaType, 100) || typeof item.size !== "number" || !Number.isSafeInteger(item.size) || item.size < 1 || !["pending", "ready"].includes(String(item.status))) return undefined;
-    media.push({ id: item.id, slot: item.slot, mediaType: item.mediaType, size: item.size, status: item.status as MediaSummary["status"] });
+    target.push({ id: item.id, slot: item.slot, mediaType: item.mediaType, size: item.size, status: item.status as MediaSummary["status"] });
   }
   for (const item of value.resolutions) {
     if (!isRecord(item) || !isText(item.requirement, 100) || !isText(item.reason, 2000) || !isText(item.resolvedBy, 200) || !isText(item.evidence, 10000)) return undefined;
@@ -192,5 +193,5 @@ export function parseSnapshot(value: unknown): OnboardingSnapshot | undefined {
     booking = { providerId: b.providerId, eventVersion: b.eventVersion, status: b.status as Booking["status"], startsAt: b.startsAt, timezone: b.timezone, meetUrl: b.meetUrl };
   }
   const evidence = { answers: answers.value, content, media, booking, resolutions };
-  return { version: "harry-v2", revision: value.revision, ...evidence, completedAt: value.completedAt as string | null, consentSignedAt: value.consentSignedAt as string | null, missing: missingRequirements(evidence) };
+  return { version: "harry-v2", revision: value.revision, ...evidence, previousMedia, completedAt: value.completedAt as string | null, consentSignedAt: value.consentSignedAt as string | null, missing: missingRequirements(evidence) };
 }

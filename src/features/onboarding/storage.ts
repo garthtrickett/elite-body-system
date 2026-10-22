@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { isIP } from "node:net";
 
 export type AssessmentStorage = Readonly<{
   authorizeUpload: (input: Readonly<{ key: string; mediaType: string; size: number }>) => Promise<Readonly<{ url: string; headers: Readonly<Record<string, string>> }>>;
@@ -10,9 +11,14 @@ export type AssessmentStorage = Readonly<{
 }>;
 export type AssessmentStorageConfig = Readonly<{ endpoint: string; region: string; bucket: string; accessKeyId: string; secretAccessKey: string; forcePathStyle?: boolean }>;
 
+function usePathStyle(config: AssessmentStorageConfig): boolean {
+  const hostname = new URL(config.endpoint).hostname.replace(/^\[|\]$/g, "");
+  return config.forcePathStyle !== false || !/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(config.bucket) || isIP(hostname) !== 0;
+}
+
 export function assessmentUploadOrigin(config: AssessmentStorageConfig): string {
   const endpoint = new URL(config.endpoint);
-  if (config.forcePathStyle === false) endpoint.hostname = `${config.bucket}.${endpoint.hostname}`;
+  if (!usePathStyle(config)) endpoint.hostname = `${config.bucket}.${endpoint.hostname}`;
   return endpoint.origin;
 }
 
@@ -27,7 +33,7 @@ export function matchesMediaType(input: Readonly<{ bytes: Uint8Array; mediaType:
 }
 
 export function createS3AssessmentStorage(config: AssessmentStorageConfig): AssessmentStorage {
-  const client = new S3Client({ endpoint: config.endpoint, region: config.region, forcePathStyle: config.forcePathStyle ?? true,
+  const client = new S3Client({ endpoint: config.endpoint, region: config.region, forcePathStyle: usePathStyle(config),
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey }, maxAttempts: 2,
     requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED" });
   const bucket = config.bucket;

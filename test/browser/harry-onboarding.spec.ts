@@ -109,6 +109,22 @@ test("cancelling an upload during a failed answer-save preserves the draft for a
   await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   await page.reload(); await section(page, "measurements"); await expect(page.getByLabel("Waistline (cm)", { exact: true })).toHaveValue("81");
 });
+
+test("earlier-version photos stay discoverable and removable without completing the current assessment", async ({ page }) => {
+  try {
+    const accountId = await signIn(page, true), media = createAssessmentMedia({ db, storage: memory.storage });
+    const requested = await media.request({ accountId, slot: "photo:front", mediaType: "image/jpeg", size: jpegBytes.length });
+    expect(requested.ok).toBe(true); if (!requested.ok) throw new Error("Upload fixture failed");
+    memory.put(requested.value.id, jpegBytes); expect((await media.finalize({ accountId, id: requested.value.id })).ok).toBe(true);
+    expect((await onboarding.configure({ content: { ...onboardingContent(), version: `browser-${randomUUID()}` } })).ok).toBe(true);
+    await page.setViewportSize({ width: 390, height: 844 }); await page.reload(); await section(page, "measurements");
+    await expect(page.getByRole("region", { name: "Earlier submissions" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Download earlier front photo", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Remove earlier front photo", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Earlier submissions" })).toHaveCount(0);
+    expect((await onboarding.get({ accountId })).ok).toBe(true);
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
 test("mobile assessment uploads persist only after verification, and booking links cannot unlock the dashboard", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await signIn(page, true);
   await page.route("https://uploads.example.test/*", async route => {
@@ -124,4 +140,84 @@ test("mobile assessment uploads persist only after verification, and booking lin
   await section(page, "call"); await expect(page.getByRole("link", { name: "Choose a call time ↗" })).toHaveAttribute("href", onboardingContent().bookingUrl);
   await page.getByRole("button", { name: "Refresh confirmation", exact: true }).click(); await expect(page.getByRole("alert")).toContainText("not connected");
   await page.goto(app.origin); await expect(page).toHaveURL(app.origin + "/onboarding");
+});
+
+test("correcting measurement and questionnaire validation keeps focus through the full answer", async ({ page }) => {
+  await signIn(page, true); await section(page, "measurements");
+  const waist = page.getByRole("textbox", { name: /^Waistline \(cm\)/ });
+  await waist.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await expect(page.locator(".ob-feedback")).toBeFocused();
+  await waist.click(); await waist.pressSequentially("80", { delay: 25 });
+  await expect(waist).toHaveValue("80"); await expect(waist).toBeFocused();
+  await section(page, "questionnaire");
+  const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+  await answer.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await expect(page.locator(".ob-feedback")).toBeFocused();
+  await answer.click(); await answer.pressSequentially("A stronger body", { delay: 15 });
+  await expect(answer).toHaveValue("A stronger body"); await expect(answer).toBeFocused();
+});
+
+test("a failed save can reconcile and retry without discarding the client’s unsaved answers", async ({ page }) => {
+  await signIn(page, true);
+  const name = page.getByLabel("What should Harry call you?", { exact: true }); await name.fill("Important unsaved name");
+  await page.route("**/api/client/onboarding/save", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, error: { code: "unavailable", message: "Fixture temporary outage" } }) }));
+  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByRole("alert")).toContainText("temporary outage");
+  await page.unroute("**/api/client/onboarding/save"); await page.getByRole("button", { name: "Reload saved progress", exact: true }).click();
+  await expect(name).toHaveValue("Important unsaved name"); await expect(name).toBeEnabled();
+  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
+  await page.reload(); await expect(name).toHaveValue("Important unsaved name");
+});
+
+test("cancelling held upload authorization waits for cleanup before reporting cancellation", async ({ page }) => {
+  const accountId = await signIn(page, true); await section(page, "measurements");
+  let release: () => void = () => {}, reached: () => void = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; }), requested = new Promise<void>(resolve => { reached = resolve; });
+  await page.route("**/api/client/onboarding/media/request", async route => { reached(); await held; await route.continue(); });
+  try {
+    await page.getByLabel("Upload front photo", { exact: true }).setInputFiles({ name: "front.jpg", mimeType: "image/jpeg", buffer: jpegBytes });
+    await requested; await page.getByRole("button", { name: "Cancel upload", exact: true }).click();
+    await expect(page.getByText("Cancelling upload…", { exact: true })).toBeVisible(); release();
+    await expect(page.getByText("Upload cancelled. Check your answers and save any remaining changes.", { exact: true })).toBeVisible();
+    const current = await onboarding.get({ accountId }); expect(current.ok).toBe(true);
+    if (current.ok) expect(current.value.media).toHaveLength(0);
+    await page.reload(); await section(page, "measurements"); await expect(page.getByRole("button", { name: "Remove front photo", exact: true })).toHaveCount(0);
+  } finally { release(); }
+});
+
+test("finalization is visibly noncancellable and the committed upload appears when it finishes", async ({ page }) => {
+  await signIn(page, true); await section(page, "measurements");
+  await page.route("https://uploads.example.test/*", async route => {
+    const headers = { "Access-Control-Allow-Origin": app.origin, "Access-Control-Allow-Methods": "PUT, OPTIONS", "Access-Control-Allow-Headers": "content-type" };
+    if (route.request().method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
+    const bytes = route.request().postDataBuffer(); if (!bytes) throw new Error("Missing upload fixture");
+    memory.put(route.request().url().split("/").at(-1)!, bytes); await route.fulfill({ status: 200, headers, body: "" });
+  });
+  let release: () => void = () => {}, reached: () => void = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; }), finalizing = new Promise<void>(resolve => { reached = resolve; });
+  await page.route("**/api/client/onboarding/media/finalize", async route => { reached(); await held; await route.continue(); });
+  try {
+    await page.getByLabel("Upload front photo", { exact: true }).setInputFiles({ name: "front.jpg", mimeType: "image/jpeg", buffer: jpegBytes });
+    await finalizing; await expect(page.getByRole("button", { name: "Finishing upload…", exact: true })).toBeDisabled();
+    release(); await expect(page.getByRole("button", { name: "Download front photo", exact: true })).toBeVisible();
+    await expect(page.getByText(/Upload cancelled\./)).toHaveCount(0);
+  } finally { release(); }
+});
+
+test("a rejected replacement cleans up its pending file and preserves the previous ready submission", async ({ page }) => {
+  const accountId = await signIn(page, true), media = createAssessmentMedia({ db, storage: memory.storage });
+  const requested = await media.request({ accountId, slot: "photo:front", mediaType: "image/jpeg", size: jpegBytes.length });
+  expect(requested.ok).toBe(true); if (!requested.ok) throw new Error("Upload fixture failed");
+  memory.put(requested.value.id, jpegBytes); expect((await media.finalize({ accountId, id: requested.value.id })).ok).toBe(true);
+  await page.route("https://uploads.example.test/*", async route => {
+    const headers = { "Access-Control-Allow-Origin": app.origin, "Access-Control-Allow-Methods": "PUT, OPTIONS", "Access-Control-Allow-Headers": "content-type" };
+    if (route.request().method() === "OPTIONS") { await route.fulfill({ status: 204, headers }); return; }
+    const bytes = route.request().postDataBuffer(); if (!bytes) throw new Error("Missing upload fixture");
+    memory.put(route.request().url().split("/").at(-1)!, bytes); await route.fulfill({ status: 200, headers, body: "" });
+  });
+  await page.reload(); await section(page, "measurements");
+  await page.getByLabel("Upload front photo", { exact: true }).setInputFiles({ name: "invalid.jpg", mimeType: "image/jpeg", buffer: Buffer.alloc(20) });
+  await expect(page.getByRole("alert")).toContainText("does not match");
+  await expect(page.getByRole("button", { name: "Download front photo", exact: true })).toBeEnabled();
+  const current = await onboarding.get({ accountId }); expect(current.ok).toBe(true);
+  if (current.ok) { expect(current.value.media).toHaveLength(1); expect(current.value.media[0]?.id).toBe(requested.value.id); expect(current.value.media[0]?.status).toBe("ready"); }
 });
