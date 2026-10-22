@@ -7,6 +7,7 @@ import type { ClientResult } from "../profile/browser.ts";
 
 export type LearningEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "load" }>
+  | Readonly<{ kind: "confirmReload" }>
   | Readonly<{ kind: "readMap" }>
   | Readonly<{ kind: "saveMap"; map: NeuralMap; revision: number; generation: number; finish: boolean }>
   | Readonly<{ kind: "saveEpisode"; episode: string; answers: readonly string[]; revision: number; generation: number; complete: boolean }>
@@ -24,19 +25,20 @@ export type LearningProposal =
   | Readonly<{ kind: "episodeSelected"; id: string }>
   | Readonly<{ kind: "answerChanged"; index: number; value: string }>
   | Readonly<{ kind: "completed"; id: number; effectKind: LearningEffect["kind"]; result: ClientResult<LearningSnapshot> }>
-  | Readonly<{ kind: "failed"; id: number }>;
+  | Readonly<{ kind: "failed"; id: number }>
+  | Readonly<{ kind: "reloadConfirmed"; id: number; discard: boolean }>;
 
 export function initialLearningModel(): LearningModel {
   return { snapshot: undefined, map: undefined, editingMap: false, episode: undefined, answers: {}, mapGeneration: 0, mapSaved: 0, episodeGeneration: 0, episodeSaved: 0,
     finishMap: false, completeEpisode: false, readRequested: false, dirtyEpisode: undefined, completionAttempt: 0, sequence: 0, pending: undefined, error: "", message: "" };
 }
-function schedule(model: LearningModel, intent: Omit<Extract<LearningEffect, { kind: "load" | "readMap" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveMap" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveEpisode" }>, "id">): LearningModel {
+function schedule(model: LearningModel, intent: Omit<Extract<LearningEffect, { kind: "load" | "readMap" | "confirmReload" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveMap" }>, "id"> | Omit<Extract<LearningEffect, { kind: "saveEpisode" }>, "id">): LearningModel {
   const id = model.sequence + 1;
   return { ...model, sequence: id, pending: { ...intent, id }, error: "", message: "" };
 }
 function sync(model: LearningModel): LearningModel {
   if (!model.snapshot || model.pending || model.error) return model;
-  if (model.map && (model.mapGeneration > model.mapSaved || model.finishMap)) return schedule(model, { kind: "saveMap", map: model.map, revision: model.snapshot.mapRevision, generation: model.mapGeneration, finish: model.finishMap });
+  if (model.map && (model.mapGeneration > model.mapSaved || model.finishMap && mapWritten(model.map))) return schedule(model, { kind: "saveMap", map: model.map, revision: model.snapshot.mapRevision, generation: model.mapGeneration, finish: model.finishMap && mapWritten(model.map) });
   if (model.readRequested) return schedule(model, { kind: "readMap" });
   if (model.dirtyEpisode && (model.episodeGeneration > model.episodeSaved || model.completeEpisode)) return schedule(model,
     { kind: "saveEpisode", episode: model.dirtyEpisode, answers: model.answers[model.dirtyEpisode] ?? [], revision: model.snapshot.progressRevision, generation: model.episodeGeneration, complete: model.completeEpisode });
@@ -46,17 +48,21 @@ function sync(model: LearningModel): LearningModel {
 export function acceptLearningProposal(model: LearningModel, proposal: LearningProposal): LearningModel {
   switch (proposal.kind) {
     case "started": return model.sequence ? model : schedule(model, { kind: "load" });
-    case "reload": return model.pending ? model : schedule(model, { kind: "load" });
+    case "reload": return model.pending ? model : model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved || model.finishMap || model.completeEpisode
+      ? { ...schedule(model, { kind: "confirmReload" }), error: model.error } : schedule(model, { kind: "load" });
+    case "reloadConfirmed": return model.pending?.kind !== "confirmReload" || model.pending.id !== proposal.id ? model
+      : proposal.discard ? schedule(model, { kind: "load" }) : { ...model, pending: undefined, message: "Your unsaved changes were kept." };
     case "retry": return model.pending ? model : model.snapshot ? sync({ ...model, error: "" }) : schedule(model, { kind: "load" });
     case "failed": return model.pending?.id === proposal.id ? { ...model, pending: undefined, error: "Your learning progress could not be saved. Try again." } : model;
     case "completed": {
       if (model.pending?.id !== proposal.id || model.pending.kind !== proposal.effectKind) return model;
       if (!proposal.result.ok) return { ...model, pending: undefined, error: proposal.result.error.message };
       const value = proposal.result.value, effect = model.pending;
+      if (effect.kind === "confirmReload") return model;
       if (effect.kind === "load") return { ...model, snapshot: value, map: value.map, editingMap: !mapWritten(value.map), answers: value.progress.answers, pending: undefined,
         mapGeneration: 0, mapSaved: 0, episodeGeneration: 0, episodeSaved: 0, error: "", message: "", finishMap: false, completeEpisode: false, readRequested: false, dirtyEpisode: undefined };
       if (effect.kind === "saveMap") return sync({ ...model, snapshot: value, pending: undefined, mapSaved: effect.generation,
-        finishMap: effect.finish ? false : model.finishMap, editingMap: effect.finish ? false : model.editingMap, message: "Map saved to your account." });
+        finishMap: effect.finish && effect.generation === model.mapGeneration ? false : model.finishMap, editingMap: effect.finish && effect.generation === model.mapGeneration ? false : model.editingMap, message: "Map saved to your account." });
       if (effect.kind === "readMap") return sync({ ...model, snapshot: value, pending: undefined, readRequested: false, message: "Map read for today." });
       return sync({ ...model, snapshot: value, pending: undefined, episodeSaved: effect.generation,
         completeEpisode: effect.complete ? false : model.completeEpisode, message: effect.complete ? "Lesson complete." : "Answers saved." });

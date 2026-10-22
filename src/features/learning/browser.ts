@@ -30,6 +30,7 @@ export function mountLearning(root: HTMLElement, config: Readonly<{ csrf: string
     },
     failed: effect => ({ kind: "failed", id: effect.id }),
     perform: async effect => {
+      if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload the saved version and discard your unsaved learning changes? Cancel to keep your draft and retry saving.") };
       if (effect.kind === "load") return { kind: "completed", id: effect.id, effectKind: effect.kind, result: await call({ path: "/api/client/learning", parse: parseLearningSnapshot }) };
       if (effect.kind === "readMap") return { kind: "completed", id: effect.id, effectKind: effect.kind, result: await call({ path: "/api/client/learning/read-map", body: {}, parse: parseLearningSnapshot }) };
       await new Promise(resolve => setTimeout(resolve, 300));

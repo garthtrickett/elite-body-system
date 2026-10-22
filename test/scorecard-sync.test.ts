@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { acceptScorecardProposal, initialScorecardModel, createScorecardRuntime } from "../src/features/scorecard/browser.ts";
+import { acceptScorecardProposal, initialScorecardModel, createScorecardRuntime, hasUnsavedScorecard } from "../src/features/scorecard/browser.ts";
 import { emptyProfile } from "../src/features/profile/browser.ts";
 import { emptyScorecard } from "../src/features/scorecard/index.ts";
 import type { SyncProposal, SyncEffect } from "../src/features/scorecard/browser.ts";
@@ -86,4 +86,48 @@ test("a requested account panel opens after loading once and setup review starts
     model = acceptScorecardProposal(model, { ...completion, id: model.pending!.id });
     assert.equal(model.panel, undefined);
   }
+});
+
+test("unsaved protection includes profile fields, numeric targets, metric text and an unadded goal", () => {
+  const clean = initial(); assert.equal(hasUnsavedScorecard(clean), false);
+  assert.equal(hasUnsavedScorecard(acceptScorecardProposal(clean, { kind: "profileProposed", proposal: { kind: "targetChanged", field: "energy", value: "2417" } })), true);
+  assert.equal(hasUnsavedScorecard(acceptScorecardProposal(clean, { kind: "profileProposed", proposal: { kind: "fieldChanged", field: "name", value: "An unsaved name" } })), true);
+  assert.equal(hasUnsavedScorecard(acceptScorecardProposal(clean, { kind: "metricChanged", metric: "steps", value: "invalid draft" })), true);
+  assert.equal(hasUnsavedScorecard(acceptScorecardProposal(clean, { kind: "goalDraftChanged", value: "An unadded goal" })), true);
+});
+
+test("sign-out confirmation protects the session and restores the unload guard after failure", () => {
+  const edited = acceptScorecardProposal(initial(), { kind: "goalDraftChanged", value: "Keep this goal" });
+  const signing = acceptScorecardProposal(edited, { kind: "signOutRequested" }); assert.ok(signing.pending?.kind === "signOut"); assert.equal(signing.pending.confirm, true);
+  const cancelled = acceptScorecardProposal(signing, { kind: "signOutConfirmed", id: signing.pending.id, accepted: false });
+  assert.equal(cancelled.exiting, false); assert.equal(cancelled.goalDraft, edited.goalDraft);
+  const next = acceptScorecardProposal(cancelled, { kind: "signOutRequested" });
+  const accepted = acceptScorecardProposal(next, { kind: "signOutConfirmed", id: next.pending!.id, accepted: true }); assert.equal(accepted.exiting, true);
+  const failed = acceptScorecardProposal(accepted, { kind: "accountChanged", account: { ...account, problem: "Sign-out failed" } }); assert.equal(failed.exiting, false);
+});
+
+test("completed v2 setup navigation selects the eight-section flow for both panels and launch URLs", () => {
+  const value = { ...loaded(), profile: { revision: 1, profile: { ...emptyProfile(), completed: true, onboardingVersion: "harry-v2" as const } } };
+  let model = acceptScorecardProposal(initialScorecardModel(account, "setup"), { kind: "started" });
+  model = acceptScorecardProposal(model, { kind: "clientLoaded", id: model.pending!.id, result: { ok: true, value } });
+  assert.ok(model.pending?.kind === "navigate"); assert.equal(model.pending.href, "/onboarding"); assert.equal(model.panel, undefined); assert.equal(hasUnsavedScorecard(model), false);
+  const loadedModel = acceptScorecardProposal(acceptScorecardProposal(initialScorecardModel(account), { kind: "started" }), { kind: "clientLoaded", id: 1, result: { ok: true, value } });
+  assert.equal(acceptScorecardProposal(loadedModel, { kind: "panelOpened", panel: "setup" }).pending?.kind, "navigate");
+});
+
+test("saved-version reload asks before replacing drafts and ignores stale confirmation", () => {
+  const edited = { ...acceptScorecardProposal(initial(), { kind: "metricChanged", metric: "steps", value: "5123" }), syncError: "Save failed" };
+  const pending = acceptScorecardProposal(edited, { kind: "reloadClient" }); assert.ok(pending.pending?.kind === "confirmReload");
+  assert.equal(acceptScorecardProposal(pending, { kind: "reloadConfirmed", id: 999, discard: true }), pending);
+  const kept = acceptScorecardProposal(pending, { kind: "reloadConfirmed", id: pending.pending.id, discard: false });
+  assert.equal(kept.drafts.steps, "5123"); assert.equal(kept.syncError, "Save failed"); assert.equal(kept.loaded, true);
+  const retry = acceptScorecardProposal(kept, { kind: "reloadClient" });
+  assert.equal(acceptScorecardProposal(retry, { kind: "reloadConfirmed", id: retry.pending!.id, discard: true }).pending?.kind, "load");
+});
+
+test("day rollover keeps an unsaved profile draft until it can be saved", () => {
+  const clean = { ...initial(), panel: undefined };
+  const edited = acceptScorecardProposal(clean, { kind: "profileProposed", proposal: { kind: "targetChanged", field: "energy", value: "2417" } });
+  const observed = acceptScorecardProposal(edited, { kind: "dayObserved", date: "2026-10-21" });
+  assert.equal(observed.pending, undefined); assert.equal(observed.profileUi.targetDrafts.energy, "2417");
 });

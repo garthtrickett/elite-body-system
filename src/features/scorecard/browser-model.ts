@@ -9,6 +9,9 @@ import type { SyncEffect, SyncProposal } from "./browser-sync.ts";
 
 export type Panel = "setup" | "profile" | "ltr";
 export type AccountState = Readonly<{ email: string; busy: boolean; problem: string }>;
+export type ScorecardUiEffect = Readonly<{ id: number }> & (Readonly<{ kind: "signOut"; confirm: boolean }> | Readonly<{ kind: "navigate"; href: string }> | Readonly<{ kind: "confirmReload" }>);
+export type ScorecardUiProposal = Readonly<{ kind: "signOutRequested" }> | Readonly<{ kind: "signOutConfirmed"; id: number; accepted: boolean }> | Readonly<{ kind: "navigationHandled"; id: number }> | Readonly<{ kind: "reloadConfirmed"; id: number; discard: boolean }>;
+export type ScorecardEffect = SyncEffect | ScorecardUiEffect;
 export type ScorecardModel = Readonly<{
   day: Scorecard;
   drafts: Readonly<Record<Metric, string>>;
@@ -20,6 +23,7 @@ export type ScorecardModel = Readonly<{
   goalDraft: string;
   message: string;
   account: AccountState;
+  exiting: boolean;
   profile: ProfileSnapshot;
   profileUi: ProfileUiModel;
   date: string;
@@ -31,7 +35,7 @@ export type ScorecardModel = Readonly<{
   generation: number;
   savedGeneration: number;
   sequence: number;
-  pending: SyncEffect | undefined;
+  pending: ScorecardEffect | undefined;
 }>;
 type LocalProposal =
   | Readonly<{ kind: "metricChanged"; metric: Metric; value: string }>
@@ -45,12 +49,12 @@ type LocalProposal =
   | Readonly<{ kind: "prioritySelected" | "goalRemoved"; id: number }>
   | Readonly<{ kind: "accountChanged"; account: AccountState }>
   | Readonly<{ kind: "profileProposed"; proposal: ProfileProposal }>;
-export type ScorecardProposal = LocalProposal | SyncProposal | Readonly<{ kind: "started" | "retrySync" | "reloadClient" }> | Readonly<{ kind: "dayObserved"; date: string }>;
+export type ScorecardProposal = LocalProposal | SyncProposal | ScorecardUiProposal | Readonly<{ kind: "started" | "retrySync" | "reloadClient" }> | Readonly<{ kind: "dayObserved"; date: string }>;
 
 export function initialScorecardModel(account: AccountState, launchPanel?: "profile" | "setup"): ScorecardModel {
   const profile = emptyProfile();
   return { day: emptyScorecard(), drafts: { weight: "", energy: "", protein: "", water: "", sleep: "", steps: "" },
-    errors: {}, card: 0, touchX: undefined, panel: undefined, launchPanel, goalDraft: "", message: "", account,
+    errors: {}, card: 0, touchX: undefined, panel: undefined, launchPanel, goalDraft: "", message: "", account, exiting: false,
     profile: { profile, revision: 0 }, profileUi: initialProfileUi(profile), date: "", observedDate: "", dayRevision: 0, history: [],
     loaded: false, syncError: "", generation: 0, savedGeneration: 0, sequence: 0, pending: undefined };
 }
@@ -79,7 +83,8 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
       const distance = model.touchX === undefined ? 0 : model.touchX - proposal.x;
       return { ...model, touchX: undefined, card: Math.max(0, Math.min(2, model.card + (Math.abs(distance) >= 40 ? Math.sign(distance) : 0))) };
     }
-    case "panelOpened": return { ...model, panel: proposal.panel, message: "", profileUi: proposal.panel === "setup" && model.profile.profile.completed ? acceptProfileProposal(model.profileUi, { kind: "editSetup" }) : model.profileUi };
+    case "panelOpened": return proposal.panel === "setup" && model.profile.profile.onboardingVersion === "harry-v2" ? schedule(model, { kind: "navigate", href: "/onboarding" })
+      : { ...model, panel: proposal.panel, message: "", profileUi: proposal.panel === "setup" && model.profile.profile.completed ? acceptProfileProposal(model.profileUi, { kind: "editSetup" }) : model.profileUi };
     case "panelClosed": return { ...model, panel: undefined, message: "" };
     case "goalDraftChanged": return { ...model, goalDraft: proposal.value, message: "" };
     case "brainDumpChanged": return { ...model, day: { ...model.day, brainDump: proposal.value } };
@@ -93,25 +98,26 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
     }
     case "goalRemoved": return { ...model, day: { ...model.day, goals: model.day.goals.filter(goal => goal.id !== proposal.id) } };
     case "profileProposed": {
+      if (proposal.proposal.kind === "editSetup" && model.profile.profile.onboardingVersion === "harry-v2") return schedule(model, { kind: "navigate", href: "/onboarding" });
       if (model.pending?.kind === "saveProfile") return model;
       const profileUi = acceptProfileProposal(model.profileUi, proposal.proposal);
       return { ...model, profileUi, panel: proposal.proposal.kind === "editSetup" ? "setup" : model.panel, syncError: "" };
     }
-    case "accountChanged": return { ...model, account: proposal.account };
+    case "accountChanged": return { ...model, account: proposal.account, exiting: proposal.account.problem ? false : model.exiting };
   }
 }
 
-function schedule(model: ScorecardModel, intent: Omit<Extract<SyncEffect, { kind: "load" }>, "id"> | Omit<Extract<SyncEffect, { kind: "saveDay" }>, "id"> | Omit<Extract<SyncEffect, { kind: "saveProfile" }>, "id">): ScorecardModel {
+function schedule(model: ScorecardModel, intent: Omit<Extract<ScorecardEffect, { kind: "load" | "confirmReload" }>, "id"> | Omit<Extract<ScorecardEffect, { kind: "signOut" }>, "id"> | Omit<Extract<ScorecardEffect, { kind: "navigate" }>, "id"> | Omit<Extract<SyncEffect, { kind: "saveDay" }>, "id"> | Omit<Extract<SyncEffect, { kind: "saveProfile" }>, "id">): ScorecardModel {
   const id = model.sequence + 1;
-  return { ...model, sequence: id, pending: { ...intent, id }, syncError: "" };
+  return { ...model, sequence: id, pending: { ...intent, id }, syncError: intent.kind === "signOut" || intent.kind === "navigate" || intent.kind === "confirmReload" ? model.syncError : "" };
 }
 function continueSync(model: ScorecardModel): ScorecardModel {
-  if (!model.loaded || model.pending || model.syncError) return model;
+  if (!model.loaded || model.pending || model.syncError || model.exiting || model.account.busy) return model;
   if (model.generation > model.savedGeneration) return schedule(model, { kind: "saveDay", date: model.date,
     revision: model.dayRevision, scorecard: model.day, generation: model.generation });
   if (model.profileUi.requestedSave) return schedule({ ...model, profileUi: acceptProfileProposal(model.profileUi, { kind: "saveHandled" }) },
     { kind: "saveProfile", revision: model.profile.revision, profile: model.profileUi.draft });
-  if (model.observedDate && model.observedDate !== model.date && !model.panel && Object.entries(model.drafts).every(([metric, value]) => value === String(model.day.values[metric as Metric] ?? ""))) return schedule({ ...model, loaded: false }, { kind: "load" });
+  if (model.observedDate && model.observedDate !== model.date && !model.panel && !hasUnsavedScorecard(model)) return schedule({ ...model, loaded: false }, { kind: "load" });
   return model;
 }
 function draftsFor(day: Scorecard): Readonly<Record<Metric, string>> {
@@ -120,19 +126,24 @@ function draftsFor(day: Scorecard): Readonly<Record<Metric, string>> {
 
 export function acceptScorecardProposal(model: ScorecardModel, proposal: ScorecardProposal): ScorecardModel {
   switch (proposal.kind) {
+    case "signOutRequested": return model.pending || model.account.busy || model.exiting ? model : schedule(model, { kind: "signOut", confirm: hasUnsavedScorecard(model) });
+    case "signOutConfirmed": return model.pending?.kind === "signOut" && model.pending.id === proposal.id ? { ...model, pending: undefined, exiting: proposal.accepted && !model.account.problem } : model;
+    case "navigationHandled": return model.pending?.kind === "navigate" && model.pending.id === proposal.id ? { ...model, pending: undefined } : model;
     case "dayObserved": return model.loaded && isDay(proposal.date) ? continueSync({ ...model, observedDate: proposal.date }) : model;
     case "started": return model.sequence === 0 ? schedule(model, { kind: "load" }) : model;
-    case "reloadClient": return model.pending ? model : schedule({ ...model, loaded: false }, { kind: "load" });
+    case "reloadClient": return model.pending ? model : hasUnsavedScorecard(model) ? schedule(model, { kind: "confirmReload" }) : schedule({ ...model, loaded: false }, { kind: "load" });
+    case "reloadConfirmed": return model.pending?.kind !== "confirmReload" || model.pending.id !== proposal.id ? model : proposal.discard ? schedule({ ...model, loaded: false }, { kind: "load" }) : { ...model, pending: undefined };
     case "retrySync": return model.pending ? model : model.loaded ? continueSync({ ...model, syncError: "" }) : schedule(model, { kind: "load" });
     case "clientLoaded": {
       if (model.pending?.kind !== "load" || model.pending.id !== proposal.id) return model;
       if (!proposal.result.ok) return { ...model, pending: undefined, syncError: proposal.result.error.message };
       const value = proposal.result.value;
       const loadedUi = initialProfileUi(value.profile.profile);
-      const profileUi = model.launchPanel === "setup" && value.profile.profile.completed ? acceptProfileProposal(loadedUi, { kind: "editSetup" }) : loadedUi;
-      return { ...model, loaded: true, pending: undefined, profile: value.profile, profileUi,
+      const profileUi = model.launchPanel === "setup" && value.profile.profile.completed && value.profile.profile.onboardingVersion !== "harry-v2" ? acceptProfileProposal(loadedUi, { kind: "editSetup" }) : loadedUi;
+      const loaded = { ...model, loaded: true, pending: undefined, profile: value.profile, profileUi,
         date: value.day.date, observedDate: value.day.date, day: value.day.scorecard, dayRevision: value.day.revision, drafts: draftsFor(value.day.scorecard), history: value.history,
         launchPanel: undefined, panel: model.launchPanel ?? (model.loaded && model.panel === "setup" && model.profile.profile.completed ? "setup" : value.profile.profile.completed ? undefined : "setup"), generation: 0, savedGeneration: 0, syncError: "" };
+      return value.profile.profile.onboardingVersion === "harry-v2" && model.launchPanel === "setup" ? schedule({ ...loaded, panel: undefined }, { kind: "navigate", href: "/onboarding" }) : loaded;
     }
     case "daySaved": {
       if (model.pending?.kind !== "saveDay" || model.pending.id !== proposal.id) return model;
@@ -202,7 +213,15 @@ export function representScorecard(model: ScorecardModel) {
 }
 
 export type ScorecardState = ReturnType<typeof representScorecard>;
+export function hasUnsavedScorecard(model: ScorecardModel): boolean {
+  const draft = { ...model.profileUi.draft, setupStep: model.profile.profile.setupStep };
+  return model.generation > model.savedGeneration || model.profileUi.requestedSave || model.pending?.kind === "saveProfile" || !!model.goalDraft.trim()
+    || JSON.stringify(draft) !== JSON.stringify(model.profile.profile)
+    || Object.entries(model.profileUi.targetDrafts).some(([key, value]) => value !== String(model.profile.profile.targets[key as keyof typeof model.profile.profile.targets]))
+    || Object.entries(model.drafts).some(([key, value]) => value !== String(model.day.values[key as Metric] ?? ""));
+}
 export function nextScorecardAction(model: ScorecardModel) {
   return model.panel ? { kind: "showPanel", panel: model.panel } as const : { kind: "closePanel" } as const;
 }
-export function nextScorecardNetworkAction(model: ScorecardModel): SyncEffect | undefined { return model.pending; }
+export function nextScorecardNetworkAction(model: ScorecardModel): SyncEffect | undefined { return model.pending?.kind === "load" || model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile" ? model.pending : undefined; }
+export function nextScorecardEffect(model: ScorecardModel): ScorecardEffect | undefined { return model.pending; }

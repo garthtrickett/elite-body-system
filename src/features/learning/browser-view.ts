@@ -75,7 +75,7 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
 
 export function learningView(state: LearningState, page: "map" | Pillar, propose: Propose) {
   return workspace({ page, navigationDisabled: state.saving, content: html`<div class="sc-page"><header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
-    ${state.snapshot ? html`<p class="sc-copy text-xs" aria-live="polite" data-testid="learning-save-status">${state.saving ? "Saving your progress…" : state.error ? "Changes not saved" : "Progress saved to your account"}</p>` : nothing}
+    ${state.snapshot ? html`<p class="sc-copy text-xs" aria-live="polite" data-testid="learning-save-status">${state.error ? "Changes not saved" : state.saving ? "Saving your progress…" : "Progress saved to your account"}</p>` : nothing}
     ${state.error && !state.episode ? html`<p class="sc-error" role="alert">${state.error}</p><div class="flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "retry" })}>Retry</button><button class="sc-secondary" @click=${() => propose({ kind: "reload" })}>Reload saved version</button></div>` : nothing}
     ${!state.snapshot ? state.error ? nothing : html`<p class="sc-copy" role="status">Loading your learning progress…</p>` : page === "map" ? state.editingMap ? mapBuilder(state, propose) : mapReading(state, propose) : courseView(state, page, propose)}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}
