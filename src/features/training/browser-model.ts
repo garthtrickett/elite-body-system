@@ -98,9 +98,9 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
       const exercise = exercises.find(e => e.id === proposal.id);
       if (!exercise?.sets || proposal.slot < 0 || proposal.slot >= exercise.sets) return model;
       const previous = model.snapshot.history.filter(w => w.date !== workout.date && w.finishedAt).find(w => w.sets[proposal.id]?.[proposal.slot]?.done)?.sets[proposal.id]?.[proposal.slot];
-      const current = workout.sets[proposal.id]?.[proposal.slot] ?? { kg: 0, reps: 0, done: false };
+      const stored = workout.sets[proposal.id]?.[proposal.slot], current = stored ?? { kg: 0, reps: 0, done: false };
       const kgDraft = model.drafts[`${proposal.id}:${proposal.slot}:kg`], repsDraft = model.drafts[`${proposal.id}:${proposal.slot}:reps`];
-      const kg = kgDraft?.trim() ? setDraftNumber(kgDraft) : current.kg || previous?.kg || 0;
+      const kg = kgDraft?.trim() ? setDraftNumber(kgDraft) : stored?.kg ?? previous?.kg ?? 0;
       const reps = repsDraft?.trim() ? setDraftNumber(repsDraft) : current.reps || previous?.reps || parseInt(exercise.reps ?? "1", 10);
       if (setNumberProblem({ field: "kg", value: kg, done: true }) || setNumberProblem({ field: "reps", value: reps, done: true })) return { ...model, error: "Check the weight and reps before completing the set." };
       return change({ ...model, drafts: { ...model.drafts, [`${proposal.id}:${proposal.slot}:kg`]: String(kg), [`${proposal.id}:${proposal.slot}:reps`]: String(reps) } },

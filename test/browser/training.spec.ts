@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createDatabase } from "../../src/platform/database/connection.ts";
 import { createProfiles, createPostgresProfileStore } from "../../src/features/profile/index.ts";
 import { startTestApp, testDatabaseUrl } from "../support/app.ts";
+import { createTraining } from "../../src/features/training/index.ts";
 import { completedProfile } from "../support/client.ts";
 
 let app: Awaited<ReturnType<typeof startTestApp>>;
@@ -22,6 +23,7 @@ async function signIn(page: Page, flagged = false) {
   const signedIn = await app.auth.redeemLink({ token: new URL(await app.readLink(email)).hash.slice(1) });
   if (!signedIn.ok) throw new Error("Fixture sign-in failed");
   await page.context().addCookies([{ name: "ebs-session", value: signedIn.value.sessionToken, httpOnly: true, sameSite: "Lax", url: app.origin }]);
+  return account.value.id;
 }
 function monday(offset = 0) {
   const date = new Date(); while (date.getUTCDay() !== 1) date.setUTCDate(date.getUTCDate() - 1); date.setUTCDate(date.getUTCDate() + offset); return date.toISOString().slice(0, 10);
@@ -84,5 +86,31 @@ test("completing cleared reps displays the prescribed value and remains saved, r
     await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
     await page.reload(); await expect(reps).toHaveValue("5"); await expect(done).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("link", { name: "‹ Scorecard", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/");
+  }
+});
+
+
+test("saved zero weight remains visible and survives completion toggles despite heavier history", async ({ page }, info) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); const accountId = await signIn(page);
+    const db = createDatabase(testDatabaseUrl());
+    try {
+      const training = createTraining({ db, profiles: createProfiles({ store: createPostgresProfileStore(db) }) });
+      const previous = await training.get({ accountId, date: monday(-14) }); if (!previous.ok) throw new Error("History fixture failed");
+      expect((await training.save({ accountId, revision: previous.value.revision, workout: { ...previous.value.workout, sets: { wpullup: [{ kg: 14.5, reps: 7, done: true }] } }, finish: true })).ok).toBe(true);
+      const current = await training.get({ accountId, date: monday(-7) }); if (!current.ok) throw new Error("Workout fixture failed");
+      expect((await training.save({ accountId, revision: current.value.revision, workout: { ...current.value.workout, sets: { wpullup: [{ kg: 0, reps: 7, done: true }] } } })).ok).toBe(true);
+      await page.goto(`${app.origin}/training?date=${monday(-7)}`);
+      const weight = page.getByLabel("Weighted Pull-up set 1 weight"), done = page.getByRole("button", { name: "Complete set 1 for Weighted Pull-up", exact: true });
+      await expect(weight).toHaveValue("0"); await expect(done).toHaveAttribute("aria-pressed", "true");
+      for (const completed of [false, true]) {
+        await done.click(); await expect(done).toHaveAttribute("aria-pressed", String(completed));
+        await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");
+        await page.reload(); await expect(weight).toHaveValue("0"); await expect(done).toHaveAttribute("aria-pressed", String(completed));
+        const saved = await training.get({ accountId, date: monday(-7) }); if (!saved.ok) throw new Error("Workout reload failed");
+        expect(saved.value.workout.sets.wpullup?.[0]).toEqual({ kg: 0, reps: 7, done: completed });
+      }
+      await page.screenshot({ path: info.outputPath(`zero-weight-history-${width}.png`) });
+    } finally { await db.destroy(); }
   }
 });

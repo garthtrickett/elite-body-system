@@ -122,3 +122,16 @@ test("comma-form set numbers share commit, validation and completion semantics",
   assert.equal(model.error, ""); assert.deepEqual(model.workout?.sets.dbpress?.[0], { kg: 12.5, reps: 5, done: true });
   assert.equal(model.drafts["dbpress:0:kg"], "12.5"); assert.equal(model.drafts["dbpress:0:reps"], "5");
 });
+
+
+test("a saved zero weight remains authoritative over history when undoing and redoing completion", () => {
+  for (const done of [true, false]) {
+    const workout = { ...snapshot().workout, sets: { dbpress: [{ kg: 0, reps: 7, done }] } };
+    const previous = { ...workout, date: "2026-10-13", finishedAt: 90000, sets: { dbpress: [{ kg: 14.5, reps: 7, done: true }] } };
+    let model = acceptTrainingProposal(initialTrainingModel({ now: 100000 }), { kind: "started" });
+    model = acceptTrainingProposal(model, { kind: "loaded", id: 1, result: { ok: true, value: { ...snapshot(), workout, history: [previous] } } });
+    model = acceptTrainingProposal(model, { kind: "setToggled", id: "dbpress", slot: 0 });
+    assert.deepEqual(model.workout?.sets.dbpress?.[0], { kg: 0, reps: 7, done: !done });
+    assert.equal(model.drafts["dbpress:0:kg"], "0");
+  }
+});
