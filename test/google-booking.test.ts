@@ -47,3 +47,42 @@ test("Google booking provider failures return a stable error without exposing to
   const send: typeof fetch = async () => Response.json({ privateProviderDetail: "do not expose" }, { status: 401 });
   const result = await createGoogleBookingProvider(config, send).find({ accountId: "account-a", previous: null }); assert.ok(!result.ok); assert.equal(result.error.code, "unavailable"); assert.doesNotMatch(JSON.stringify(result), /privateProviderDetail|fixture-secret/);
 });
+test("Google booking reconciles a missing old event with one verified account-bound replacement", async () => {
+  const previous: Booking = { providerId: "google:event1", eventVersion: 1, status: "confirmed", startsAt: event.start.dateTime, timezone: "Europe/London", meetUrl: event.hangoutLink };
+  for (const status of [404, 410]) {
+    const send: typeof fetch = async url => {
+      if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "test", expires_in: 3600 });
+      if (String(url).endsWith("/event1")) return Response.json({ error: { code: status } }, { status });
+      return Response.json({ items: [{ ...event, id: "event2" }] });
+    };
+    const result = await createGoogleBookingProvider(config, send).find({ accountId: "account-a", previous });
+    assert.ok(result.ok && result.value); assert.equal(result.value.providerId, "google:event2"); assert.equal(result.value.replacesProviderId, previous.providerId);
+  }
+});
+test("a missing previous event cannot preserve an unverified booking or bypass replacement ownership", async () => {
+  const previous: Booking = { providerId: "google:event1", eventVersion: 1, status: "confirmed", startsAt: event.start.dateTime, timezone: "Europe/London", meetUrl: event.hangoutLink };
+  for (const items of [[], [{ ...event, extendedProperties: undefined }]]) {
+    const send: typeof fetch = async url => url === "https://oauth2.googleapis.com/token" ? Response.json({ access_token: "test", expires_in: 3600 }) : String(url).endsWith("/event1") ? Response.json({}, { status: 404 }) : Response.json({ items });
+    const result = await createGoogleBookingProvider(config, send).find({ accountId: "account-a", previous }); assert.equal(result.ok, false);
+  }
+});
+test("Google authorization failures refresh the token once and remain bounded if credentials stay invalid", async () => {
+  for (const recovers of [true, false]) {
+    let tokens = 0, requests = 0;
+    const send: typeof fetch = async url => {
+      if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: `test-${++tokens}`, expires_in: 3600 });
+      return ++requests === 2 && recovers ? Response.json({ items: [event] }) : Response.json({ error: "invalid credentials" }, { status: 401 });
+    };
+    const result = await createGoogleBookingProvider(config, send).find({ accountId: "account-a", previous: null });
+    assert.equal(result.ok, recovers); assert.equal(tokens, 2); assert.equal(requests, 2);
+  }
+});
+test("sparse Google cancellation tombstones revoke a known booking and reconcile idempotently", async () => {
+  const previous: Booking = { providerId: "google:event1", eventVersion: 100, status: "confirmed", startsAt: event.start.dateTime, timezone: "Europe/London", meetUrl: event.hangoutLink };
+  const send: typeof fetch = async url => url === "https://oauth2.googleapis.com/token" ? Response.json({ access_token: "test", expires_in: 3600 }) : String(url).endsWith("/event1") ? Response.json({ id: "event1", status: "cancelled" }) : Response.json({ items: [] });
+  const provider = createGoogleBookingProvider(config, send);
+  const cancelled = await provider.find({ accountId: "account-a", previous }); assert.ok(cancelled.ok && cancelled.value);
+  assert.equal(cancelled.value.status, "cancelled"); assert.equal(cancelled.value.eventVersion, 101);
+  const repeated = await provider.find({ accountId: "account-a", previous: cancelled.value }); assert.ok(repeated.ok && repeated.value);
+  assert.deepEqual(repeated.value, cancelled.value);
+});

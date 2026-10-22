@@ -4,7 +4,7 @@ import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
 
 type SaveInput = Readonly<{ answers: OnboardingAnswers; revision: number; contentVersion: string }>;
 export type OnboardingEffect = Readonly<{ id: number }> & (
-  | Readonly<{ kind: "load" }>
+  | Readonly<{ kind: "load"; preserveDraft?: boolean }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
   | Readonly<{ kind: "signOut"; confirm: boolean }>
@@ -17,7 +17,7 @@ export type OnboardingEffect = Readonly<{ id: number }> & (
 export type OnboardingModel = Readonly<{
   snapshot: OnboardingSnapshot | null; draft: OnboardingAnswers; section: Section;
   dirty: boolean; sequence: number; pending: OnboardingEffect | undefined;
-  error: string; message: string; showMissing: boolean; progress: number; reloadRequired: boolean;
+  error: string; message: string; showMissing: boolean; progress: number; finalizing: boolean; reloadRequired: boolean;
   accountBusy: boolean; accountProblem: string; exiting: boolean;
 }>;
 export type OnboardingProposal =
@@ -32,16 +32,38 @@ export type OnboardingProposal =
   | Readonly<{ kind: "upload"; slot: string; selection: number }>
   | Readonly<{ kind: "remove" | "read"; mediaId: string }>
   | Readonly<{ kind: "progress"; id: number; progress: number }>
+  | Readonly<{ kind: "uploadFinalizing"; id: number }>
   | Readonly<{ kind: "completed"; id: number; effectKind: OnboardingEffect["kind"]; result: ClientResult<OnboardingSnapshot>; saved?: OnboardingSnapshot }>
   | Readonly<{ kind: "fileOpened"; id: number; result: ClientResult<Readonly<{ opened: true }>> }>
   | Readonly<{ kind: "failed"; id: number }>;
 
-export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
-function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0 }; }
+export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
+function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0, finalizing: false }; }
+function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: OnboardingAnswers; saved: OnboardingSnapshot }>): OnboardingAnswers {
+  const { base, draft, saved } = input;
+  const retain = <T>(before: T, edited: T, current: T): T => JSON.stringify(before) === JSON.stringify(edited) ? current : edited;
+  const fields = <T extends object>(before: T, edited: T, current: T): T => Object.fromEntries((Object.keys(current) as (keyof T)[]).map(key => [key, retain(before[key], edited[key], current[key])])) as T;
+  const merged = fields(base.answers, draft, saved.answers);
+  const changedContent = base.content.version !== saved.content.version;
+  const changedScreening = base.content.parqVersion !== saved.content.parqVersion || JSON.stringify(base.content.healthQuestions) !== JSON.stringify(saved.content.healthQuestions);
+  const changedRanking = JSON.stringify([base.answers.goals, base.answers.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]);
+  return { ...merged,
+    goals: changedRanking ? draft.goals : saved.answers.goals,
+    goalsConfirmed: changedRanking ? draft.goalsConfirmed : saved.answers.goalsConfirmed,
+    acknowledged: changedContent ? saved.answers.acknowledged : fields(base.answers.acknowledged, draft.acknowledged, saved.answers.acknowledged),
+    consent: changedContent ? { ...fields(base.answers.consent, draft.consent, saved.answers.consent), accepted: false, version: saved.answers.consent.version } : fields(base.answers.consent, draft.consent, saved.answers.consent),
+    questionnaire: fields(base.answers.questionnaire, draft.questionnaire, saved.answers.questionnaire),
+    measurements: fields(base.answers.measurements, draft.measurements, saved.answers.measurements),
+    lifestyle: fields(base.answers.lifestyle, draft.lifestyle, saved.answers.lifestyle),
+    routine: fields(base.answers.routine, draft.routine, saved.answers.routine),
+    health: changedScreening ? saved.answers.health : saved.answers.health.map((answer, index) => retain(base.answers.health[index], draft.health[index], answer) ?? null),
+  };
+}
 export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingProposal): OnboardingModel {
   if (proposal.kind === "accountChanged") return { ...model, accountBusy: proposal.busy, accountProblem: proposal.problem, exiting: proposal.problem ? false : model.exiting };
   if (proposal.kind === "signOutConfirmed") return model.pending?.id === proposal.id && model.pending.kind === "signOut" ? { ...model, pending: undefined, exiting: proposal.accepted && !model.accountProblem } : model;
-  if (proposal.kind === "cancelUpload") return model.pending?.kind === "upload" ? queue(model, { kind: "cancelUpload", id: model.sequence + 1 }) : model;
+  if (proposal.kind === "uploadFinalizing") return model.pending?.id === proposal.id && model.pending.kind === "upload" ? { ...model, finalizing: true } : model;
+  if (proposal.kind === "cancelUpload") return model.pending?.kind === "upload" && !model.finalizing ? queue(model, { kind: "cancelUpload", id: model.sequence + 1 }) : model;
   if (proposal.kind === "progress") return model.pending?.id === proposal.id && model.pending.kind === "upload" ? { ...model, progress: Math.max(0, Math.min(100, proposal.progress)) } : model;
   if (proposal.kind === "failed") return model.pending?.id === proposal.id ? { ...model, pending: undefined, error: "Could not complete that action. Reload saved progress before retrying.", reloadRequired: true } : model;
   if (proposal.kind === "fileOpened") {
@@ -56,13 +78,16 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     const invalid = effect.kind === "save" && effect.validate && snapshot.missing[model.section].length > 0;
     const section = effect.kind === "save" && effect.next && !invalid ? effect.next : model.section;
     const cancelled = effect.kind === "cancelUpload";
-    const updated = { ...model, snapshot, draft: cancelled ? model.draft : snapshot.answers, dirty: cancelled && JSON.stringify(model.draft) !== JSON.stringify(snapshot.answers), pending: undefined, section, showMissing: !!invalid, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? "" : "Saved to your account.", reloadRequired: false };
+    const retained = cancelled || effect.kind === "load" && effect.preserveDraft;
+    const draft = retained && model.snapshot ? reconcileDraft({ base: model.snapshot, draft: model.draft, saved: snapshot }) : snapshot.answers;
+    const dirty = !!retained && JSON.stringify(draft) !== JSON.stringify(snapshot.answers);
+    const updated = { ...model, snapshot, draft, dirty, pending: undefined, section, showMissing: !!invalid, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : "Saved to your account.", reloadRequired: false };
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
   }
   if (model.pending || model.accountBusy) return model;
   const id = model.sequence + 1;
   if (proposal.kind === "signOut") return queue(model, { kind: "signOut", id, confirm: model.dirty });
-  if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id });
+  if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty });
   if (!model.snapshot) return model;
   if (proposal.kind === "refreshBooking") return model.dirty ? { ...model, error: "Save your answers before refreshing your booking." } : queue(model, { kind: "refreshBooking", id });
   if (proposal.kind === "edit") {

@@ -41,6 +41,11 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
     const parsed = parseAnswers(record.data.answers);
     if (!parsed.ok) throw new Error("Invalid onboarding answers");
     answers = record.data.contentVersion === content.version ? parsed.value : { ...parsed.value, acknowledged: { welcome: false, communication: false, rhythm: false }, consent: { ...parsed.value.consent, accepted: false } };
+    if (record.data.contentVersion !== content.version) {
+      const archived = typeof record.data.contentVersion === "string" ? await db.selectFrom("onboarding_settings").select("data").where("key", "=", `archive:${record.data.contentVersion}` as OnboardingSettingsKey).executeTakeFirst() : undefined;
+      const previous = archived ? parseContent(archived.data) : undefined;
+      if (!previous || previous.parqVersion !== content.parqVersion || JSON.stringify(previous.healthQuestions) !== JSON.stringify(content.healthQuestions)) answers = { ...answers, health: Array.from({ length: 7 }, () => null) };
+    }
   } else {
     const profile = await createProfiles({ store: createPostgresProfileStore(db) }).get({ accountId });
     if (!profile.ok) throw new Error("Profile unavailable");
@@ -54,5 +59,6 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
   const signature = JSON.stringify([content.version, answers.consent, answers.health, answers.healthDetails]);
   const acknowledgement = acknowledgements.find(item => isRecord(item) && item.signature === signature);
   const consentSignedAt = isRecord(acknowledgement) && typeof acknowledgement.signedAt === "string" && Number.isFinite(Date.parse(acknowledgement.signedAt)) ? acknowledgement.signedAt : null;
-  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
+  const previousMedia = media.filter(item => item.content_version !== content.version).map(item => ({ id: item.id, slot: item.slot, mediaType: item.media_type, size: item.size, status: item.status === "ready" ? "ready" as const : "pending" as const }));
+  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, previousMedia, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
 }

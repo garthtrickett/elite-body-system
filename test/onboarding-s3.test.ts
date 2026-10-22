@@ -14,6 +14,14 @@ test("Railway virtual-hosted uploads and CSP use the same exact bucket origin", 
     assert.equal(new URL(upload.url).hostname, forcePathStyle ? "t3.storageapi.dev" : "private-assessments.t3.storageapi.dev");
   }
 });
+test("S3 bucket and endpoint addressing fallbacks retain the actual upload origin in CSP", async () => {
+  for (const [endpoint, bucket] of [["https://s3.example.test", "private.assessments"], ["https://s3.example.test", "PrivateBucket"], ["https://127.0.0.1:9000", "private-assessments"], ["https://[::1]:9000", "private-assessments"]]) {
+    const config = { endpoint: endpoint!, region: "test", bucket: bucket!, accessKeyId: "fixture", secretAccessKey: "fixture", forcePathStyle: false };
+    const upload = await createS3AssessmentStorage(config).authorizeUpload({ key: "onboarding/pending/test", mediaType: "image/jpeg", size: 12 });
+    assert.equal(new URL(upload.url).origin, new URL(endpoint!).origin);
+    assert.equal(assessmentUploadOrigin(config), new URL(upload.url).origin);
+  }
+});
 test("S3 assessment adapter uploads, checks metadata/signatures, copies immutable ready objects, signs reads and deletes", { skip: !endpoint }, async () => {
   const storage = createS3AssessmentStorage({ endpoint: endpoint!, region: "us-east-1", bucket: "onboarding-test", accessKeyId: "fixture", secretAccessKey: "fixture" });
   const id = randomUUID(), pendingKey = `onboarding/pending/fixture/${id}`, readyKey = `onboarding/ready/fixture/${id}`;

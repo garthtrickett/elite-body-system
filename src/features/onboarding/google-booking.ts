@@ -22,20 +22,29 @@ export function createGoogleBookingProvider(config: GoogleBookingConfig, send: t
       try {
         const base = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(config.calendarId)}/events`;
         const eventId = previous?.providerId.startsWith("google:") ? previous.providerId.slice(7) : null;
-        const get = async (url: string) => {
-          const response = await send(url, { headers: { Authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(10000) });
+        const get = async (url: string, allowMissing = false) => {
+          let response = await send(url, { headers: { Authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(10000) });
+          if (response.status === 401) {
+            await response.body?.cancel(); token = ""; expiresAt = 0;
+            response = await send(url, { headers: { Authorization: `Bearer ${await accessToken()}` }, signal: AbortSignal.timeout(10000) });
+          }
+          if (allowMissing && [404, 410].includes(response.status)) { await response.body?.cancel(); return null; }
           const value: unknown = await response.json();
           if (!response.ok || !isRecord(value)) throw new Error("Calendar unavailable");
           return value;
         };
         const listed = async (): Promise<unknown> => {
           const value = await get(`${base}?${new URLSearchParams({ privateExtendedProperty: `ebsAccountId=${accountId}`, maxResults: "2", showDeleted: "false" })}`);
-          if (!Array.isArray(value.items)) throw new Error("Invalid calendar events");
+          if (!value || !Array.isArray(value.items)) throw new Error("Invalid calendar events");
           if (!value.items.length) return null;
           if (value.items.length !== 1 || value.nextPageToken) throw new Error("Ambiguous calendar events");
           return value.items[0];
         };
-        let event: unknown = eventId ? await get(`${base}/${encodeURIComponent(eventId)}`) : await listed();
+        let event: unknown = eventId ? await get(`${base}/${encodeURIComponent(eventId)}`, true) : await listed();
+        if (eventId && event === null) {
+          event = await listed();
+          if (event === null) return err({ code: "not_configured", message: "Your previous appointment can no longer be verified. Contact Harry or book a new call, then refresh confirmation." });
+        }
         if (event === null) return ok(null);
         if (eventId && isRecord(event) && event.status === "cancelled") {
           const replacement = await listed();
@@ -48,7 +57,7 @@ export function createGoogleBookingProvider(config: GoogleBookingConfig, send: t
         const startsAt = typeof start?.dateTime === "string" ? start.dateTime : event.status === "cancelled" ? previous?.startsAt : undefined;
         const timezone = typeof start?.timeZone === "string" ? start.timeZone : previous?.timezone ?? "UTC";
         const meetUrl = typeof event.hangoutLink === "string" ? event.hangoutLink : event.status === "cancelled" ? previous?.meetUrl : undefined;
-        const updated = typeof event.updated === "string" ? Date.parse(event.updated) : NaN;
+        const updated = typeof event.updated === "string" ? Date.parse(event.updated) : event.status === "cancelled" && eventId === event.id && previous ? previous.eventVersion + (previous.status === "cancelled" ? 0 : 1) : NaN;
         if (!startsAt || !Number.isFinite(Date.parse(startsAt)) || !isMeetUrl(meetUrl) || !Number.isSafeInteger(updated)) return err({ code: "not_configured", message: "Your appointment needs a confirmed time and a Google Meet link. Contact Harry." });
         new Intl.DateTimeFormat("en", { timeZone: timezone });
         return ok({ providerId: `google:${event.id}`, eventVersion: updated, status: event.status as Booking["status"], startsAt: new Date(startsAt).toISOString(), timezone, meetUrl,

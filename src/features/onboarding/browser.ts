@@ -3,8 +3,7 @@ import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
 import { isRecord } from "../../shared/validation.ts";
 import { parseSnapshot, GOALS } from "./data.ts";
-import type { Goal, OnboardingSnapshot } from "./data.ts";
-import type { ClientResult } from "../../shared/client-result.ts";
+import type { Goal } from "./data.ts";
 import type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
 import { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
 import { onboardingView } from "./browser-view.ts";
@@ -14,8 +13,8 @@ export type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./br
 export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }> }>) {
   const call = createClientTransport({ csrf: config.csrf, send: fetch });
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
-  const preparations = new Map<number, Promise<ClientResult<OnboardingSnapshot>>>();
-  let selection = 0, shownSection = "", shownError = "", dragged: Goal | null = null;
+  const uploads = new Map<number, Promise<void>>();
+  let selection = 0, shownSection = "", shownError = "", shownMissing = false, shownPending: OnboardingEffect["kind"] | undefined, dragged: Goal | null = null;
   const unavailable = () => ({ ok: false, error: { code: "unavailable", message: "The file could not be uploaded. Reload saved progress, remove any unfinished upload and try again." } } as const);
   function moveTo(target: Goal) {
     const model = runtime.getModel();
@@ -42,9 +41,8 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
         root.querySelector<HTMLDetailsElement>(".ob-nav-mobile")?.removeAttribute("open");
         const heading = root.querySelector<HTMLElement>(".ob-title"); heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: "start", behavior: "instant" });
       }
-      const error = state.error || (state.showMissing ? state.missing?.[state.section].join("|") ?? "" : "");
-      if (error && error !== shownError) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
-      shownError = error;
+      if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && (!shownMissing || shownPending === "save" && !state.pending)) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
+      shownError = state.error; shownMissing = state.showMissing; shownPending = state.pending?.kind;
     },
     failed: effect => ({ kind: "failed", id: effect.id }),
     perform: async effect => {
@@ -59,7 +57,7 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
       if (effect.kind === "refreshBooking") return completed(await call({ path: "/api/client/onboarding/booking/refresh", body: {}, parse: parseSnapshot, timeout: 30000 }));
       if (effect.kind === "cancelUpload") {
         for (const controller of controllers.values()) controller.abort();
-        await Promise.allSettled([...preparations.values()]);
+        await Promise.allSettled([...uploads.values()]);
         return completed(await load());
       }
       if (effect.kind === "save") return completed(await call({ path: "/api/client/onboarding/save", body: effect, parse: parseSnapshot }));
@@ -73,9 +71,11 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
       const file = files.get(effect.selection); files.delete(effect.selection);
       if (!file) return completed(unavailable());
       const controller = new AbortController(); controllers.set(effect.id, controller);
+      let settle: () => void = () => {}, authorizationId: string | undefined;
+      let finalizationStarted = false;
+      uploads.set(effect.id, new Promise<void>(resolve => { settle = resolve; }));
       try {
         const preparation = call({ path: "/api/client/onboarding/save", body: effect, parse: parseSnapshot });
-        preparations.set(effect.id, preparation);
         const saved = await preparation;
         if (!saved.ok) return completed(saved);
         if (controller.signal.aborted) return completed(await load());
@@ -85,11 +85,26 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
         } });
         if (!authorization.ok) return { ...completed(authorization), saved: saved.value };
         const a = authorization.value;
+        authorizationId = a.id;
+        if (controller.signal.aborted) return completed(await load());
         await uploadFile({ file, url: a.url, headers: a.headers, signal: controller.signal, progress: progress => runtime.propose({ kind: "progress", id: effect.id, progress }) });
+        if (controller.signal.aborted) return completed(await load());
+        runtime.propose({ kind: "uploadFinalizing", id: effect.id });
+        finalizationStarted = true;
         const finalized = await call({ path: "/api/client/onboarding/media/finalize", body: { id: a.id }, parse: parseSnapshot, timeout: 60000 });
+        if (!finalized.ok) {
+          const recovered = finalized.error.code === "invalid_input" ? await call({ path: "/api/client/onboarding/media/remove", body: { id: a.id }, parse: parseSnapshot }) : await load();
+          return { ...completed(recovered.ok ? finalized : unavailable()), saved: recovered.ok ? recovered.value : saved.value };
+        }
         return { ...completed(finalized), saved: saved.value };
-      } catch { return completed(unavailable()); }
-      finally { controllers.delete(effect.id); preparations.delete(effect.id); }
+      } catch {
+        const recovered = authorizationId ? await load() : undefined;
+        return { ...completed(unavailable()), ...(recovered?.ok ? { saved: recovered.value } : {}) };
+      }
+      finally {
+        try { if (controller.signal.aborted && authorizationId && !finalizationStarted) await call({ path: "/api/client/onboarding/media/remove", body: { id: authorizationId }, parse: parseSnapshot }); }
+        finally { controllers.delete(effect.id); uploads.delete(effect.id); settle(); }
+      }
     },
   });
   function load() { return call({ path: "/api/client/onboarding", parse: parseSnapshot }); }

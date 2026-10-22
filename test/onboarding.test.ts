@@ -184,3 +184,37 @@ test("changed health answers invalidate prior clearance, and content archives re
   const unfinished = await onboarding.get({ accountId: a.id }); assert.ok(unfinished.ok); assert.equal(unfinished.value.answers.acknowledged.welcome, false); assert.equal(unfinished.value.answers.consent.accepted, false);
   const historical = await onboarding.get({ accountId: b.id }); assert.ok(historical.ok); assert.equal(historical.value.content.version, "fixture-v2"); assert.ok(historical.value.completedAt);
 });
+
+test("a revised screening version or question requires fresh answers before signing new consent evidence", async () => {
+  try {
+    for (const change of [{ parqVersion: "fixture-parq-revised" }, { healthQuestions: onboardingContent().healthQuestions.map((question, index) => index === 0 ? "A newly approved screening question" : question) }]) {
+      assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
+      const a = await account(); await saved(a.id);
+      const content = { ...onboardingContent(), version: `screening-${randomUUID()}`, ...change };
+      assert.ok((await onboarding.configure({ content })).ok);
+      const loaded = await onboarding.get({ accountId: a.id }); assert.ok(loaded.ok);
+      assert.deepEqual(loaded.value.answers.health, Array(7).fill(null)); assert.equal(loaded.value.consentSignedAt, null);
+      const accepted = await onboarding.save({ accountId: a.id, revision: loaded.value.revision, contentVersion: content.version, answers: { ...loaded.value.answers, consent: { ...loaded.value.answers.consent, accepted: true } } });
+      assert.ok(accepted.ok); assert.equal(accepted.value.consentSignedAt, null); assert.ok(accepted.value.missing.audit.includes("Answer every health screening question."));
+      const answered = await onboarding.save({ accountId: a.id, revision: accepted.value.revision, contentVersion: content.version, answers: { ...accepted.value.answers, health: Array(7).fill(false) } });
+      assert.ok(answered.ok); assert.ok(answered.value.consentSignedAt);
+    }
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
+
+test("content-only updates preserve unchanged screening answers and retain discoverable removable earlier submissions", async () => {
+  try {
+    assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
+    const a = await account(); await saved(a.id); await upload(a.id, "photo:front", "image");
+    const before = await onboarding.get({ accountId: a.id }); assert.ok(before.ok);
+    const id = before.value.media.find(item => item.slot === "photo:front")!.id;
+    assert.ok((await onboarding.configure({ content: { ...onboardingContent(), version: `content-${randomUUID()}`, welcomeText: "Revised introduction" } })).ok);
+    const after = await onboarding.get({ accountId: a.id }); assert.ok(after.ok);
+    assert.deepEqual(after.value.answers.health, onboardingAnswers().health);
+    assert.equal(after.value.media.length, 0); assert.equal(after.value.previousMedia?.[0]?.id, id);
+    assert.ok(after.value.missing.measurements.includes("Submit front photo."));
+    assert.ok((await media.read({ accountId: a.id, id })).ok);
+    const removed = await media.remove({ accountId: a.id, id }); assert.ok(removed.ok);
+    assert.equal(removed.value.previousMedia?.length, 0); assert.equal((await media.read({ accountId: a.id, id })).ok, false);
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
