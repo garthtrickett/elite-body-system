@@ -4,16 +4,17 @@ import type { ClientResult } from "../../shared/client-result.ts";
 
 export const SECTIONS = ["welcome", "questionnaire", "audit", "communication", "measurements", "lifestyle", "rhythm", "call"] as const;
 export type Section = typeof SECTIONS[number];
-export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome", questionnaire: "Your questionnaire", audit: "Physical audit · week one", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
+export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Physical audit · week one", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
 export const GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
 export type Goal = typeof GOALS[number];
 export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Size", energy: "Energy", cardio: "Cardio", "get-lean": "Get lean", "reduce-pain": "Reduce pain" };
 export const QUESTIONS = {
-  transformation: "What would you consider an incredible result or transformation in 180 days?",
-  motivation: "What motivates you to stay committed to your fitness to achieve that result?",
+  transformation: "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
+  now: "What are your main reasons for doing this now? Your “WHY”?",
+  choice: "Why did you choose EBS to solve this over other options?",
+  finalThought: "What was the final thought that made you decide to sign up?",
   experience: "What previous experience do you have with personal training or fitness programs?",
-  choice: "Why did you choose EBS over other options?",
-  now: "What are your main reasons for doing this now?",
+  motivation: "What motivates you to stay committed to your fitness to achieve that result?",
   success: "When have you succeeded physically in the past, and what made you succeed?",
   struggles: "What particular struggles need solving to achieve your desired result?",
 } as const;
@@ -52,7 +53,7 @@ export type OnboardingSnapshot = Readonly<{
 
 export function emptyAnswers(): OnboardingAnswers {
   return { acknowledged: { welcome: false, communication: false, rhythm: false },
-    questionnaire: { transformation: "", motivation: "", experience: "", choice: "", now: "", success: "", struggles: "" },
+    questionnaire: { transformation: "", motivation: "", experience: "", choice: "", now: "", finalThought: "", success: "", struggles: "" },
     goals: [...GOALS], goalsConfirmed: false, health: Array.from({ length: 7 }, () => null), healthDetails: "",
     consent: { version: "", signedName: "", accepted: false, healthData: false, adult: false }, cardio: "run",
     measurements: { bicepLeft: "", bicepRight: "", hamLeft: "", hamRight: "", forearmLeft: "", forearmRight: "", waist: "", neck: "" },
@@ -78,8 +79,9 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
   const invalid = () => err({ code: "invalid_input", message: "Check your onboarding answers and field lengths." } as const);
   if (!isRecord(value) || !isRecord(value.acknowledged) || !isRecord(value.questionnaire) || !isRecord(value.measurements) || !isRecord(value.lifestyle) || !isRecord(value.routine) || !isRecord(value.consent)) return invalid();
   const { acknowledged, questionnaire, measurements, lifestyle, routine, consent } = value;
+  // Saved questionnaires from before this prompt was added have no finalThought field.
   if (!["welcome", "communication", "rhythm"].every(key => typeof acknowledged[key] === "boolean") ||
-      !Object.keys(QUESTIONS).every(key => isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
+      !Object.keys(QUESTIONS).every(key => (key === "finalThought" && questionnaire[key] === undefined) || isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
       !Array.isArray(value.goals) || value.goals.length !== GOALS.length || new Set(value.goals).size !== GOALS.length || !value.goals.every(goal => GOALS.includes(goal)) || typeof value.goalsConfirmed !== "boolean" ||
       !Array.isArray(value.health) || value.health.length !== 7 || !value.health.every(answer => answer === null || typeof answer === "boolean") || !isText(value.healthDetails, 2000) || !["run", "cross-trainer", "bike"].includes(String(value.cardio)) ||
       !isText(consent.version, 100) || !isText(consent.signedName, 100) || !["accepted", "healthData", "adult"].every(key => typeof consent[key] === "boolean") ||
@@ -87,7 +89,7 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
       !Array.isArray(routine.trainingDays) || routine.trainingDays.length > 4 || new Set(routine.trainingDays).size !== routine.trainingDays.length || !routine.trainingDays.every(day => Number.isInteger(day) && day >= 0 && day <= 6) || typeof routine.restDay !== "number" || !Number.isInteger(routine.restDay) || routine.restDay < 0 || routine.restDay > 6) return invalid();
   if (!validTimezone(routine.timezone as string)) return err({ code: "invalid_input", message: "Enter a valid time zone, for example Europe/London." });
   return ok({ acknowledged: { welcome: acknowledged.welcome as boolean, communication: acknowledged.communication as boolean, rhythm: acknowledged.rhythm as boolean },
-    questionnaire: Object.fromEntries(Object.keys(QUESTIONS).map(key => [key, (questionnaire[key] as string).trim()])) as OnboardingAnswers["questionnaire"],
+    questionnaire: Object.fromEntries(Object.keys(QUESTIONS).map(key => [key, typeof questionnaire[key] === "string" ? questionnaire[key].trim() : ""])) as OnboardingAnswers["questionnaire"],
     measurements: Object.fromEntries(Object.keys(MEASUREMENTS).map(key => [key, (measurements[key] as string).trim()])) as OnboardingAnswers["measurements"],
     lifestyle: Object.fromEntries(Object.keys(LIFESTYLE).map(key => [key, (lifestyle[key] as string).trim()])) as OnboardingAnswers["lifestyle"],
     goals: [...value.goals] as Goal[], goalsConfirmed: value.goalsConfirmed, health: [...value.health] as (boolean | null)[], healthDetails: value.healthDetails.trim(), cardio: value.cardio as OnboardingAnswers["cardio"],
