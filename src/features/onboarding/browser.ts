@@ -48,7 +48,7 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
     perform: async effect => {
       const completed = (result: Awaited<ReturnType<typeof load>>) => ({ kind: "completed", id: effect.id, effectKind: effect.kind, result } as const);
       if (effect.kind === "signOut") {
-        const accepted = !effect.confirm || window.confirm("Sign out and leave your unsaved answers? Save progress first if you want to keep them.");
+        const accepted = !effect.confirm || window.confirm("Sign out and leave your unsaved answers? Complete this section first if you want to keep them.");
         if (accepted) config.signOut();
         return { kind: "signOutConfirmed", id: effect.id, accepted };
       }

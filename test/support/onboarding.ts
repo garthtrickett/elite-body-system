@@ -11,7 +11,7 @@ export function onboardingContent(): OnboardingContent {
 }
 export function onboardingAnswers(): OnboardingAnswers {
   const empty = emptyAnswers();
-  return { ...empty, acknowledged: { welcome: true, communication: true, rhythm: true }, questionnaire: { transformation: "A stronger 180 days", motivation: "Family", experience: "None", choice: "Coaching", now: "Ready", success: "Walking regularly", struggles: "Time" },
+  return { ...empty, acknowledged: { welcome: true, communication: true, rhythm: true }, questionnaire: { transformation: "A stronger 180 days", motivation: "Family", experience: "None", choice: "Coaching", now: "Ready", finalThought: "Ready to commit", success: "Walking regularly", struggles: "Time" },
     goalsConfirmed: true, health: [false, false, false, false, false, false, false], consent: { version: "fixture-consent", signedName: "Alex Example", accepted: true, healthData: true, adult: true },
     measurements: { bicepLeft: "30", bicepRight: "31", hamLeft: "50", hamRight: "51", forearmLeft: "24", forearmRight: "24", waist: "80", neck: "35" },
     lifestyle: { diet: "Regular meals", feeling: "Good", symptoms: "None", sleep: "Consistent bedtime" }, routine: { ...empty.routine, name: "Alex", timezone: "Europe/London", weight: "80", equipment: "Gym", emergencyName: "Sam", emergencyPhone: "+447000000000" } };

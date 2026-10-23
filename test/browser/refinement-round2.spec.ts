@@ -56,7 +56,7 @@ test("accepted sign-out asks once before revoking the session", async ({ page })
 test("new-onboarding clients reach their saved eight-section flow from setup navigation", async ({ page }) => {
   await signIn(page, true); await page.goto(app.origin);
   await page.getByRole("button", { name: "Day 1 setup", exact: true }).first().click(); await expect(page).toHaveURL(app.origin + "/onboarding");
-  await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible();
   await page.goto(app.origin + "/?panel=setup"); await expect(page).toHaveURL(app.origin + "/onboarding");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
