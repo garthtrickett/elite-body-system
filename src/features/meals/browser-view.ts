@@ -63,13 +63,8 @@ function favoritesView(state: MealState, actions: Actions) {
 </fieldset>`;
 }
 export function mealsView(state: MealState, actions: Actions) {
-  return workspace({ page: "meals", navigationDisabled: state.locked, navigate: href => actions.propose({ kind: "navigationRequested", href }),
-    mobileFooter: state.draft ? html`<div class="sc-meal-quick-log"><div><p class="sc-label">Meal totals</p><p class="sc-copy sc-meal-footer-status text-xs" aria-live="polite">${Object.keys(state.fieldErrors).length ? "Check highlighted fields" : !state.totals ? "Check meal details" : `${state.totals.energy} kcal · ${state.totals.protein} g protein`}</p></div><button class="sc-primary" ?disabled=${state.locked || !state.canLog} aria-label=${`Log meal for ${displayDate(state.snapshot?.date)}`} @click=${actions.log}>Log meal</button></div>` : undefined,
-    content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/" @click=${(e: MouseEvent) => {
-      if (state.locked) { e.preventDefault(); return; }
-      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      e.preventDefault(); actions.propose({ kind: "navigationRequested", href: "/" });
-    }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+  return workspace({ mobileFooter: state.draft ? html`<div class="sc-meal-quick-log"><div><p class="sc-label">Meal totals</p><p class="sc-copy sc-meal-footer-status text-xs" aria-live="polite">${Object.keys(state.fieldErrors).length ? "Check highlighted fields" : !state.totals ? "Check meal details" : `${state.totals.energy} kcal · ${state.totals.protein} g protein`}</p></div><button class="sc-primary" ?disabled=${state.locked || !state.canLog} aria-label=${`Log meal for ${displayDate(state.snapshot?.date)}`} @click=${actions.log}>Log meal</button></div>` : undefined,
+    content: html`<div class="sc-page"><header class="flex items-center justify-between gap-3"><a class="sc-copy py-2 underline" href="/">‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     ${state.error && !Object.keys(state.fieldErrors).length ? html`<p class="sc-error sc-meal-error" tabindex="-1" role="alert">${state.error}</p>${state.retry ? html`<button class="sc-secondary" @click=${() => actions.propose({ kind: "retry" })}>Retry same action</button><button class="sc-secondary" @click=${() => actions.propose({ kind: "reload" })}>Reload saved meals</button>` : nothing}` : nothing}
     ${state.busy ? html`<p class="sc-copy" role="status">${state.pending?.kind === "analyze" ? "Analysing your meal…" : state.pending?.kind === "preparePhotos" ? "Preparing your photos…" : state.pending?.kind === "load" ? "Loading your meals…" : "Saving your meal…"}</p>` : nothing}
     ${state.message ? html`<p class="sc-copy" role="status">${state.message}</p>` : nothing}

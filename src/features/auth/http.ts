@@ -1,3 +1,4 @@
+import { appRoute } from "../../shared/app-routes.ts";
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { newToken, validToken } from "./operations.ts";
@@ -88,7 +89,8 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       sendResult(response, await auth.resolveSession({ sessionToken }));
       return;
     }
-    const signedInPage = ["/", "/onboarding", "/training", "/meals", "/mindset/map", "/courses/nutrition", "/courses/activity", "/courses/mindset"].includes(path);
+    const signedInPage = appRoute(path) !== undefined;
+    let accountId: string | null = null;
     if (request.method === "GET" && (signedInPage || ["/sign-in", "/sign-in/confirm"].includes(path))) {
       if (signedInPage) {
         const session = await auth.resolveSession({ sessionToken });
@@ -96,6 +98,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
           if (session.error.code === "unavailable") { failure(response, 503, "unavailable"); return; }
           response.writeHead(303, { Location: "/sign-in", "Cache-Control": "no-store" }); response.end(); return;
         }
+        accountId = session.value.id;
         if (config.pageAccess) {
           const access = await config.pageAccess({ accountId: session.value.id, path });
           if (access.unavailable) { failure(response, 503, "unavailable"); return; }
@@ -104,11 +107,17 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       }
       const existingCsrf = cookie(request, names.csrf);
       const csrf = validToken(existingCsrf) ? existingCsrf : newToken();
+      // Client routing goes through exactly the same session and mandatory page gate.
+      if (request.headers.accept === "application/json") {
+        response.setHeader("Set-Cookie", setCookie(names.csrf, csrf, 28_800));
+        json(response, 200, { ok: true, value: { page: signedInPage ? appRoute(path)?.page : "sign-in", csrf, accountId } });
+        return;
+      }
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
         "Set-Cookie": setCookie(names.csrf, csrf, 28_800),
-        "Content-Security-Policy": `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'${path === "/onboarding" && config.uploadOrigin ? ` ${new URL(config.uploadOrigin).origin}` : ""}; img-src 'self' data:; media-src https:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` });
-      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${path === "/onboarding" ? "onboarding" : path === "/training" ? "training" : path === "/meals" ? "meals" : path === "/mindset/map" ? "map" : path.startsWith("/courses/") ? path.slice(9) : "scorecard"}" data-mode="${signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
+        "Content-Security-Policy": `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'${signedInPage && config.uploadOrigin ? ` ${new URL(config.uploadOrigin).origin}` : ""}; img-src 'self' data:; media-src https:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` });
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${appRoute(path)?.page ?? "scorecard"}" data-mode="${signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
       return;
     }
     const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out", "/api/auth/harry-preview"];

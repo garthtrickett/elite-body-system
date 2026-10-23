@@ -63,8 +63,8 @@ export function trainingView(state: TrainingState, propose: Propose) {
   const bases = workout ? PROGRAM[workout.planKey] ?? [] : [];
   const selectedIndex = bases.findIndex(exercise => exercise.id === state.selected);
   const selectedBase = bases[selectedIndex], selected = state.exercises[selectedIndex];
-  return workspace({ page: "training", mobileFooter: state.compact && state.remaining > 0 && !state.loading ? restControls(state, propose) : undefined, navigationDisabled: state.saving, content: html`<div class="sc-page">
-    <header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+  return workspace({ mobileFooter: state.compact && state.remaining > 0 && !state.loading ? restControls(state, propose) : undefined, content: html`<div class="sc-page">
+    <header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     <div class="flex items-baseline justify-between gap-2"><h1 class="sc-display text-[40px] leading-[1.1]">${state.loading ? "Your training" : day?.name ?? "Your training"}</h1><span class="sc-data text-xl text-sc-ink" aria-label="Workout elapsed time">${formatTime(state.elapsed)}</span></div>
     <p class="sc-copy text-xs">Foundation program · follows your chosen training days</p>
     ${workout ? html`<label class="sc-form-field sc-date-field"><span class="sc-label">Workout date</span><input class="sc-textarea" type="date" .value=${live(state.pending?.kind === "load" && state.pending.date ? state.pending.date : workout.date)} ?disabled=${state.pending !== undefined || state.saving} @change=${(event: Event) => propose({ kind: "dateSelected", date: (event.target as HTMLInputElement).value })}></label>` : nothing}

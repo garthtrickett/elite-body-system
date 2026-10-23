@@ -1,8 +1,11 @@
+import { trainingNavigation } from "./browser-model.ts";
+export { trainingNavigation } from "./browser-model.ts";
+import type { RouteHost } from "../../shared/browser-route.ts";
 import { render } from "lit-html";
 import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
 import { parseTrainingSnapshot } from "./data.ts";
-import { initialTrainingModel, acceptTrainingProposal, representTraining, hasUnsavedTraining } from "./browser-model.ts";
+import { initialTrainingModel, acceptTrainingProposal, representTraining } from "./browser-model.ts";
 import type { TrainingProposal, TrainingEffect, TrainingModel, TrainingState } from "./browser-model.ts";
 import { trainingView } from "./browser-view.ts";
 
@@ -10,9 +13,11 @@ export { initialTrainingModel, acceptTrainingProposal, representTraining, hasUns
 export type { TrainingProposal, TrainingEffect, TrainingModel, TrainingState } from "./browser-model.ts";
 export { parseWorkout, emptyWorkout, planFor, workoutStats } from "./data.ts";
 
-export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string }>) {
-  const call = createClientTransport({ csrf: config.csrf, send: fetch });
+export function mountTraining(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string }>) {
+  const scope = new AbortController();
+  const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
   const requestedDate = new URLSearchParams(location.search).get("date") ?? "";
+  let loadedDate: string | undefined;
   let shownSelection = "", shownFieldErrors = "", shownRest = false;
   const alignSelection = () => {
     const strip = root.querySelector<HTMLElement>(".sc-workout-list"), selected = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
@@ -24,6 +29,11 @@ export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string
   const runtime = createSamRuntime<TrainingModel, TrainingProposal, TrainingState, TrainingEffect>({
     initial: initialTrainingModel({ now: Date.now(), compact: window.innerWidth < 1024 }), accept: acceptTrainingProposal, represent: representTraining, next: model => model.pending,
     present: state => {
+      config.navigationChanged(trainingNavigation(state));
+      if (state.workout && !state.loading && state.failedLoadDate === undefined) {
+        if (loadedDate && loadedDate !== state.workout.date) config.replaceQuery("date", state.workout.date);
+        loadedDate = state.workout.date;
+      }
       render(trainingView(state, proposal => runtime.propose(proposal)), root);
       if (state.remaining > 0 && !shownRest && state.compact && document.activeElement instanceof HTMLElement && root.contains(document.activeElement)) {
         document.activeElement.scrollIntoView({ block: "center", behavior: "instant" });
@@ -46,10 +56,10 @@ export function mountTraining(root: HTMLElement, config: Readonly<{ csrf: string
     },
   });
   const tick = window.setInterval(() => runtime.propose({ kind: "clockTicked", now: Date.now() }), 1000);
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (hasUnsavedTraining(model)) event.preventDefault(); };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { if (trainingNavigation(runtime.getModel()).kind !== "ready") { event.preventDefault(); event.returnValue = ""; } };
   window.addEventListener("beforeunload", protectUnsaved);
   const resized = () => { runtime.propose({ kind: "viewportChanged", compact: window.innerWidth < 1024 }); alignSelection(); };
   window.addEventListener("resize", resized);
   runtime.propose({ kind: "started" });
-  return { dispose: () => { clearInterval(tick); window.removeEventListener("beforeunload", protectUnsaved); window.removeEventListener("resize", resized); runtime.dispose(); } } as const;
+  return { navigation: () => trainingNavigation(runtime.getModel()), dispose: () => { scope.abort(); clearInterval(tick); window.removeEventListener("beforeunload", protectUnsaved); window.removeEventListener("resize", resized); runtime.dispose(); } } as const;
 }

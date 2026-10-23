@@ -53,7 +53,7 @@ test("raw set drafts survive date changes and cancelled navigation, and a saved 
     await expect(page.getByLabel("Workout date")).toHaveValue(monday(-7)); await expect(reps).toHaveValue("7.5");
     await page.screenshot({ path: info.outputPath(`set-draft-${width}.png`) });
     let warnings = 0;
-    const dismiss = async (dialog: import("@playwright/test").Dialog) => { expect(dialog.type()).toBe("beforeunload"); warnings++; await dialog.dismiss(); };
+    const dismiss = async (dialog: import("@playwright/test").Dialog) => { expect(dialog.type()).toBe("confirm"); warnings++; await dialog.dismiss(); };
     page.once("dialog", dismiss); await page.getByRole("link", { name: "‹ Scorecard", exact: true }).click({ noWaitAfter: true });
     await expect.poll(() => warnings).toBe(1); await expect(page).toHaveURL(`${app.origin}/training?date=${monday(-7)}`); await expect(reps).toHaveValue("7.5");
     await reps.fill("8"); await reps.press("Enter"); await expect(page.getByTestId("training-save-status")).toHaveText("Workout saved to your account");

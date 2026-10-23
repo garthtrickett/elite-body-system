@@ -81,7 +81,7 @@ test("setup resumes from PostgreSQL, completes Harry’s questions and persists 
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(page.getByLabel("Body weight in kg")).toHaveValue("80");
   await expect(page.getByRole("button", { name: "Open L to R" })).toContainText("1 goal");
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Training on hold: clearance needed");
   await page.getByLabel("Energy (kcal)", { exact: true }).fill("2400");
   await page.getByRole("button", { name: "Save targets", exact: true }).click();
@@ -102,7 +102,7 @@ test("another tab sees the saved account and stale profile revisions surface a c
   await page.keyboard.press("Escape");
   const other = await page.context().newPage(); await other.goto(app.origin);
   await expect(other.getByRole("dialog")).toBeVisible(); await other.keyboard.press("Escape");
-  for (const tab of [page, other]) await tab.getByRole("button", { name: "Profile", exact: true }).click();
+  for (const tab of [page, other]) await tab.getByRole("link", { name: "Profile", exact: true }).click();
   await page.getByLabel("Energy (kcal)", { exact: true }).fill("2300");
   await page.getByRole("button", { name: "Save targets", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save targets", exact: true })).toBeEnabled();

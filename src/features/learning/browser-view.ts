@@ -48,7 +48,7 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
       <div class="sc-course-list-heading"><p class="sc-eyebrow">${pillar} course · Week ${snapshot.week}</p><h1 class="sc-display mt-2 text-[40px] leading-[1.1]">${titles[pillar]}</h1>
         <p class="sc-copy mt-3">One episode every three weeks, alongside the other two pillars.</p></div>
       ${!episode ? welcomeCard("sc-course-next") : nothing}
-      ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>Neural Map · Five-part build ›</a>` : nothing}
+      ${pillar === "mindset" ? html`<a class="sc-panel-card border border-sc-border text-sm font-medium" href="/mindset/map" aria-disabled=${state.saving}>Neural Map · Five-part build ›</a>` : nothing}
       ${EPISODES.filter(item => item.pillar === pillar).map(item => {
         const status = episodeStatus({ episode: item, snapshot });
         return html`<button class="sc-panel-card sc-course-card text-left" aria-pressed=${episode?.id === item.id}
@@ -74,7 +74,7 @@ function courseView(state: LearningState, pillar: Pillar, propose: Propose) {
 }
 
 export function learningView(state: LearningState, page: "map" | Pillar, propose: Propose) {
-  return workspace({ page, navigationDisabled: state.saving, content: html`<div class="sc-page"><header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving} @click=${(event: Event) => { if (state.saving) event.preventDefault(); }}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
+  return workspace({ content: html`<div class="sc-page"><header class="flex items-center justify-between"><a class="sc-copy py-2 underline" href="/" aria-disabled=${state.saving}>‹ Scorecard</a><p class="sc-eyebrow">Elite Body System</p></header>
     ${state.snapshot ? html`<p class="sc-copy text-xs" aria-live="polite" data-testid="learning-save-status">${state.error ? "Changes not saved" : state.saving ? "Saving your progress…" : "Progress saved to your account"}</p>` : nothing}
     ${state.error && !state.episode ? html`<p class="sc-error" role="alert">${state.error}</p><div class="flex gap-2"><button class="sc-secondary" @click=${() => propose({ kind: "retry" })}>Retry</button><button class="sc-secondary" @click=${() => propose({ kind: "reload" })}>Reload saved version</button></div>` : nothing}
     ${!state.snapshot ? state.error ? nothing : html`<p class="sc-copy" role="status">Loading your learning progress…</p>` : page === "map" ? state.editingMap ? mapBuilder(state, propose) : mapReading(state, propose) : courseView(state, page, propose)}

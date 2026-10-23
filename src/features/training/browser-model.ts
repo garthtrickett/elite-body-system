@@ -1,3 +1,4 @@
+import type { NavigationGuard } from "../../shared/browser-route.ts";
 import { PROGRAM } from "./catalog.ts";
 import { exercisesFor, workoutStats, setNumberProblem } from "./data.ts";
 import type { Workout, TrainingSnapshot, LiftSet } from "./data.ts";
@@ -152,3 +153,8 @@ export function representTraining(model: TrainingModel) {
     unsaved: hasUnsavedTraining(model), saving: model.pending?.kind === "save", loading: model.pending?.kind === "load" } as const;
 }
 export type TrainingState = ReturnType<typeof representTraining>;
+
+export function trainingNavigation(model: TrainingModel): NavigationGuard {
+  if (model.pending?.kind === "save") return { kind: "blocked", message: "Wait for your workout to finish saving before leaving." };
+  return hasUnsavedTraining(model) ? { kind: "confirm", message: "Discard your unsaved workout entries? Cancel to correct them or retry saving." } : { kind: "ready" };
+}

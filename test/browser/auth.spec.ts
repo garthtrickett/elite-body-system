@@ -42,7 +42,7 @@ test("email link signs in only after confirmation, removes its fragment, and sig
   await page.getByRole("button", { name: "Continue to Elite Body System" }).click();
   await expect(page.getByRole("heading", { name: "Day 1", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await expect(page.getByText(email, { exact: true })).toBeVisible();
   const session = (await page.context().cookies()).find(cookie => cookie.name === "ebs-session");
   expect(session?.httpOnly).toBe(true);

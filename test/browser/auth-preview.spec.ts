@@ -19,7 +19,7 @@ test("Harry enters the alias in the email field and signs into his own persisten
     await page.reload(); await expect(page.getByRole("dialog")).toBeVisible(); await page.keyboard.press("Escape"); await expect(page.getByLabel("Water in litres")).toHaveValue("2");
     expect((await readdir(app.outbox)).length).toBe(0);
     expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
-    await page.getByRole("button", { name: "Profile", exact: true }).click();
+    await page.getByRole("link", { name: "Profile", exact: true }).click();
     await expect(page.getByText(HARRY_PREVIEW_EMAIL, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click(); await expect(page).toHaveURL(`${app.origin}/sign-in`);
   } finally {

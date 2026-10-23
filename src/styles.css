@@ -489,3 +489,7 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
 .sc-rest-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
 .sc-rest-controls .sc-secondary { font-size: .75rem; padding: .5rem .75rem; }
 .sc-rest-controls [role="timer"] { font-size: .75rem; }
+
+.sc-route-outlet { display: contents; }
+.sc-route-status { position: fixed; z-index: 70; top: .5rem; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 2rem); padding: .75rem 1rem; border: 1px solid var(--color-sc-border); border-radius: .5rem; background: var(--color-sc-bg); color: var(--color-sc-ink); }
+.sc-route-status[hidden] { display: none; }

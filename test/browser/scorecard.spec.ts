@@ -77,7 +77,7 @@ test("Harry’s shell fits phone and desktop, loads its own fonts under CSP, and
   for (const width of [320, 390, 430, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect(page.getByRole("button", { name: "Profile", exact: true })).toBeInViewport();
+    await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeInViewport();
     await page.screenshot({ path: info.outputPath(`scorecard-${width}.png`), fullPage: true });
   }
   expect(errors).toEqual([]);
@@ -167,13 +167,13 @@ test("daily mindset and training interactions work, dialogs trap and restore foc
 
 test("shell navigation opens saved workflows and leaves sign-out functional after a failed attempt", async ({ page }) => {
   await signIn(page);
-  await page.getByRole("button", { name: "Day 1 setup", exact: true }).click();
+  await page.getByRole("link", { name: "Day 1 setup", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Your answers are saved to your account");
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Log meal", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Log a Meal", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "‹ Scorecard", exact: true }).click();
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await page.route("**/api/auth/sign-out", route => route.fulfill({ status: 503, contentType: "application/json",
     body: JSON.stringify({ ok: false, error: { code: "unavailable" } }) }), { times: 1 });
   await page.getByRole("button", { name: "Sign out", exact: true }).click();

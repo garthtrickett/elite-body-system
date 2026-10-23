@@ -15,45 +15,43 @@ const courses: readonly NavigationItem[] = [
   { page: "activity", label: "Activity", href: "/courses/activity" },
 ];
 
-/** Presentation only: each feature still owns its model, actions and effects. */
+/** Feature presentation is restricted to the content outlet and its mobile feedback. */
 export function workspace(input: Readonly<{
-  page: WorkspacePage;
-  content: TemplateResult;
-  navigationDisabled?: boolean;
-  navigate?: (href: string) => void;
-  mobileFooter?: TemplateResult | undefined;
-  openPanel?: (panel: "profile" | "setup") => void;
+  content: TemplateResult; mobileFooter?: TemplateResult | undefined;
 }>) {
-  const guard = (event: Event) => {
-    if (input.navigationDisabled) { event.preventDefault(); return; }
-    if (!input.navigate || !(event.currentTarget instanceof HTMLAnchorElement)) return;
-    if (event instanceof MouseEvent && (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)) return;
-    event.preventDefault(); input.navigate(event.currentTarget.getAttribute("href") ?? "/");
-  };
+  return html`<div class="sc-shell sc-workspace-body" id="workspace-content">${input.content}</div>
+    ${input.mobileFooter ? html`<div class="sc-mobile-footer">${input.mobileFooter}</div>` : nothing}`;
+}
+
+/** The same Lit template updates selection without replacing navigation nodes. */
+export function workspaceShell(input: Readonly<{
+  page: WorkspacePage | "onboarding"; panel?: string | undefined; outlet: HTMLElement;
+  navigationDisabled: boolean; status: string; retry?: (() => void) | undefined;
+}>) {
+  const panel = input.page === "onboarding" ? "setup" : input.page === "scorecard" && (input.panel === "profile" || input.panel === "setup") ? input.panel : undefined;
+  const moreActive = !panel && input.page !== "scorecard" && input.page !== "training";
   const items = (entries: readonly NavigationItem[]) => entries.map(item => html`<a class="sc-sidebar-link" href=${item.href}
-    aria-current=${input.page === item.page ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>${item.label}</a>`);
+    aria-current=${input.page === item.page && !panel ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>${item.label}</a>`);
   return html`<div class="sc-app"><div class="sc-workspace">
     <aside class="sc-sidebar" aria-label="Elite Body System workspace">
-      <a class="sc-sidebar-brand" href="/" aria-label="Elite Body System home" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Elite Body<br>System<span class="sc-eyebrow">Build your standard.</span></a>
+      <a class="sc-sidebar-brand" href="/" aria-label="Elite Body System home" aria-disabled=${input.navigationDisabled ?? false}>Elite Body<br>System<span class="sc-eyebrow">Build your standard.</span></a>
       <nav class="sc-sidebar-nav" aria-label="Workspace navigation">
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Daily practice</p>${items(practice)}</div>
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Your courses</p>${items(courses)}</div>
         <div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
-          ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([panel, label]) => input.openPanel
-            ? html`<button class="sc-sidebar-link" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.(panel)}>${label}</button>`
-            : html`<a class="sc-sidebar-link" href=${`/?panel=${panel}`} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>${label}</a>`)}
+          ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([key, label]) => html`<a class="sc-sidebar-link" href=${`/?panel=${key}`} aria-current=${panel === key ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>${label}</a>`)}
         </div>
       </nav>
       <p class="sc-sidebar-footer">One system.<br>A standard for life.</p>
     </aside>
-    <div class="sc-shell sc-workspace-body" id="workspace-content">${input.content}</div>
-    ${input.mobileFooter ? html`<div class="sc-mobile-footer">${input.mobileFooter}</div>` : nothing}
+    ${input.outlet}
+    <div class="sc-route-status" role="status" ?hidden=${!input.status}>${input.status}${input.retry ? html` <button class="sc-secondary" @click=${input.retry}>Retry navigation</button>` : nothing}</div>
     <nav class="sc-mobile-nav" aria-label="Main navigation">
-      ${input.openPanel ? html`<button class="sc-nav-button" aria-label="Day 1 setup" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.("setup")}>Setup</button>` : html`<a class="sc-nav-button" href="/?panel=setup" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Setup</a>`}
-      <a class="sc-nav-button ${input.page === "training" ? "sc-nav-active" : ""}" href="/training" aria-current=${input.page === "training" ? "page" : nothing} aria-label="Training" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Train</a>
-      <a class="sc-nav-button ${input.page === "scorecard" ? "sc-nav-active" : ""}" href="/" aria-current=${input.page === "scorecard" ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Scorecard</a>
-      ${input.openPanel ? html`<button class="sc-nav-button" ?disabled=${input.navigationDisabled ?? false} @click=${() => input.openPanel?.("profile")}>Profile</button>` : html`<a class="sc-nav-button" href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false} @click=${guard}>Profile</a>`}
-      <div class="sc-mobile-more"><button class="sc-nav-button ${input.page !== "scorecard" && input.page !== "training" ? "sc-nav-active" : ""}" aria-current=${input.page !== "scorecard" && input.page !== "training" ? "true" : nothing} aria-label="More navigation" popovertarget="workspace-more-menu">More <span aria-hidden="true">⌃</span></button>
+      <a class="sc-nav-button ${panel === "setup" ? "sc-nav-active" : ""}" aria-current=${panel === "setup" ? "page" : nothing} href="/?panel=setup" aria-label="Day 1 setup" aria-disabled=${input.navigationDisabled ?? false}>Setup</a>
+      <a class="sc-nav-button ${input.page === "training" ? "sc-nav-active" : ""}" href="/training" aria-current=${input.page === "training" ? "page" : nothing} aria-label="Training" aria-disabled=${input.navigationDisabled ?? false}>Train</a>
+      <a class="sc-nav-button ${input.page === "scorecard" && !panel ? "sc-nav-active" : ""}" href="/" aria-current=${input.page === "scorecard" && !panel ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>Scorecard</a>
+      <a class="sc-nav-button ${panel === "profile" ? "sc-nav-active" : ""}" aria-current=${panel === "profile" ? "page" : nothing} href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false}>Profile</a>
+      <div class="sc-mobile-more"><button class="sc-nav-button ${moreActive ? "sc-nav-active" : ""}" aria-current=${moreActive ? "true" : nothing} aria-label="More navigation" popovertarget="workspace-more-menu">More <span aria-hidden="true">⌃</span></button>
         <div class="sc-mobile-menu" id="workspace-more-menu" popover="auto"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}
 
         </div>

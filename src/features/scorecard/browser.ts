@@ -1,3 +1,6 @@
+import { scorecardNavigation } from "./browser-model.ts";
+export { scorecardNavigation } from "./browser-model.ts";
+import type { RouteHost } from "../../shared/browser-route.ts";
 import { clientDay } from "../profile/browser.ts";
 import { render } from "lit-html";
 import type { AccountState, ScorecardProposal, ScorecardState } from "./browser-model.ts";
@@ -5,16 +8,17 @@ import { createScorecardRuntime } from "./browser-runtime.ts";
 import { createScorecardEffects } from "./browser-effects.ts";
 import type { ScorecardActions } from "./browser-actions.ts";
 import { scorecardView } from "./browser-view.ts";
-import { hasUnsavedScorecard } from "./browser-model.ts";
 
 export { acceptScorecardProposal, initialScorecardModel, representScorecard, nextScorecardAction, hasUnsavedScorecard } from "./browser-model.ts";
 export type { ScorecardModel, ScorecardProposal, ScorecardState } from "./browser-model.ts";
 export { createScorecardRuntime } from "./browser-runtime.ts";
 
-export function mountScorecard(root: HTMLElement, config: Readonly<{ account: AccountState; signOut: () => void; csrf: string }>) {
+export function mountScorecard(root: HTMLElement, config: RouteHost & Readonly<{ account: AccountState; signOut: () => void; csrf: string }>) {
+  const scope = new AbortController();
   let shownPanel: ScorecardState["panel"];
   let shownStep: number | undefined, validationAttempt = 0, shownSyncError = "";
   function present(state: ScorecardState): void {
+    config.navigationChanged(scorecardNavigation(state));
     render(scorecardView(state, actions), root);
     const panel = state.panel;
     const step = panel === "setup" ? state.profileUi.draft.setupStep : undefined;
@@ -68,8 +72,8 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
   };
   const panelQuery = new URLSearchParams(window.location.search).get("panel");
   const launchPanel = panelQuery === "profile" || panelQuery === "setup" ? panelQuery : undefined;
-  const runtime = createScorecardRuntime({ ...(launchPanel ? { launchPanel } : {}), account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch }), performUi: async effect => {
-    if (effect.kind === "navigate") { location.assign(effect.href); return { kind: "navigationHandled", id: effect.id }; }
+  const runtime = createScorecardRuntime({ ...(launchPanel ? { launchPanel } : {}), account: config.account, present, perform: createScorecardEffects({ csrf: config.csrf, send: fetch, signal: scope.signal }), performUi: async effect => {
+    if (effect.kind === "navigate") { config.navigate(effect.href); return { kind: "navigationHandled", id: effect.id }; }
     if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload the saved version and discard your unsaved changes? Cancel to keep your draft and retry saving.") };
     const accepted = !effect.confirm || window.confirm("Sign out and discard your unsaved changes? Cancel to keep your session and continue editing.");
     if (accepted) config.signOut();
@@ -87,15 +91,18 @@ export function mountScorecard(root: HTMLElement, config: Readonly<{ account: Ac
     else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first.focus(); }
   };
   root.addEventListener("keydown", keepDialogFocus);
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (!model.exiting && hasUnsavedScorecard(model)) event.preventDefault(); };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { if (scorecardNavigation(runtime.getModel()).kind !== "ready" && !runtime.getModel().exiting) { event.preventDefault(); event.returnValue = ""; } };
   const observeDay = () => { const model = runtime.getModel(); if (model.loaded) runtime.propose({ kind: "dayObserved", date: clientDay({ timezone: model.profile.profile.timezone, now: new Date() }) }); };
   const dayTimer = window.setInterval(observeDay, 15000);
   const onVisible = () => { if (document.visibilityState === "visible") observeDay(); };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("beforeunload", protectUnsaved);
   return {
+    navigation: () => scorecardNavigation(runtime.getModel()),
+    retain: (href: string) => { const panel = new URL(href, location.origin).searchParams.get("panel"); propose({ kind: "routeIntentChanged", panel: panel === "profile" || panel === "setup" ? panel : undefined }); },
+    revisit: () => { const panel = new URLSearchParams(location.search).get("panel"); if (panel === "profile" || panel === "setup") propose({ kind: "panelOpened", panel }); },
     updateAccount: (input: Readonly<{ account: AccountState }>) => propose({ kind: "accountChanged", account: input.account }),
-    dispose: () => { root.removeEventListener("keydown", keepDialogFocus); window.clearInterval(dayTimer); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("beforeunload", protectUnsaved); runtime.dispose(); root.querySelector<HTMLDialogElement>("dialog")?.close(); },
+    dispose: () => { scope.abort(); root.removeEventListener("keydown", keepDialogFocus); window.clearInterval(dayTimer); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("beforeunload", protectUnsaved); runtime.dispose(); root.querySelector<HTMLDialogElement>("dialog")?.close(); },
   } as const;
 }
 

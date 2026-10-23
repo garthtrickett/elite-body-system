@@ -1,3 +1,4 @@
+import type { NavigationGuard } from "../../shared/browser-route.ts";
 import { EPISODES } from "./courses.ts";
 import { MAP_STEPS } from "./map-content.ts";
 import type { MapKey } from "./map-content.ts";
@@ -48,7 +49,7 @@ function sync(model: LearningModel): LearningModel {
 export function acceptLearningProposal(model: LearningModel, proposal: LearningProposal): LearningModel {
   switch (proposal.kind) {
     case "started": return model.sequence ? model : schedule(model, { kind: "load" });
-    case "reload": return model.pending ? model : model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved || model.finishMap || model.completeEpisode
+    case "reload": return model.pending ? model : hasUnsavedLearning(model)
       ? { ...schedule(model, { kind: "confirmReload" }), error: model.error } : schedule(model, { kind: "load" });
     case "reloadConfirmed": return model.pending?.kind !== "confirmReload" || model.pending.id !== proposal.id ? model
       : proposal.discard ? schedule(model, { kind: "load" }) : { ...model, pending: undefined, message: "Your unsaved changes were kept." };
@@ -107,3 +108,12 @@ export function representLearning(model: LearningModel) {
     written: model.map ? mapWritten(model.map) : false } as const;
 }
 export type LearningState = ReturnType<typeof representLearning>;
+
+export function hasUnsavedLearning(model: LearningModel): boolean {
+  return model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved || model.finishMap || model.completeEpisode || model.readRequested;
+}
+
+export function learningNavigation(model: LearningModel): NavigationGuard {
+  if (model.pending && model.pending.kind !== "load" && model.pending.kind !== "confirmReload") return { kind: "blocked", message: "Wait for your learning progress to finish saving before leaving." };
+  return hasUnsavedLearning(model) ? { kind: "confirm", message: "Discard your unsaved learning changes? Cancel to keep your Map or lesson answers and retry saving." } : { kind: "ready" };
+}

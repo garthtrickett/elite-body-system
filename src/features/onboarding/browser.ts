@@ -1,3 +1,6 @@
+import { onboardingNavigation } from "./browser-model.ts";
+export { onboardingNavigation } from "./browser-model.ts";
+import type { RouteHost } from "../../shared/browser-route.ts";
 import { render } from "lit-html";
 import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
@@ -10,21 +13,24 @@ import { onboardingView } from "./browser-view.ts";
 
 export { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
 export type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
-export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }> }>) {
-  const call = createClientTransport({ csrf: config.csrf, send: fetch });
+export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }> }>) {
+  const scope = new AbortController();
+  const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
   const uploads = new Map<number, Promise<void>>();
-  let selection = 0, shownSection = "", shownError = "", shownMissing = false, shownPending: OnboardingEffect["kind"] | undefined, dragged: Goal | null = null;
+  let autosaveTimer: number | undefined;
+  let selection = 0, shownSection = "", shownError = "", shownMissing = false, dragged: Goal | null = null;
   const unavailable = () => ({ ok: false, error: { code: "unavailable", message: "The file could not be uploaded. Reload saved progress, remove any unfinished upload and try again." } } as const);
   function moveTo(target: Goal) {
     const model = runtime.getModel();
-    if (!dragged || model.pending || model.snapshot?.completedAt) return;
+    if (!dragged || representOnboarding(model).busy || model.reloadRequired || model.snapshot?.completedAt) return;
     const goals = [...model.draft.goals], from = goals.indexOf(dragged), to = goals.indexOf(target);
     if (from !== to && from >= 0 && to >= 0) { goals.splice(from, 1); goals.splice(to, 0, dragged); runtime.propose({ kind: "edit", answers: { ...model.draft, goals, goalsConfirmed: false } }); }
   }
   const runtime = createSamRuntime<OnboardingModel, OnboardingProposal, ReturnType<typeof representOnboarding>, OnboardingEffect>({
     initial: { ...initialOnboardingModel(), accountBusy: config.account.busy, accountProblem: config.account.problem }, accept: acceptOnboarding, represent: representOnboarding, next: model => model.pending,
     present: state => {
+      config.navigationChanged(onboardingNavigation(state));
       const previousFocus = document.activeElement;
       const focusedGoal = previousFocus instanceof HTMLElement ? previousFocus.closest<HTMLElement>("[data-goal]")?.dataset.goal : undefined;
       render(onboardingView(state, {
@@ -41,8 +47,11 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
         root.querySelector<HTMLDetailsElement>(".ob-nav-mobile")?.removeAttribute("open");
         const heading = root.querySelector<HTMLElement>(".ob-title"); heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: "start", behavior: "instant" });
       }
-      if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && (!shownMissing || shownPending === "save" && !state.pending)) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
-      shownError = state.error; shownMissing = state.showMissing; shownPending = state.pending?.kind;
+      if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && !shownMissing) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
+      shownError = state.error; shownMissing = state.showMissing;
+      window.clearTimeout(autosaveTimer);
+      autosaveTimer = state.section === "questionnaire" && state.dirty && !state.pending && !state.error && !state.reloadRequired && !state.accountBusy && !state.snapshot?.completedAt
+        ? window.setTimeout(() => runtime.propose({ kind: "autosave" }), 600) : undefined;
     },
     failed: effect => ({ kind: "failed", id: effect.id }),
     perform: async effect => {
@@ -52,7 +61,7 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
         if (accepted) config.signOut();
         return { kind: "signOutConfirmed", id: effect.id, accepted };
       }
-      if (effect.kind === "navigate") { location.assign(effect.href); return { kind: "failed", id: effect.id }; }
+      if (effect.kind === "navigate") { config.navigate(effect.href); return { kind: "navigationHandled", id: effect.id }; }
       if (effect.kind === "load") return completed(await load());
       if (effect.kind === "refreshBooking") return completed(await call({ path: "/api/client/onboarding/booking/refresh", body: {}, parse: parseSnapshot, timeout: 30000 }));
       if (effect.kind === "cancelUpload") {
@@ -108,10 +117,11 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
     },
   });
   function load() { return call({ path: "/api/client/onboarding", parse: parseSnapshot }); }
-  const protect = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if ((model.dirty && !model.exiting) || model.pending?.kind === "upload") event.preventDefault(); };
+  const protect = (event: BeforeUnloadEvent) => { if (onboardingNavigation(runtime.getModel()).kind !== "ready" && !runtime.getModel().exiting) { event.preventDefault(); event.returnValue = ""; } };
   window.addEventListener("beforeunload", protect);
   runtime.propose({ kind: "started" });
-  return { updateAccount: ({ account }: Readonly<{ account: Readonly<{ busy: boolean; problem: string }> }>) => runtime.propose({ kind: "accountChanged", busy: account.busy, problem: account.problem }), dispose: () => { for (const controller of controllers.values()) controller.abort(); files.clear(); window.removeEventListener("beforeunload", protect); runtime.dispose(); } } as const;
+  return { navigation: () => onboardingNavigation(runtime.getModel()), updateAccount: ({ account }: Readonly<{ account: Readonly<{ busy: boolean; problem: string }> }>) => runtime.propose({ kind: "accountChanged", busy: account.busy, problem: account.problem }), dispose: () => { window.clearTimeout(autosaveTimer); scope.abort(); for (const controller of controllers.values()) controller.abort(); files.clear(); window.removeEventListener("beforeunload", protect); runtime.dispose(); } } as const;
+
 }
 function uploadFile(input: Readonly<{ file: File; url: string; headers: Readonly<Record<string, string>>; signal: AbortSignal; progress: (percent: number) => void }>): Promise<void> {
   return new Promise((resolve, reject) => {

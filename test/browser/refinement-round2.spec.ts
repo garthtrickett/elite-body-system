@@ -29,10 +29,10 @@ test("profile targets warn before navigation and remain available when exit is c
   const energy = page.getByLabel("Energy (kcal)", { exact: true }); await energy.fill("2417");
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   let warnings = 0;
-  page.on("dialog", async dialog => { expect(dialog.type()).toBe("beforeunload"); warnings++; await dialog.dismiss(); });
+  page.on("dialog", async dialog => { expect(dialog.type()).toBe("confirm"); warnings++; await dialog.dismiss(); });
   await page.getByRole("link", { name: "Training", exact: true }).first().click({ noWaitAfter: true });
   await expect.poll(() => warnings).toBe(1); await expect(page).toHaveURL(app.origin + "/?panel=profile");
-  await page.getByRole("button", { name: "Profile", exact: true }).first().click(); await expect(energy).toHaveValue("2417");
+  await page.getByRole("link", { name: "Profile", exact: true }).first().click(); await expect(energy).toHaveValue("2417");
 });
 
 test("cancelling sign-out leaves both the unsaved draft and authenticated session intact", async ({ page }) => {
@@ -55,7 +55,7 @@ test("accepted sign-out asks once before revoking the session", async ({ page })
 
 test("new-onboarding clients reach their saved eight-section flow from setup navigation", async ({ page }) => {
   await signIn(page, true); await page.goto(app.origin);
-  await page.getByRole("button", { name: "Day 1 setup", exact: true }).first().click(); await expect(page).toHaveURL(app.origin + "/onboarding");
+  await page.getByRole("link", { name: "Day 1 setup", exact: true }).first().click(); await expect(page).toHaveURL(app.origin + "/onboarding");
   await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible();
   await page.goto(app.origin + "/?panel=setup"); await expect(page).toHaveURL(app.origin + "/onboarding");
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -105,8 +105,8 @@ test("Setup and Profile wait for an active day save on desktop and phone", async
     await page.route("**/api/client/day", async route => { reached(); await held; await route.continue(); });
     try {
       const steps = page.getByLabel("Steps today"); await steps.fill(String(5123 + width)); await steps.press("Enter"); await saving;
-      const setup = page.getByRole("button", { name: "Day 1 setup", exact: true }).filter({ visible: true });
-      await expect(setup).toBeDisabled(); await expect(page.getByRole("button", { name: "Profile", exact: true }).filter({ visible: true })).toBeDisabled();
+      const setup = page.getByRole("link", { name: "Day 1 setup", exact: true }).filter({ visible: true });
+      await expect(setup).toBeDisabled(); await expect(page.getByRole("link", { name: "Profile", exact: true }).filter({ visible: true })).toBeDisabled();
       await page.screenshot({ path: info.outputPath(`saving-navigation-${width}.png`) }); release();
       await expect(page.getByTestId("save-status")).toHaveText("Saved to your account"); await expect(setup).toBeEnabled();
       await page.unroute("**/api/client/day"); await setup.click(); await expect(page).toHaveURL(app.origin + "/onboarding");

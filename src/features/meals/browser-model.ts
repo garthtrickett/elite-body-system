@@ -1,3 +1,4 @@
+import type { NavigationGuard } from "../../shared/browser-route.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import { isDay } from "../../shared/validation.ts";
 import { emptyMeal, emptyNutrients, parseMeal, mealTotals, mealNumberProblem, MACROS, MICROS, isUuid } from "./data.ts";
@@ -109,7 +110,7 @@ export function acceptMealProposal(model: MealModel, proposal: MealProposal): Me
   if (model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind)) return model;
   if (proposal.kind === "navigationRequested") {
     if (!proposal.href.startsWith("/") || proposal.href.startsWith("//") || proposal.href.includes("\\")) return model;
-    return queue(model, { kind: model.draft || model.description.trim() || model.photos.length ? "confirmNavigation" : "navigate", id, href: proposal.href });
+    return queue(model, { kind: hasUnsavedMeal(model) ? "confirmNavigation" : "navigate", id, href: proposal.href });
   }
   if (proposal.kind === "descriptionChanged") return { ...model, description: proposal.value.slice(0, 4000), error: null, retry: null };
   if (proposal.kind === "dateChanged") return isDay(proposal.value) ? queue(model, { kind: "load", id, date: proposal.value }) : model;
@@ -161,3 +162,12 @@ export function representMeals(model: MealModel) {
     busy: model.pending !== null && model.pending.kind !== "confirmNavigation" && model.pending.kind !== "navigate", locked: model.pending !== null || !!model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind), totals } as const;
 }
 export type MealState = ReturnType<typeof representMeals>;
+
+export function hasUnsavedMeal(model: MealModel): boolean {
+  return !!(model.draft || model.description.trim() || model.photos.length || model.pending?.kind === "log" || model.retry?.kind === "log");
+}
+
+export function mealsNavigation(model: MealModel): NavigationGuard {
+  if (model.pending && model.pending.kind !== "load" && model.pending.kind !== "navigate" && model.pending.kind !== "confirmNavigation" || model.retry && ["log", "remove", "removeFavorite"].includes(model.retry.kind)) return { kind: "blocked", message: "Confirm your meal action with Retry safely or Reload saved before leaving." };
+  return hasUnsavedMeal(model) ? { kind: "confirm", message: "Discard this unfinished meal? Your changes have not been logged." } : { kind: "ready" };
+}

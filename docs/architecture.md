@@ -360,7 +360,7 @@ field error; transport failures reveal their retry feedback.
 Meal links propose a navigation intent. An unfinished draft/capture queues a
 confirmation effect; only its correlated acceptance queues navigation. Cancelling
 retains the draft, and uncertain writes remain frozen for their existing safe
-retry. Browser Back/refresh use native unload protection. No new local storage,
+retry. Browser Back/Forward use the same feature-owned leave policy as links; refresh and tab close retain native unload protection. No new local storage,
 account records or schema are introduced. The shared shell's More popover uses
 native dismissal/focus behaviour and derives active-route presentation from the
 workspace page.
@@ -385,3 +385,40 @@ Phone scorecard transport failures own a feedback row above navigation; desktop
 feedback remains sticky. Unsaved-day labels distinguish local completion from
 persisted data. The current meal review summary sticks independently of history;
 history follows the review grid, so its length cannot displace current actions.
+
+### Persistent authenticated navigation
+
+`browser.ts` owns one authenticated workspace shell and a content outlet. Feature
+views render only their content and optional mobile footer. Lit updates shell
+selection without replacing the sidebar, mobile navigation or their scroll state.
+Scorecard Profile/setup intents reuse its runtime and typed route proposal, so
+opening or closing those panels preserves local drafts. Other route transitions
+dispose the previous runtime before mounting the next one.
+
+`shared/navigation-model.ts` owns typed navigation requests, correlated server
+resolution and leave authorization. Only ordinary, unmodified same-origin links
+to known app paths are intercepted. Real hrefs support direct requests, refresh,
+keyboard access and new tabs. Training changes its date query only after the
+feature accepts a successfully loaded day. Same-URL clicks do not add history.
+
+Route resolution requests JSON from the existing page handler. Session resolution
+and the mandatory onboarding gate run before either HTML or JSON is returned;
+client routing cannot grant access. All authenticated documents carry the same
+configured private-upload origin in CSP so onboarding can enter the persistent
+outlet. The rollout flag remains unchanged and defaults off. A changed account or
+expired session starts a fresh authentication document after leave authorization.
+
+Feature models expose a pure navigation policy shared with native unload
+protection. Pending writes block leaving. Unsaved generations and raw input drafts
+require explicit discard; uncertain meal writes remain blocked until their exact
+idempotent retry or explicit reload is resolved. The router checks this policy
+after route resolution, immediately before committing, so edits made during a
+slow route request remain protected. Back/Forward first restores the active
+history entry, then resolves and authorizes the requested entry. Cancellation or
+failure retains the current URL and feature state; Retry retains the target.
+
+Route disposal aborts HTTP requests and debounce timers, removes feature listeners
+and intervals, and prevents late proposals from presenting or scheduling more
+effects. Navigation resolution also rejects superseded completions. Accepted
+transitions dismiss More, set the route title, reset content scroll and focus the
+content region without moving sidebar scroll or overriding dialog focus.

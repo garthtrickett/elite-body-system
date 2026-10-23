@@ -1,3 +1,7 @@
+import { routeDelay } from "../../shared/browser-delay.ts";
+import { learningNavigation } from "./browser-model.ts";
+export { learningNavigation } from "./browser-model.ts";
+import type { RouteHost } from "../../shared/browser-route.ts";
 import { render } from "lit-html";
 import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
@@ -9,12 +13,14 @@ import { learningView } from "./browser-view.ts";
 
 export { initialLearningModel, acceptLearningProposal, representLearning } from "./browser-model.ts";
 export type { LearningModel, LearningProposal, LearningEffect } from "./browser-model.ts";
-export function mountLearning(root: HTMLElement, config: Readonly<{ csrf: string; page: "map" | Pillar }>) {
-  const call = createClientTransport({ csrf: config.csrf, send: fetch });
+export function mountLearning(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; page: "map" | Pillar }>) {
+  const scope = new AbortController();
+  const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
   let shownContext = "", completionAttempt = 0;
   const runtime = createSamRuntime<LearningModel, LearningProposal, LearningState, LearningEffect>({
     initial: initialLearningModel(), accept: acceptLearningProposal, represent: representLearning, next: model => model.pending,
     present: state => {
+      config.navigationChanged(learningNavigation(state));
       render(learningView(state, config.page, proposal => runtime.propose(proposal)), root);
       const context = state.snapshot ? config.page === "map" ? `map:${state.editingMap}:${state.map?.step}` : `episode:${state.episode ?? "list"}` : "";
       if (context !== shownContext) {
@@ -33,13 +39,13 @@ export function mountLearning(root: HTMLElement, config: Readonly<{ csrf: string
       if (effect.kind === "confirmReload") return { kind: "reloadConfirmed", id: effect.id, discard: window.confirm("Reload the saved version and discard your unsaved learning changes? Cancel to keep your draft and retry saving.") };
       if (effect.kind === "load") return { kind: "completed", id: effect.id, effectKind: effect.kind, result: await call({ path: "/api/client/learning", parse: parseLearningSnapshot }) };
       if (effect.kind === "readMap") return { kind: "completed", id: effect.id, effectKind: effect.kind, result: await call({ path: "/api/client/learning/read-map", body: {}, parse: parseLearningSnapshot }) };
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await routeDelay(300, scope.signal);
       return { kind: "completed", id: effect.id, effectKind: effect.kind, result: await call({ path: effect.kind === "saveMap" ? "/api/client/learning/map" : "/api/client/learning/episode",
         body: effect.kind === "saveMap" ? { map: effect.map, revision: effect.revision, finish: effect.finish } : { id: effect.episode, answers: effect.answers, revision: effect.revision, complete: effect.complete }, parse: parseLearningSnapshot }) };
     },
   });
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.mapGeneration > model.mapSaved || model.episodeGeneration > model.episodeSaved || model.finishMap || model.completeEpisode) event.preventDefault(); };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { if (learningNavigation(runtime.getModel()).kind !== "ready") { event.preventDefault(); event.returnValue = ""; } };
   window.addEventListener("beforeunload", protectUnsaved);
   runtime.propose({ kind: "started" });
-  return { dispose: () => { window.removeEventListener("beforeunload", protectUnsaved); runtime.dispose(); } } as const;
+  return { navigation: () => learningNavigation(runtime.getModel()), dispose: () => { scope.abort(); window.removeEventListener("beforeunload", protectUnsaved); runtime.dispose(); } } as const;
 }

@@ -1,3 +1,4 @@
+import type { NavigationGuard } from "../../shared/browser-route.ts";
 import { addGoal, representDay, selectPriority, setDailyCheck, setMetric } from "./operations.ts";
 import type { DailyCheck, Metric, Scorecard } from "./operations.ts";
 import { emptyScorecard } from "./operations.ts";
@@ -19,6 +20,7 @@ export type ScorecardModel = Readonly<{
   card: number;
   touchX: number | undefined;
   panel: Panel | undefined;
+  setupStarted: boolean;
   launchPanel: "profile" | "setup" | undefined;
   goalDraft: string;
   message: string;
@@ -49,12 +51,12 @@ type LocalProposal =
   | Readonly<{ kind: "prioritySelected" | "goalRemoved"; id: number }>
   | Readonly<{ kind: "accountChanged"; account: AccountState }>
   | Readonly<{ kind: "profileProposed"; proposal: ProfileProposal }>;
-export type ScorecardProposal = LocalProposal | SyncProposal | ScorecardUiProposal | Readonly<{ kind: "started" | "retrySync" | "reloadClient" }> | Readonly<{ kind: "dayObserved"; date: string }>;
+export type ScorecardProposal = Readonly<{ kind: "routeIntentChanged"; panel: "profile" | "setup" | undefined }> | LocalProposal | SyncProposal | ScorecardUiProposal | Readonly<{ kind: "started" | "retrySync" | "reloadClient" }> | Readonly<{ kind: "dayObserved"; date: string }>;
 
 export function initialScorecardModel(account: AccountState, launchPanel?: "profile" | "setup"): ScorecardModel {
   const profile = emptyProfile();
   return { day: emptyScorecard(), drafts: { weight: "", energy: "", protein: "", water: "", sleep: "", steps: "" },
-    errors: {}, card: 0, touchX: undefined, panel: undefined, launchPanel, goalDraft: "", message: "", account, exiting: false,
+    errors: {}, card: 0, touchX: undefined, panel: undefined, setupStarted: false, launchPanel, goalDraft: "", message: "", account, exiting: false,
     profile: { profile, revision: 0 }, profileUi: initialProfileUi(profile), date: "", observedDate: "", dayRevision: 0, history: [],
     loaded: false, syncError: "", generation: 0, savedGeneration: 0, sequence: 0, pending: undefined };
 }
@@ -84,7 +86,7 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
       return { ...model, touchX: undefined, card: Math.max(0, Math.min(2, model.card + (Math.abs(distance) >= 40 ? Math.sign(distance) : 0))) };
     }
     case "panelOpened": return proposal.panel === "setup" && model.profile.profile.onboardingVersion === "harry-v2" ? model.pending ? model : schedule(model, { kind: "navigate", href: "/onboarding" })
-      : { ...model, panel: proposal.panel, message: "", profileUi: proposal.panel === "setup" && model.profile.profile.completed ? acceptProfileProposal(model.profileUi, { kind: "editSetup" }) : model.profileUi };
+      : { ...model, panel: proposal.panel, setupStarted: model.setupStarted || proposal.panel === "setup", message: "", profileUi: proposal.panel === "setup" && model.profile.profile.completed && !model.setupStarted ? acceptProfileProposal(model.profileUi, { kind: "editSetup" }) : model.profileUi };
     case "panelClosed": return { ...model, panel: undefined, message: "" };
     case "goalDraftChanged": return { ...model, goalDraft: proposal.value, message: "" };
     case "brainDumpChanged": return { ...model, day: { ...model.day, brainDump: proposal.value } };
@@ -101,7 +103,7 @@ function acceptLocal(model: ScorecardModel, proposal: LocalProposal): ScorecardM
       if (proposal.proposal.kind === "editSetup" && model.profile.profile.onboardingVersion === "harry-v2") return model.pending ? model : schedule(model, { kind: "navigate", href: "/onboarding" });
       if (model.pending?.kind === "saveProfile") return model;
       const profileUi = acceptProfileProposal(model.profileUi, proposal.proposal);
-      return { ...model, profileUi, panel: proposal.proposal.kind === "editSetup" ? "setup" : model.panel, syncError: "" };
+      return { ...model, profileUi, setupStarted: model.setupStarted || proposal.proposal.kind === "editSetup", panel: proposal.proposal.kind === "editSetup" ? "setup" : model.panel, syncError: "" };
     }
     case "accountChanged": return { ...model, account: proposal.account, exiting: proposal.account.problem ? false : model.exiting };
   }
@@ -126,6 +128,8 @@ function draftsFor(day: Scorecard): Readonly<Record<Metric, string>> {
 
 export function acceptScorecardProposal(model: ScorecardModel, proposal: ScorecardProposal): ScorecardModel {
   switch (proposal.kind) {
+    case "routeIntentChanged": return !model.loaded ? { ...model, launchPanel: proposal.panel }
+      : proposal.panel ? continueSync(acceptLocal(model, { kind: "panelOpened", panel: proposal.panel })) : { ...model, panel: undefined };
     case "signOutRequested": return model.pending || model.account.busy || model.exiting ? model : schedule(model, { kind: "signOut", confirm: hasUnsavedScorecard(model) });
     case "signOutConfirmed": return model.pending?.kind === "signOut" && model.pending.id === proposal.id ? { ...model, pending: undefined, exiting: proposal.accepted && !model.account.problem } : model;
     case "navigationHandled": return model.pending?.kind === "navigate" && model.pending.id === proposal.id ? { ...model, pending: undefined } : model;
@@ -140,7 +144,7 @@ export function acceptScorecardProposal(model: ScorecardModel, proposal: Scoreca
       const value = proposal.result.value;
       const loadedUi = initialProfileUi(value.profile.profile);
       const profileUi = model.launchPanel === "setup" && value.profile.profile.completed && value.profile.profile.onboardingVersion !== "harry-v2" ? acceptProfileProposal(loadedUi, { kind: "editSetup" }) : loadedUi;
-      const loaded = { ...model, loaded: true, pending: undefined, profile: value.profile, profileUi,
+      const loaded = { ...model, setupStarted: model.launchPanel === "setup" || model.panel === "setup" || !value.profile.profile.completed, loaded: true, pending: undefined, profile: value.profile, profileUi,
         date: value.day.date, observedDate: value.day.date, day: value.day.scorecard, dayRevision: value.day.revision, drafts: draftsFor(value.day.scorecard), history: value.history,
         launchPanel: undefined, panel: model.launchPanel ?? (model.loaded && model.panel === "setup" && model.profile.profile.completed ? "setup" : value.profile.profile.completed ? undefined : "setup"), generation: 0, savedGeneration: 0, syncError: "" };
       return value.profile.profile.onboardingVersion === "harry-v2" && model.launchPanel === "setup" ? schedule({ ...loaded, panel: undefined }, { kind: "navigate", href: "/onboarding" }) : loaded;
@@ -225,3 +229,8 @@ export function nextScorecardAction(model: ScorecardModel) {
 }
 export function nextScorecardNetworkAction(model: ScorecardModel): SyncEffect | undefined { return model.pending?.kind === "load" || model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile" ? model.pending : undefined; }
 export function nextScorecardEffect(model: ScorecardModel): ScorecardEffect | undefined { return model.pending; }
+
+export function scorecardNavigation(model: ScorecardModel): NavigationGuard {
+  if (model.account.busy || model.pending?.kind === "saveDay" || model.pending?.kind === "saveProfile") return { kind: "blocked", message: "Wait for your account to finish saving before leaving." };
+  return hasUnsavedScorecard(model) ? { kind: "confirm", message: "Discard your unsaved scorecard or profile changes? Cancel to keep editing and retry saving." } : { kind: "ready" };
+}
