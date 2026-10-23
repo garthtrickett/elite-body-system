@@ -142,18 +142,19 @@ test("mobile assessment uploads persist only after verification, and booking lin
   await page.goto(app.origin); await expect(page).toHaveURL(app.origin + "/onboarding");
 });
 
-test("correcting measurement and questionnaire validation keeps focus through the full answer", async ({ page }) => {
+test("Continue advances incomplete sections and final validation keeps focus through questionnaire corrections", async ({ page }) => {
   await signIn(page, true); await section(page, "measurements");
   const waist = page.getByRole("textbox", { name: /^Waistline \(cm\)/ });
   await waist.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
-  await expect(page.locator(".ob-feedback")).toBeFocused();
-  await waist.click(); await waist.pressSequentially("80", { delay: 25 });
-  await expect(waist).toHaveValue("80"); await expect(waist).toBeFocused();
+  await expect(page.getByRole("heading", { name: SECTION_LABELS.lifestyle, exact: true })).toBeFocused();
   await section(page, "questionnaire");
   const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
   await answer.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
-  await expect(page.locator(".ob-feedback")).toBeFocused();
+  await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
+  await section(page, "call"); await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
+  await expect(page.locator(".ob-feedback")).toBeFocused(); await expect(answer).toHaveAttribute("aria-invalid", "true");
   await answer.click(); await answer.pressSequentially("A stronger body", { delay: 15 });
+  await expect(page.getByTestId("onboarding-save-status")).toHaveText("Progress saved to your account");
   await expect(answer).toHaveValue("A stronger body"); await expect(answer).toBeFocused();
 });
 
@@ -220,4 +221,75 @@ test("a rejected replacement cleans up its pending file and preserves the previo
   await expect(page.getByRole("button", { name: "Download front photo", exact: true })).toBeEnabled();
   const current = await onboarding.get({ accountId }); expect(current.ok).toBe(true);
   if (current.ok) { expect(current.value.media).toHaveLength(1); expect(current.value.media[0]?.id).toBe(requested.value.id); expect(current.value.media[0]?.status).toBe("ready"); }
+});
+
+
+test("questionnaire answers and confirmed goal order autosave without interrupting desktop or phone typing", async ({ page }, info) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); const accountId = await signIn(page, true); await section(page, "questionnaire");
+    const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+    await answer.fill(`A stronger body at ${width}`);
+    await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible(); await expect(answer).toBeFocused();
+    const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Questionnaire read failed");
+    expect(saved.value.answers.questionnaire.transformation).toBe(`A stronger body at ${width}`);
+    await page.getByRole("button", { name: "Move Strength up", exact: true }).click();
+    await page.getByLabel("This is my preferred goal order.").check();
+    await expect(page.getByTestId("onboarding-save-status")).toHaveText("Progress saved to your account");
+    await page.reload(); await section(page, "questionnaire");
+    await expect(answer).toHaveValue(`A stronger body at ${width}`); await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
+    await expect(page.getByLabel("This is my preferred goal order.")).toBeChecked();
+    await page.screenshot({ path: info.outputPath(`questionnaire-autosaved-${width}.png`) });
+  }
+});
+
+test("Continue during a held autosave flushes newer answers before showing the next section", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); const accountId = await signIn(page, true); await section(page, "questionnaire");
+    let release: () => void = () => {}, entered: () => void = () => {}, calls = 0;
+    const hold = new Promise<void>(resolve => { release = resolve; }), reached = new Promise<void>(resolve => { entered = resolve; });
+    const count = (request: import("@playwright/test").Request) => { if (request.url().endsWith("/api/client/onboarding/save")) calls++; };
+    page.on("request", count);
+    await page.route("**/api/client/onboarding/save", async route => { const response = await route.fetch(); entered(); await hold; await route.fulfill({ response }); }, { times: 1 });
+    try {
+      const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+      await answer.fill("First answer"); await reached; await expect(answer).toBeEnabled();
+      await answer.fill("Latest answer before Continue"); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+      await expect(answer).toBeDisabled(); await expect(page.getByRole("heading", { name: SECTION_LABELS.questionnaire, exact: true })).toBeVisible();
+      release(); await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
+      const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Saved questionnaire unavailable");
+      expect(saved.value.answers.questionnaire.transformation).toBe("Latest answer before Continue"); expect(calls).toBe(2);
+      await section(page, "questionnaire"); await expect(answer).toHaveValue("Latest answer before Continue");
+    } finally { release(); page.off("request", count); await page.unroute("**/api/client/onboarding/save"); }
+  }
+});
+
+test("a failed questionnaire autosave keeps the draft and section until recovery saves it", async ({ page }) => {
+  const accountId = await signIn(page, true); await section(page, "questionnaire");
+  await page.route("**/api/client/onboarding/save", route => route.fulfill({ status: 503, json: { ok: false, error: { code: "unavailable", message: "Autosave is temporarily unavailable" } } }), { times: 1 });
+  const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+  await answer.fill("Keep this important answer");
+  await expect(page.getByRole("alert")).toContainText("temporarily unavailable"); await expect(answer).toHaveValue("Keep this important answer");
+  await expect(page.getByRole("button", { name: "Save and continue", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Reload saved progress", exact: true }).click();
+  await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
+  const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Autosave retry read failed");
+  expect(saved.value.answers.questionnaire.transformation).toBe("Keep this important answer");
+  await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
+});
+
+test("Continue follows all eight sections with unfinished content while Finish keeps the dashboard locked", async ({ page }) => {
+  try {
+    expect((await onboarding.configure({ content: { ...onboardingContent(), version: "browser-unconfigured", approved: false, welcomeVideo: "", consentText: "", measurementVideo: "", bookingUrl: "" } })).ok).toBe(true);
+    const accountId = await signIn(page);
+    for (const key of SECTIONS.slice(1)) {
+      await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+      await expect(page.getByRole("heading", { name: SECTION_LABELS[key], exact: true })).toBeFocused();
+    }
+    await expect(page.getByText("0 of 8 sections ready", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("remaining requirements");
+    const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Onboarding read failed"); expect(saved.value.completedAt).toBeNull();
+    await page.goto(app.origin + "/training"); await expect(page).toHaveURL(app.origin + "/onboarding");
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
 });

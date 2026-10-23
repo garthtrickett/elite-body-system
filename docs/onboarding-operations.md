@@ -8,6 +8,34 @@ The new flow is `harry-v2`. The operator confirmed that all clients must complet
 
 Do not enable the production gate until Harry’s approved content, private media provider and actual booking confirmation have passed acceptance. Missing content/integrations are shown explicitly; they do not count as completed steps. No production settings have been changed by this implementation.
 
+
+## Draft saving and section navigation
+
+Questionnaire text and goal ranking autosave after a 600 ms pause. Background
+saves leave the fields editable. Save responses reconcile against the answers
+actually sent, retaining newer typing and ranking changes. A pending save remains
+protected against page unload. Other sections retain explicit Save progress and
+Save and continue controls.
+
+Save and continue saves the latest draft and moves to the next section in the
+eight-section order. It can be requested during a background save; the current
+section stays visible until any newer answers are also saved. Failed saves retain
+the draft and section. Reload saved progress reconciles local edits with the
+server before saving resumes. This uses the existing account storage and revision
+checks, with no browser storage of assessment answers.
+
+Section navigation is independent of completion eligibility. Clients may advance
+past incomplete answers, evidence or unconfigured guidance and return later. The
+ready counter continues to reflect actual requirements. Finish onboarding and the
+server gate still require every section, finalized evidence and a confirmed
+booking.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Questionnaire changes needed an explicit save. | Text and goal order save after a short pause, with saving/saved feedback and editable fields during background saves. | Clients can write without repeatedly pressing Save. |
+| Continue stayed on a section when requirements or Harry’s content were missing. | Continue saves and advances through the eight-section list; final completion still enforces every requirement. | Moving through the form and unlocking the dashboard are distinct actions. |
+| A save froze all fields and could not accept a newer draft. | Older responses retain newer answers; Continue flushes the latest draft before advancing. | A slow connection must not discard input or move on with an older answer. |
+
 ## Approved content
 
 Use the trusted CLI with the app’s own environment:

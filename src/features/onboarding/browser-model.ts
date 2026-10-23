@@ -9,7 +9,7 @@ export type OnboardingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
   | Readonly<{ kind: "signOut"; confirm: boolean }>
-  | (Readonly<{ kind: "save"; next: Section | null; validate: boolean }> & SaveInput)
+  | (Readonly<{ kind: "save"; next: Section | null; mode: "background" | "explicit" }> & SaveInput)
   | Readonly<{ kind: "complete"; revision: number }>
   | (Readonly<{ kind: "upload"; selection: number; slot: string }> & SaveInput)
   | Readonly<{ kind: "remove"; mediaId: string }>
@@ -23,7 +23,7 @@ export type OnboardingModel = Readonly<{
 }>;
 export type OnboardingProposal =
   | Readonly<{ kind: "navigationHandled"; id: number }>
-  | Readonly<{ kind: "started" | "reload" | "save" | "next" | "complete" }>
+  | Readonly<{ kind: "started" | "reload" | "save" | "autosave" | "next" | "complete" }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
   | Readonly<{ kind: "signOut" }>
@@ -41,6 +41,11 @@ export type OnboardingProposal =
 
 export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
 function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0, finalizing: false }; }
+function saveDraft(model: OnboardingModel, input: Readonly<{ next: Section | null; mode: "background" | "explicit" }>): OnboardingModel {
+  if (!model.snapshot) return model;
+  return queue(model, { kind: "save", id: model.sequence + 1, ...input, answers: model.draft, revision: model.snapshot.revision, contentVersion: model.snapshot.content.version });
+}
+function followingSection(section: Section): Section { return SECTIONS[Math.min(SECTIONS.length - 1, SECTIONS.indexOf(section) + 1)]!; }
 function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: OnboardingAnswers; saved: OnboardingSnapshot }>): OnboardingAnswers {
   const { base, draft, saved } = input;
   const retain = <T>(before: T, edited: T, current: T): T => JSON.stringify(before) === JSON.stringify(edited) ? current : edited;
@@ -78,14 +83,23 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     if (!effect || effect.id !== proposal.id || effect.kind !== proposal.effectKind) return model;
     if (!proposal.result.ok) return { ...model, ...(proposal.saved ? { snapshot: proposal.saved, draft: proposal.saved.answers, dirty: false } : {}), pending: undefined, error: proposal.result.error.message, reloadRequired: proposal.result.error.code === "conflict" || proposal.result.error.code === "unavailable" };
     const snapshot = proposal.result.value;
-    const invalid = effect.kind === "save" && effect.validate && snapshot.missing[model.section].length > 0;
-    const section = effect.kind === "save" && effect.next && !invalid ? effect.next : model.section;
+    const saving = effect.kind === "save";
+    const section = saving && effect.next ? effect.next : model.section;
     const cancelled = effect.kind === "cancelUpload";
-    const retained = cancelled || effect.kind === "load" && effect.preserveDraft;
-    const draft = retained && model.snapshot ? reconcileDraft({ base: model.snapshot, draft: model.draft, saved: snapshot }) : snapshot.answers;
+    const retained = saving || cancelled || effect.kind === "load" && effect.preserveDraft;
+    const base = saving && model.snapshot ? { ...model.snapshot, answers: effect.answers } : model.snapshot;
+    const draft = retained && base ? reconcileDraft({ base, draft: model.draft, saved: snapshot }) : snapshot.answers;
     const dirty = !!retained && JSON.stringify(draft) !== JSON.stringify(snapshot.answers);
-    const updated = { ...model, snapshot, draft, dirty, pending: undefined, section, showMissing: !!invalid, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : "Saved to your account.", reloadRequired: false };
+    const updated = { ...model, snapshot, draft, dirty, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
+    if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
+  }
+  if (proposal.kind === "edit") {
+    if (!model.snapshot || model.snapshot.completedAt || model.reloadRequired || model.accountBusy || model.pending && !(model.pending.kind === "save" && model.pending.mode === "background")) return model;
+    return { ...model, draft: proposal.answers, dirty: JSON.stringify(proposal.answers) !== JSON.stringify(model.snapshot.answers), error: "", message: "" };
+  }
+  if (!model.accountBusy && model.pending?.kind === "save" && model.pending.mode === "background" && (proposal.kind === "next" || proposal.kind === "section" || proposal.kind === "save")) {
+    return { ...model, pending: { ...model.pending, mode: "explicit", next: proposal.kind === "next" ? followingSection(model.section) : proposal.kind === "section" ? proposal.section : null } };
   }
   if (model.pending || model.accountBusy) return model;
   const id = model.sequence + 1;
@@ -93,10 +107,6 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty });
   if (!model.snapshot) return model;
   if (proposal.kind === "refreshBooking") return model.dirty ? { ...model, error: "Save your answers before refreshing your booking." } : queue(model, { kind: "refreshBooking", id });
-  if (proposal.kind === "edit") {
-    if (model.snapshot.completedAt || model.reloadRequired) return model;
-    return { ...model, draft: proposal.answers, dirty: true, message: "" };
-  }
   if (proposal.kind === "read" || proposal.kind === "remove") return model.dirty ? { ...model, error: "Save your answers before managing assessment files." } : queue(model, { ...proposal, id });
   if (proposal.kind === "complete") {
     if (model.dirty) return { ...model, error: "Save your answers before finishing onboarding." };
@@ -107,11 +117,13 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (model.reloadRequired) return { ...model, error: "Reload saved progress before editing or saving again." };
   const saved = { answers: model.draft, revision: model.snapshot.revision, contentVersion: model.snapshot.content.version };
   if (proposal.kind === "upload") return queue(model, { kind: "upload", id, ...saved, slot: proposal.slot, selection: proposal.selection });
-  if (proposal.kind === "save" || proposal.kind === "next" || proposal.kind === "section") return queue(model, { kind: "save", id, ...saved, validate: proposal.kind === "next", next: proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? SECTIONS[Math.min(SECTIONS.length - 1, SECTIONS.indexOf(model.section) + 1)]! : null });
+  if (proposal.kind === "autosave") return model.section === "questionnaire" && model.dirty && !model.error && !model.snapshot.completedAt ? saveDraft(model, { next: null, mode: "background" }) : model;
+  if (proposal.kind === "save" || proposal.kind === "next" || proposal.kind === "section") return saveDraft(model, { mode: "explicit", next: proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? followingSection(model.section) : null });
   return model;
 }
 export function representOnboarding(model: OnboardingModel) {
-  return { ...model, busy: !!model.pending || model.accountBusy, missing: model.snapshot ? missingRequirements({ ...model.snapshot, answers: model.draft }) : null } as const;
+  const backgroundSaving = model.pending?.kind === "save" && model.pending.mode === "background";
+  return { ...model, saving: model.pending?.kind === "save", busy: !!model.pending && !backgroundSaving || model.accountBusy, missing: model.snapshot ? missingRequirements({ ...model.snapshot, answers: model.draft }) : null } as const;
 }
 
 export function onboardingNavigation(model: OnboardingModel): NavigationGuard {
