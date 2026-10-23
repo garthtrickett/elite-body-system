@@ -58,6 +58,8 @@ test("query intents retain scorecard drafts, reopen same-route panels, and work 
   await page.setViewportSize({ width: 1440, height: 900 }); await signIn(page); await page.goto(app.origin);
   await expect(page.getByLabel("Calories eaten today")).toBeVisible(); const identity = await stableNodes(page);
   await nav(page).getByRole("link", { name: "Profile", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/?panel=profile");
+  await expect(nav(page).getByRole("link", { name: "Profile", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav(page).getByRole("link", { name: "Scorecard", exact: true })).not.toHaveAttribute("aria-current", "page");
   await page.getByLabel("Energy (kcal)", { exact: true }).fill("2417"); await page.keyboard.press("Escape");
   await nav(page).getByRole("link", { name: "Scorecard", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/");
   await nav(page).getByRole("link", { name: "Profile", exact: true }).click(); await expect(page.getByLabel("Energy (kcal)", { exact: true })).toHaveValue("2417");
@@ -103,7 +105,8 @@ test("mobile More dismisses, content scroll resets, modified links keep href beh
   await expect(page).toHaveURL(app.origin + "/training"); await identity();
   expect(await page.locator("#workspace-content").evaluate(element => element.scrollTop)).toBe(0);
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Day 1 setup", exact: true }).click();
-  await expect(page).toHaveURL(app.origin + "/onboarding"); await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible(); await identity();
+  await expect(page).toHaveURL(app.origin + "/onboarding"); await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Day 1 setup", exact: true })).toHaveAttribute("aria-current", "page"); await identity();
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Scorecard", exact: true }).click();
   await expect(page).toHaveURL(app.origin + "/"); await identity();
   await page.setViewportSize({ width: 1440, height: 900 });
