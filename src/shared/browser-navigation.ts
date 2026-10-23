@@ -21,6 +21,7 @@ export function createBrowserNavigation(config: Readonly<{
   present: (model: NavigationModel) => void;
   commit: (route: ResolvedRoute, previous: ResolvedRoute, csrf: string) => void;
   revisit: () => void;
+  prepareTraversal: (route: ResolvedRoute, previous: ResolvedRoute) => void;
 }>) {
   // Anti-CSRF material stays in the adapter closure, outside SAM state/proposals.
   const csrfByRoute = new WeakMap<ResolvedRoute, string>(); csrfByRoute.set(config.initial, config.csrf);
@@ -44,6 +45,7 @@ export function createBrowserNavigation(config: Readonly<{
       activeRoute = model.current;
       if (model.index !== activeIndex && pendingTarget?.index !== undefined) {
         traversing = { route: model.current, previous, index: model.index };
+        config.prepareTraversal(model.current, previous);
         // History traversal commits asynchronously. Freeze inputs after acceptance
         // until the matching pop event, so that final gap cannot admit a lost edit.
         config.root.querySelector<HTMLElement>(".sc-route-outlet")?.setAttribute("inert", "");

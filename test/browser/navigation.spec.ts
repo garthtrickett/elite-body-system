@@ -277,3 +277,22 @@ test("background questionnaire saves block sidebar and Back navigation while pre
     } finally { release(); await page.unroute("**/api/client/onboarding/save"); }
   }
 });
+
+test("accepted Back discard disposes the old route before inert focus changes can commit raw input", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 }); await signIn(page); await page.goto(app.origin + "/meals");
+  await nav(page).getByRole("link", { name: "Training", exact: true }).evaluate((element, date) => element.setAttribute("href", `/training?date=${date}`), monday(-7));
+  await nav(page).getByRole("link", { name: "Training", exact: true }).click();
+  await page.getByLabel("Weighted Pull-up set 1 weight").fill("17");
+  let writes = 0;
+  page.on("request", request => { if (request.method() === "POST" && new URL(request.url()).pathname === "/api/client/training") writes++; });
+  page.on("dialog", async dialog => { expect(dialog.type()).toBe("confirm"); await dialog.accept(); });
+  await page.evaluate(() => {
+    const go = history.go.bind(history);
+    // A busy browser can delay the accepted traversal past a focus update/frame.
+    history.go = (delta = 0) => { if (delta < 0) window.setTimeout(() => go(delta), 500); else go(delta); };
+    history.back();
+  });
+  await expect(page.getByLabel("What did you eat?")).toBeVisible(); await expect(page).toHaveURL(app.origin + "/meals");
+  expect(writes).toBe(0);
+  await page.goForward(); await expect(page.getByLabel("Weighted Pull-up set 1 weight")).toHaveValue("");
+});

@@ -15,6 +15,10 @@ const root = document.querySelector<HTMLElement>("#app");
 if (root) {
   let latestAccount = { email: "", busy: false, problem: "" };
   let feature: RouteRuntime | undefined, navigation: ReturnType<typeof createBrowserNavigation> | undefined;
+  let featureDisposed = true;
+  const disposeFeature = () => { if (!featureDisposed) { featureDisposed = true; feature?.dispose(); } };
+  const retainsFeature = (route: ResolvedRoute, previous: ResolvedRoute) => route.accountId === previous.accountId
+    && (route.href === previous.href || route.page === previous.page && !!feature?.retain);
   let current: ResolvedRoute | undefined, guard: NavigationGuard = { kind: "ready" }, status = "", retry: (() => void) | undefined;
   const outlet = document.createElement("div"); outlet.className = "sc-route-outlet";
   const showShell = () => {
@@ -38,20 +42,22 @@ if (root) {
           : route.page === "meals" ? mountMeals(outlet, host)
           : route.page === "map" || route.page === "nutrition" || route.page === "activity" || route.page === "mindset" ? mountLearning(outlet, { ...host, page: route.page })
           : mountScorecard(outlet, { ...host, account: latestAccount, signOut: actions.signOut });
+        featureDisposed = false;
         const panel = new URL(route.href, location.origin).searchParams.get("panel");
         document.title = `${panel === "profile" ? "Profile" : panel === "setup" ? "Day 1 setup" : appRoute(new URL(route.href, location.origin).pathname)?.title ?? "Scorecard"} · Elite Body System`;
       };
       navigation = createBrowserNavigation({ initial, csrf: root.dataset.csrf ?? "", root,
         guard: route => {
           const policy = feature?.navigation() ?? { kind: "ready" };
-          return policy.kind === "confirm" && feature?.retain && current?.page === route.page && current.accountId === route.accountId ? { kind: "ready" } : policy;
+          return policy.kind === "confirm" && current && retainsFeature(route, current) ? { kind: "ready" } : policy;
         },
         revisit: () => feature?.revisit?.(),
+        prepareTraversal: (route, previous) => { if (!retainsFeature(route, previous)) disposeFeature(); },
         present: model => { current = model.current; status = model.pending ? "Opening page…" : model.error; retry = model.retry ? () => navigation?.retry() : undefined; showShell(); },
         commit: (route, previous, csrf) => {
           if (route.page === "sign-in" || route.accountId !== initial.accountId) {
             // A different authentication context requires a fresh auth runtime.
-            feature?.dispose(); navigation?.dispose(); location.replace(route.href); return;
+            disposeFeature(); navigation?.dispose(); location.replace(route.href); return;
           }
           if (route.href === previous.href) return;
           if (previous.page === route.page && feature?.retain) {
@@ -60,7 +66,7 @@ if (root) {
             document.title = `${panel === "profile" ? "Profile" : panel === "setup" ? "Day 1 setup" : "Scorecard"} · Elite Body System`;
             return;
           }
-          feature?.dispose(); render(nothing, outlet); guard = { kind: "ready" }; mount(route, csrf);
+          disposeFeature(); render(nothing, outlet); guard = { kind: "ready" }; mount(route, csrf);
           const content = outlet.querySelector<HTMLElement>("#workspace-content, .ob-shell");
           if (content) { content.scrollTop = 0; content.tabIndex = -1; if (!new URL(route.href, location.origin).searchParams.has("panel") && !outlet.querySelector("dialog[open]")) content.focus({ preventScroll: true }); }
           window.scrollTo({ top: 0, behavior: "instant" });
@@ -69,6 +75,6 @@ if (root) {
       mount(initial, root.dataset.csrf ?? "");
     },
   });
-  window.addEventListener("pagehide", event => { if (!event.persisted) { navigation?.dispose(); feature?.dispose(); disposeAuth(); } });
+  window.addEventListener("pagehide", event => { if (!event.persisted) { navigation?.dispose(); disposeFeature(); disposeAuth(); } });
   window.addEventListener("pageshow", event => { if (event.persisted) location.reload(); });
 }
