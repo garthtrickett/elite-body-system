@@ -1,5 +1,5 @@
 import type { ClientResult } from "../../shared/client-result.ts";
-import { SECTIONS, emptyAnswers, missingRequirements } from "./data.ts";
+import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers } from "./data.ts";
 import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
 
 type SaveInput = Readonly<{ answers: OnboardingAnswers; revision: number; contentVersion: string }>;
@@ -16,7 +16,7 @@ export type OnboardingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "navigate"; href: string }>);
 export type OnboardingModel = Readonly<{
   snapshot: OnboardingSnapshot | null; draft: OnboardingAnswers; section: Section;
-  dirty: boolean; sequence: number; pending: OnboardingEffect | undefined;
+  dirty: boolean; recoveryAnswers: OnboardingAnswers | null; sequence: number; pending: OnboardingEffect | undefined;
   error: string; message: string; showMissing: boolean; progress: number; finalizing: boolean; reloadRequired: boolean;
   accountBusy: boolean; accountProblem: string; exiting: boolean;
 }>;
@@ -37,31 +37,36 @@ export type OnboardingProposal =
   | Readonly<{ kind: "fileOpened"; id: number; result: ClientResult<Readonly<{ opened: true }>> }>
   | Readonly<{ kind: "failed"; id: number }>;
 
-export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
+export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, recoveryAnswers: null, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
 function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0, finalizing: false }; }
 function saveDraft(model: OnboardingModel, input: Readonly<{ next: Section | null; mode: "background" | "explicit" }>): OnboardingModel {
   if (!model.snapshot) return model;
   return queue(model, { kind: "save", id: model.sequence + 1, ...input, answers: model.draft, revision: model.snapshot.revision, contentVersion: model.snapshot.content.version });
 }
+function answersDiffer(draft: OnboardingAnswers, saved: OnboardingAnswers): boolean {
+  const parsed = parseAnswers(draft), stored = parseAnswers(saved);
+  return !parsed.ok || !stored.ok || JSON.stringify(parsed.value) !== JSON.stringify(stored.value);
+}
 function followingSection(section: Section): Section { return SECTIONS[Math.min(SECTIONS.length - 1, SECTIONS.indexOf(section) + 1)]!; }
-function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: OnboardingAnswers; saved: OnboardingSnapshot }>): OnboardingAnswers {
+function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: OnboardingAnswers; saved: OnboardingSnapshot; attempted?: OnboardingAnswers | null }>): OnboardingAnswers {
   const { base, draft, saved } = input;
-  const retain = <T>(before: T, edited: T, current: T): T => JSON.stringify(before) === JSON.stringify(edited) ? current : edited;
-  const fields = <T extends object>(before: T, edited: T, current: T): T => Object.fromEntries((Object.keys(current) as (keyof T)[]).map(key => [key, retain(before[key], edited[key], current[key])])) as T;
-  const merged = fields(base.answers, draft, saved.answers);
+  const retain = <T>(before: T, edited: T, current: T, attempted?: T): T => JSON.stringify(before) === JSON.stringify(edited) && (attempted === undefined || JSON.stringify(attempted) === JSON.stringify(edited)) ? current : edited;
+  const fields = <T extends object>(before: T, edited: T, current: T, attempted?: T): T => Object.fromEntries((Object.keys(current) as (keyof T)[]).map(key => [key, retain(before[key], edited[key], current[key], attempted?.[key])])) as T;
+  const attempted = input.attempted;
+  const merged = fields(base.answers, draft, saved.answers, attempted ?? undefined);
   const changedContent = base.content.version !== saved.content.version;
   const changedScreening = base.content.parqVersion !== saved.content.parqVersion || JSON.stringify(base.content.healthQuestions) !== JSON.stringify(saved.content.healthQuestions);
-  const changedRanking = JSON.stringify([base.answers.goals, base.answers.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]);
+  const changedRanking = JSON.stringify([base.answers.goals, base.answers.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]) || !!attempted && JSON.stringify([attempted.goals, attempted.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]);
   return { ...merged,
     goals: changedRanking ? draft.goals : saved.answers.goals,
     goalsConfirmed: changedRanking ? draft.goalsConfirmed : saved.answers.goalsConfirmed,
-    acknowledged: changedContent ? saved.answers.acknowledged : fields(base.answers.acknowledged, draft.acknowledged, saved.answers.acknowledged),
-    consent: changedContent ? { ...fields(base.answers.consent, draft.consent, saved.answers.consent), accepted: false, version: saved.answers.consent.version } : fields(base.answers.consent, draft.consent, saved.answers.consent),
-    questionnaire: fields(base.answers.questionnaire, draft.questionnaire, saved.answers.questionnaire),
-    measurements: fields(base.answers.measurements, draft.measurements, saved.answers.measurements),
-    lifestyle: fields(base.answers.lifestyle, draft.lifestyle, saved.answers.lifestyle),
-    routine: fields(base.answers.routine, draft.routine, saved.answers.routine),
-    health: changedScreening ? saved.answers.health : saved.answers.health.map((answer, index) => retain(base.answers.health[index], draft.health[index], answer) ?? null),
+    acknowledged: changedContent ? saved.answers.acknowledged : fields(base.answers.acknowledged, draft.acknowledged, saved.answers.acknowledged, attempted?.acknowledged),
+    consent: changedContent ? { ...fields(base.answers.consent, draft.consent, saved.answers.consent, attempted?.consent), accepted: false, version: saved.answers.consent.version } : fields(base.answers.consent, draft.consent, saved.answers.consent, attempted?.consent),
+    questionnaire: fields(base.answers.questionnaire, draft.questionnaire, saved.answers.questionnaire, attempted?.questionnaire),
+    measurements: fields(base.answers.measurements, draft.measurements, saved.answers.measurements, attempted?.measurements),
+    lifestyle: fields(base.answers.lifestyle, draft.lifestyle, saved.answers.lifestyle, attempted?.lifestyle),
+    routine: fields(base.answers.routine, draft.routine, saved.answers.routine, attempted?.routine),
+    health: changedScreening ? saved.answers.health : saved.answers.health.map((answer, index) => retain(base.answers.health[index], draft.health[index], answer, attempted?.health[index]) ?? null),
   };
 }
 export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingProposal): OnboardingModel {
@@ -70,7 +75,7 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (proposal.kind === "uploadFinalizing") return model.pending?.id === proposal.id && model.pending.kind === "upload" ? { ...model, finalizing: true } : model;
   if (proposal.kind === "cancelUpload") return model.pending?.kind === "upload" && !model.finalizing ? queue(model, { kind: "cancelUpload", id: model.sequence + 1 }) : model;
   if (proposal.kind === "progress") return model.pending?.id === proposal.id && model.pending.kind === "upload" ? { ...model, progress: Math.max(0, Math.min(100, proposal.progress)) } : model;
-  if (proposal.kind === "failed") return model.pending?.id === proposal.id ? { ...model, pending: undefined, error: "Could not complete that action. Reload saved progress before retrying.", reloadRequired: true } : model;
+  if (proposal.kind === "failed") return model.pending?.id === proposal.id ? { ...model, ...(model.pending.kind === "save" ? { dirty: true, recoveryAnswers: model.pending.answers } : {}), pending: undefined, error: "Could not complete that action. Reload saved progress before retrying.", reloadRequired: true } : model;
   if (proposal.kind === "fileOpened") {
     if (model.pending?.id !== proposal.id || model.pending.kind !== "read") return model;
     return { ...model, pending: undefined, error: proposal.result.ok ? "" : proposal.result.error.message };
@@ -78,22 +83,23 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (proposal.kind === "completed") {
     const effect = model.pending;
     if (!effect || effect.id !== proposal.id || effect.kind !== proposal.effectKind) return model;
-    if (!proposal.result.ok) return { ...model, ...(proposal.saved ? { snapshot: proposal.saved, draft: proposal.saved.answers, dirty: false } : {}), pending: undefined, error: proposal.result.error.message, reloadRequired: proposal.result.error.code === "conflict" || proposal.result.error.code === "unavailable" };
+    if (!proposal.result.ok) return { ...model, ...(effect.kind === "save" ? { dirty: true, recoveryAnswers: effect.answers } : {}), ...(proposal.saved ? { snapshot: proposal.saved, draft: proposal.saved.answers, dirty: false } : {}), pending: undefined, error: proposal.result.error.message, reloadRequired: proposal.result.error.code === "conflict" || proposal.result.error.code === "unavailable" };
     const snapshot = proposal.result.value;
     const saving = effect.kind === "save";
     const section = saving && effect.next ? effect.next : model.section;
     const cancelled = effect.kind === "cancelUpload";
     const retained = saving || cancelled || effect.kind === "load" && effect.preserveDraft;
     const base = saving && model.snapshot ? { ...model.snapshot, answers: effect.answers } : model.snapshot;
-    const draft = retained && base ? reconcileDraft({ base, draft: model.draft, saved: snapshot }) : snapshot.answers;
-    const dirty = !!retained && JSON.stringify(draft) !== JSON.stringify(snapshot.answers);
-    const updated = { ...model, snapshot, draft, dirty, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
+    const reconciled = retained && base ? reconcileDraft({ base, draft: model.draft, saved: snapshot, attempted: saving ? null : model.recoveryAnswers }) : snapshot.answers;
+    const draft = saving && effect.mode === "background" ? { ...reconciled, questionnaire: model.draft.questionnaire } : reconciled;
+    const dirty = !!retained && answersDiffer(draft, snapshot.answers);
+    const updated = { ...model, snapshot, draft, dirty, recoveryAnswers: null, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
     if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
   }
   if (proposal.kind === "edit") {
     if (!model.snapshot || model.snapshot.completedAt || model.reloadRequired || model.accountBusy || model.pending && !(model.pending.kind === "save" && model.pending.mode === "background")) return model;
-    return { ...model, draft: proposal.answers, dirty: JSON.stringify(proposal.answers) !== JSON.stringify(model.snapshot.answers), error: "", message: "" };
+    return { ...model, draft: proposal.answers, dirty: model.pending?.kind === "save" || answersDiffer(proposal.answers, model.snapshot.answers), error: "", message: "" };
   }
   if (!model.accountBusy && model.pending?.kind === "save" && model.pending.mode === "background" && (proposal.kind === "next" || proposal.kind === "section" || proposal.kind === "save")) {
     return { ...model, pending: { ...model.pending, mode: "explicit", next: proposal.kind === "next" ? followingSection(model.section) : proposal.kind === "section" ? proposal.section : null } };
