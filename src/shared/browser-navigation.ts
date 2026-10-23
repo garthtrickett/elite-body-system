@@ -29,6 +29,7 @@ export function createBrowserNavigation(config: Readonly<{
   let controller: AbortController | undefined;
   stamp(0, config.initial.href, true);
   const apply = (route: ResolvedRoute, previous: ResolvedRoute) => {
+    config.root.querySelector<HTMLElement>(".sc-route-outlet")?.removeAttribute("inert");
     const menu = config.root.querySelector<HTMLElement>("#workspace-more-menu");
     if (menu?.matches(":popover-open")) menu.hidePopover();
     config.commit(route, previous, csrfByRoute.get(route) ?? config.csrf);
@@ -43,6 +44,9 @@ export function createBrowserNavigation(config: Readonly<{
       activeRoute = model.current;
       if (model.index !== activeIndex && pendingTarget?.index !== undefined) {
         traversing = { route: model.current, previous, index: model.index };
+        // History traversal commits asynchronously. Freeze inputs after acceptance
+        // until the matching pop event, so that final gap cannot admit a lost edit.
+        config.root.querySelector<HTMLElement>(".sc-route-outlet")?.setAttribute("inert", "");
         history.go(model.index - activeIndex);
       } else {
         stamp(model.index, model.current.href, model.current.href === previous.href);

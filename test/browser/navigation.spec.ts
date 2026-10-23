@@ -37,7 +37,10 @@ test("desktop navigation preserves the document, sidebar identity and scroll acr
   await page.locator(".sc-sidebar").evaluate(element => { element.scrollTop = 50; });
   const scroll = await page.locator(".sc-sidebar").evaluate(element => element.scrollTop); expect(scroll).toBeGreaterThan(0);
   for (const [name, path] of [["Training", "/training"], ["Meals", "/meals"], ["Neural Map", "/mindset/map"], ["Mindset", "/courses/mindset"], ["Nutrition", "/courses/nutrition"], ["Activity", "/courses/activity"], ["Scorecard", "/"]] as const) {
-    await nav(page).getByRole("link", { name, exact: true }).click(); await expect(page).toHaveURL(app.origin + path);
+    const link = nav(page).getByRole("link", { name, exact: true });
+    if (name === "Training") await link.dispatchEvent("click"); else await link.click();
+    await expect(page).toHaveURL(app.origin + path);
+    if (name === "Training") expect(await page.locator(".sc-sidebar").evaluate(element => element.scrollTop)).toBe(scroll);
     await expect(nav(page).getByRole("link", { name, exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page).toHaveTitle(new RegExp(name)); await identity();
     // Clicking an offscreen link may scroll it into view; route rendering keeps that position.
@@ -242,4 +245,32 @@ test("legacy setup drafts survive cancelled route changes and real reloads still
   await nav(page).getByRole("link", { name: "Training", exact: true }).click(); await expect.poll(() => confirmations).toBe(1); await expect(page).toHaveURL(app.origin + "/?panel=setup");
   await nav(page).getByRole("link", { name: "Day 1 setup", exact: true }).click(); await expect(name).toHaveValue("Unsaved setup name");
   await page.evaluate(() => location.reload()); await expect.poll(() => unloads).toBe(1); await expect(name).toHaveValue("Unsaved setup name");
+});
+
+test("background questionnaire saves block sidebar and Back navigation while preserving newer typing", async ({ page }) => {
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 }); await signIn(page, true); await page.goto(app.origin + "/meals");
+    await page.locator('a[href="/?panel=setup"]').filter({ visible: true }).click(); await expect(page).toHaveURL(app.origin + "/onboarding");
+    const chooseQuestionnaire = async () => {
+      const mobile = page.locator(".ob-nav-mobile"); if (await mobile.isVisible()) await mobile.locator("summary").click();
+      await page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Your questionnaire/ }).click();
+      await expect(page.getByRole("heading", { name: "Your questionnaire", exact: true })).toBeVisible();
+    };
+    await chooseQuestionnaire();
+    let release = () => {}, reached = () => {};
+    const held = new Promise<void>(resolve => { release = resolve; }), saving = new Promise<void>(resolve => { reached = resolve; });
+    await page.route("**/api/client/onboarding/save", async route => { const response = await route.fetch(); reached(); await held; await route.fulfill({ response }); }, { times: 1 });
+    try {
+      const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+      await answer.fill("First answer"); await saving; await expect(answer).toBeEnabled(); await answer.fill(`Newest answer at ${width}`);
+      const meals = width === 1440 ? nav(page).getByRole("link", { name: "Meals", exact: true }) : page.locator("#workspace-more-menu").getByRole("link", { name: "Meals", exact: true });
+      if (width !== 1440) await page.getByRole("button", { name: "More navigation", exact: true }).click();
+      await meals.dispatchEvent("click"); await expect(page.locator(".sc-route-status")).toContainText("finish before leaving"); await expect(page).toHaveURL(app.origin + "/onboarding");
+      const backResolved = page.waitForResponse(response => new URL(response.url()).pathname === "/" && response.request().headers().accept === "application/json");
+      await page.evaluate(() => history.back()); await backResolved; await expect(page.locator(".sc-route-status")).toContainText("finish before leaving"); await expect(page).toHaveURL(app.origin + "/onboarding"); await expect(answer).toHaveValue(`Newest answer at ${width}`);
+      release(); await expect(page.getByTestId("onboarding-save-status")).toHaveText("Progress saved to your account");
+      await meals.click(); await expect(page).toHaveURL(app.origin + "/meals");
+      await page.goBack(); await expect(page).toHaveURL(app.origin + "/onboarding"); await chooseQuestionnaire(); await expect(answer).toHaveValue(`Newest answer at ${width}`);
+    } finally { release(); await page.unroute("**/api/client/onboarding/save"); }
+  }
 });
