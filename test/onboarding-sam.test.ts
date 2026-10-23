@@ -134,3 +134,29 @@ test("Continue traverses all eight sections while final completion still enforce
   }
   model = acceptOnboarding(model, { kind: "complete" }); assert.equal(model.pending, undefined); assert.equal(model.section, "audit"); assert.equal(model.showMissing, true); assert.match(model.error, /remaining requirements/);
 });
+
+test("recovery retains a reverted answer after an uncertain autosave while merging untouched server updates", () => {
+  let model = questionnaire(); const original = model.draft.questionnaire.transformation;
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, questionnaire: { ...model.draft.questionnaire, transformation: "A temporary change" } } });
+  model = acceptOnboarding(model, { kind: "autosave" }); const effect = model.pending; assert.ok(effect?.kind === "save");
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, questionnaire: { ...model.draft.questionnaire, transformation: original } } });
+  model = acceptOnboarding(model, { kind: "completed", id: effect.id, effectKind: "save", result: { ok: false, error: { code: "unavailable", message: "Lost response" } } });
+  assert.equal(model.dirty, true);
+  model = acceptOnboarding(model, { kind: "reload" }); const loading = model.pending; assert.ok(loading?.kind === "load");
+  const remote = { ...snapshot(), revision: 3, answers: { ...effect.answers, routine: { ...effect.answers.routine, equipment: "Other tab equipment" } } };
+  model = acceptOnboarding(model, { kind: "completed", id: loading.id, effectKind: "load", result: { ok: true, value: remote } });
+  assert.equal(model.draft.questionnaire.transformation, original); assert.equal(model.draft.routine.equipment, "Other tab equipment"); assert.equal(model.dirty, true);
+  model = finishSave(acceptOnboarding(model, { kind: "autosave" })); assert.equal(model.dirty, false); assert.equal(model.snapshot?.answers.questionnaire.transformation, original);
+});
+
+
+test("autosave preserves raw spaces while semantic saved status uses server-normalized answers", () => {
+  let model = questionnaire(); const raw = "I want to ";
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, questionnaire: { ...model.draft.questionnaire, transformation: raw } } });
+  model = acceptOnboarding(model, { kind: "autosave" }); const effect = model.pending; assert.ok(effect?.kind === "save");
+  const saved = { ...snapshot(), revision: 2, answers: { ...effect.answers, questionnaire: { ...effect.answers.questionnaire, transformation: raw.trim() } } };
+  model = acceptOnboarding(model, { kind: "completed", id: effect.id, effectKind: "save", result: { ok: true, value: saved } });
+  assert.equal(model.draft.questionnaire.transformation, raw); assert.equal(model.dirty, false); assert.equal(acceptOnboarding(model, { kind: "autosave" }), model);
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, questionnaire: { ...model.draft.questionnaire, transformation: model.draft.questionnaire.transformation + "train" } } });
+  model = acceptOnboarding(model, { kind: "autosave" }); assert.ok(model.pending?.kind === "save"); assert.equal(model.pending.answers.questionnaire.transformation, "I want to train");
+});

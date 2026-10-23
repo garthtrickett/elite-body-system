@@ -13,7 +13,10 @@ Do not enable the production gate until Harry’s approved content, private medi
 
 Questionnaire text and goal ranking autosave after a 600 ms pause. Background
 saves leave the fields editable. Save responses reconcile against the answers
-actually sent, retaining newer typing and ranking changes. A pending save remains
+actually sent, retaining newer typing and ranking changes. Raw spaces remain in
+the active answer while saved status uses server-normalized values. An uncertain
+save also retains explicit reversions during recovery, while untouched fields
+can accept other-tab updates. A pending save remains
 protected against page unload. Other sections retain explicit Save progress and
 Save and continue controls.
 

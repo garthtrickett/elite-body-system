@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { createDatabase } from "../../src/platform/database/connection.ts";
 import { createOnboarding, createAssessmentMedia, mediaSlots } from "../../src/features/onboarding/index.ts";
-import { SECTIONS, SECTION_LABELS } from "../../src/features/onboarding/data.ts";
+import { SECTIONS, SECTION_LABELS, QUESTIONS } from "../../src/features/onboarding/data.ts";
 import { startTestApp, testDatabaseUrl } from "../support/app.ts";
 import { onboardingContent, onboardingAnswers, memoryAssessmentStorage, jpegBytes, videoBytes } from "../support/onboarding.ts";
 
@@ -149,7 +149,7 @@ test("Continue advances incomplete sections and final validation keeps focus thr
   await expect(page.getByRole("heading", { name: SECTION_LABELS.lifestyle, exact: true })).toBeFocused();
   await section(page, "questionnaire");
   const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
-  await answer.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await answer.fill(""); await page.getByLabel(QUESTIONS.motivation, { exact: true }).fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
   await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
   await section(page, "call"); await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
   await expect(page.locator(".ob-feedback")).toBeFocused(); await expect(answer).toHaveAttribute("aria-invalid", "true");
@@ -228,15 +228,17 @@ test("questionnaire answers and confirmed goal order autosave without interrupti
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 }); const accountId = await signIn(page, true); await section(page, "questionnaire");
     const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
-    await answer.fill(`A stronger body at ${width}`);
+    await answer.fill(`A stronger body at ${width} `);
     await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible(); await expect(answer).toBeFocused();
+    await expect(answer).toHaveValue(`A stronger body at ${width} `); await answer.pressSequentially("with Harry");
+    await expect(page.getByTestId("onboarding-save-status")).toHaveText("Progress saved to your account");
     const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Questionnaire read failed");
-    expect(saved.value.answers.questionnaire.transformation).toBe(`A stronger body at ${width}`);
+    expect(saved.value.answers.questionnaire.transformation).toBe(`A stronger body at ${width} with Harry`);
     await page.getByRole("button", { name: "Move Strength up", exact: true }).click();
     await page.getByLabel("This is my preferred goal order.").check();
     await expect(page.getByTestId("onboarding-save-status")).toHaveText("Progress saved to your account");
     await page.reload(); await section(page, "questionnaire");
-    await expect(answer).toHaveValue(`A stronger body at ${width}`); await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
+    await expect(answer).toHaveValue(`A stronger body at ${width} with Harry`); await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
     await expect(page.getByLabel("This is my preferred goal order.")).toBeChecked();
     await page.screenshot({ path: info.outputPath(`questionnaire-autosaved-${width}.png`) });
   }
@@ -292,4 +294,23 @@ test("Continue follows all eight sections with unfinished content while Finish k
     const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Onboarding read failed"); expect(saved.value.completedAt).toBeNull();
     await page.goto(app.origin + "/training"); await expect(page).toHaveURL(app.origin + "/onboarding");
   } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
+
+test("an uncertain autosave preserves the latest reverted answer through recovery and persistence", async ({ page }) => {
+  const accountId = await signIn(page, true); await section(page, "questionnaire");
+  const answer = page.getByLabel(QUESTIONS.transformation, { exact: true }), original = await answer.inputValue();
+  let release: () => void = () => {}, entered: () => void = () => {};
+  const held = new Promise<void>(resolve => { release = resolve; }), reached = new Promise<void>(resolve => { entered = resolve; });
+  await page.route("**/api/client/onboarding/save", async route => {
+    const committed = await route.fetch(); expect(committed.ok()).toBe(true); entered(); await held;
+    await route.fulfill({ status: 503, json: { ok: false, error: { code: "unavailable", message: "Fixture lost autosave response" } } });
+  }, { times: 1 });
+  try {
+    await answer.fill("A temporary change"); await reached; await answer.fill(original); release();
+    await expect(page.getByRole("alert")).toContainText("lost autosave response"); await expect(answer).toHaveValue(original);
+    await page.getByRole("button", { name: "Reload saved progress", exact: true }).click();
+    await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible(); await expect(answer).toHaveValue(original);
+    const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Recovered answer unavailable"); expect(saved.value.answers.questionnaire.transformation).toBe(original);
+    await page.reload(); await section(page, "questionnaire"); await expect(answer).toHaveValue(original);
+  } finally { release(); await page.unroute("**/api/client/onboarding/save"); }
 });

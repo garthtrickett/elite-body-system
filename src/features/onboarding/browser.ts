@@ -19,7 +19,7 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
   const uploads = new Map<number, Promise<void>>();
   let autosaveTimer: number | undefined;
-  let selection = 0, shownSection = "", shownError = "", shownMissing = false, shownPending: OnboardingEffect["kind"] | undefined, dragged: Goal | null = null;
+  let selection = 0, shownSection = "", shownError = "", shownMissing = false, dragged: Goal | null = null;
   const unavailable = () => ({ ok: false, error: { code: "unavailable", message: "The file could not be uploaded. Reload saved progress, remove any unfinished upload and try again." } } as const);
   function moveTo(target: Goal) {
     const model = runtime.getModel();
@@ -47,8 +47,8 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
         root.querySelector<HTMLDetailsElement>(".ob-nav-mobile")?.removeAttribute("open");
         const heading = root.querySelector<HTMLElement>(".ob-title"); heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: "start", behavior: "instant" });
       }
-      if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && (!shownMissing || shownPending === "save" && !state.pending)) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
-      shownError = state.error; shownMissing = state.showMissing; shownPending = state.pending?.kind;
+      if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && !shownMissing) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
+      shownError = state.error; shownMissing = state.showMissing;
       window.clearTimeout(autosaveTimer);
       autosaveTimer = state.section === "questionnaire" && state.dirty && !state.pending && !state.error && !state.reloadRequired && !state.accountBusy && !state.snapshot?.completedAt
         ? window.setTimeout(() => runtime.propose({ kind: "autosave" }), 600) : undefined;
