@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 import { createDatabase } from "../../src/platform/database/connection.ts";
 import { createOnboarding, createAssessmentMedia, mediaSlots } from "../../src/features/onboarding/index.ts";
 import { SECTIONS, SECTION_LABELS, QUESTIONS } from "../../src/features/onboarding/data.ts";
@@ -20,7 +21,7 @@ async function signIn(page: Page, seeded = false) {
   await page.context().addCookies([{ name: "ebs-session", value: redeemed.value.sessionToken, httpOnly: true, sameSite: "Lax", url: app.origin }]);
   await page.route("https://example.test/**", route => route.fulfill({ status: 200, body: "" }));
   await page.goto(app.origin); await expect(page).toHaveURL(app.origin + "/onboarding");
-  await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible();
   return provisioned.value.id;
 }
 async function section(page: Page, key: typeof SECTIONS[number]) {
@@ -40,7 +41,7 @@ test("all eight onboarding sections reflow at narrow, landscape and desktop size
   await page.getByLabel("What should Harry call you?").fill("Taylor");
   const timezone = page.getByLabel("Your time zone (for example Europe/London)");
   await timezone.clear(); await timezone.pressSequentially("Europe/London"); await expect(timezone).toHaveValue("Europe/London");
-  await page.getByRole("button", { name: "Save progress", exact: true }).click();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   await page.reload(); await expect(page.getByLabel("What should Harry call you?")).toHaveValue("Taylor");
   for (const viewport of [{ width: 320, height: 568 }, { width: 844, height: 390 }, { width: 1440, height: 1000 }]) {
@@ -70,6 +71,60 @@ test("a fully submitted assessment with a confirmed booking finishes onboarding 
   await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
   await expect(page).toHaveURL(app.origin + "/");
   await expect(page.getByRole("dialog")).not.toBeVisible();
+  await sql`update onboarding_records set data = data #- '{answers,questionnaire,finalThought}' where account_id = ${accountId}`.execute(db);
+  await page.goto(app.origin + "/onboarding"); await section(page, "questionnaire");
+  const finalThought = page.getByLabel("What was the final thought that made you decide to sign up?", { exact: true });
+  await expect(finalThought).toHaveValue(""); await expect(finalThought).toBeDisabled();
+  await expect(page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ })).toContainText("✓");
+});
+test("Welcome completion saves before showing its check and keeps it after revisiting and reloading", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 }); await signIn(page);
+  const welcome = page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Welcome video/ });
+  await page.getByLabel("What should Harry call you?", { exact: true }).fill("Taylor");
+  await page.getByLabel("I’ve watched or read this guidance and understand what to do.", { exact: true }).check();
+  await expect(welcome).not.toContainText("✓");
+  await expect(page.getByRole("button", { name: "Save progress", exact: true })).toHaveCount(0);
+  let saves = 0;
+  page.on("request", request => { if (request.url().endsWith("/api/client/onboarding/save") && request.method() === "POST") saves++; });
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Start Point Form", exact: true })).toBeVisible();
+  expect(saves).toBe(1); await expect(welcome).toContainText("✓");
+  await section(page, "welcome"); await expect(welcome).toContainText("✓");
+  await page.reload(); await expect(welcome).toContainText("✓");
+  await expect(page.getByLabel("What should Harry call you?", { exact: true })).toHaveValue("Taylor");
+  await expect(page.getByLabel("I’ve watched or read this guidance and understand what to do.", { exact: true })).toBeChecked();
+});
+test("Start Point Form places questions around full-width goal cards and saves their dragged order", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 }); await signIn(page, true); await section(page, "questionnaire");
+  const labels = await page.locator(".ob-main > .ob-fields").evaluate(form => [...form.children].flatMap(child => {
+    const label = child.querySelector(".sc-label"); return label ? [label.textContent] : [];
+  }));
+  expect(labels).toEqual([
+    "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
+    "What are your main reasons for doing this now? Your “WHY”?",
+    "Why did you choose EBS to solve this over other options?",
+    "What was the final thought that made you decide to sign up?",
+    "Rank your fitness goals",
+    "What previous experience do you have with personal training or fitness programs?",
+    "What motivates you to stay committed to your fitness to achieve that result?",
+    "When have you succeeded physically in the past, and what made you succeed?",
+    "What particular struggles need solving to achieve your desired result?",
+  ]);
+  await page.locator('[data-goal="strength"] .ob-rank-handle').dragTo(page.locator('[data-goal="mobility"]'));
+  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
+  await expect(page.getByLabel("This is my preferred goal order.")).not.toBeChecked();
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const sizes = await page.locator(".ob-ranking").evaluate(list => [...list.children].map(card => ({ list: list.getBoundingClientRect().width, card: card.getBoundingClientRect().width })));
+    for (const size of sizes) expect(Math.abs(size.list - size.card)).toBeLessThan(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  }
+  await page.getByLabel("This is my preferred goal order.").check();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeVisible();
+  await page.reload(); await section(page, "questionnaire");
+  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
+  await expect(page.getByLabel("This is my preferred goal order.")).toBeChecked();
 });
 test("goal ranking supports keyboard controls and preserves order after saving and reloading", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 }); await signIn(page, true); await section(page, "questionnaire");
@@ -78,7 +133,7 @@ test("goal ranking supports keyboard controls and preserves order after saving a
   await expect(page.getByRole("button", { name: "Reorder Strength with arrow keys or drag", exact: true })).toBeFocused();
   await expect(page.getByLabel("This is my preferred goal order.")).not.toBeChecked();
   await page.getByLabel("This is my preferred goal order.").check();
-  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Complete", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   await page.reload(); await section(page, "questionnaire"); await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
 });
 test("onboarding sign-out failures remain visible and cancelling a dirty exit retains the answers", async ({ page }) => {
@@ -92,7 +147,7 @@ test("onboarding sign-out failures remain visible and cancelling a dirty exit re
   page.once("dialog", dialog => dialog.dismiss());
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByLabel("What should Harry call you?")).toHaveValue("Unsaved name"); expect(calls).toBe(1);
-  await page.getByRole("button", { name: "Save progress", exact: true }).click();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
 });
 test("cancelling an upload during a failed answer-save preserves the draft for a successful retry", async ({ page }) => {
@@ -104,9 +159,9 @@ test("cancelling an upload during a failed answer-save preserves the draft for a
   await page.getByLabel("Upload front photo", { exact: true }).setInputFiles({ name: "front.jpg", mimeType: "image/jpeg", buffer: jpegBytes });
   await saving; await page.getByRole("button", { name: "Cancel upload", exact: true }).click(); release?.();
   await expect(page.getByText("Upload cancelled. Check your answers and save any remaining changes.", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Waistline (cm)", { exact: true })).toHaveValue("81"); await expect(page.getByText("Unsaved changes", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Waistline (cm)", { exact: true })).toHaveValue("81"); await expect(page.getByText("Complete this section to save your changes.", { exact: true })).toBeVisible();
   await page.unroute("**/api/client/onboarding/save");
-  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Complete", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   await page.reload(); await section(page, "measurements"); await expect(page.getByLabel("Waistline (cm)", { exact: true })).toHaveValue("81");
 });
 
@@ -145,11 +200,11 @@ test("mobile assessment uploads persist only after verification, and booking lin
 test("Continue advances incomplete sections and final validation keeps focus through questionnaire corrections", async ({ page }) => {
   await signIn(page, true); await section(page, "measurements");
   const waist = page.getByRole("textbox", { name: /^Waistline \(cm\)/ });
-  await waist.fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await waist.fill(""); await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("heading", { name: SECTION_LABELS.lifestyle, exact: true })).toBeFocused();
   await section(page, "questionnaire");
-  const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
-  await answer.fill(""); await page.getByLabel(QUESTIONS.motivation, { exact: true }).fill(""); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  const answer = page.getByLabel("What would be an incredible result for you over the next 180 days? What do you want to achieve?", { exact: true });
+  await answer.fill(""); await page.getByLabel(QUESTIONS.motivation, { exact: true }).fill(""); await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
   await section(page, "call"); await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
   await expect(page.locator(".ob-feedback")).toBeFocused(); await expect(answer).toHaveAttribute("aria-invalid", "true");
@@ -162,10 +217,10 @@ test("a failed save can reconcile and retry without discarding the client’s un
   await signIn(page, true);
   const name = page.getByLabel("What should Harry call you?", { exact: true }); await name.fill("Important unsaved name");
   await page.route("**/api/client/onboarding/save", route => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, error: { code: "unavailable", message: "Fixture temporary outage" } }) }));
-  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByRole("alert")).toContainText("temporary outage");
+  await page.getByRole("button", { name: "Complete", exact: true }).click(); await expect(page.getByRole("alert")).toContainText("temporary outage");
   await page.unroute("**/api/client/onboarding/save"); await page.getByRole("button", { name: "Reload saved progress", exact: true }).click();
   await expect(name).toHaveValue("Important unsaved name"); await expect(name).toBeEnabled();
-  await page.getByRole("button", { name: "Save progress", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Complete", exact: true }).click(); await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   await page.reload(); await expect(name).toHaveValue("Important unsaved name");
 });
 
@@ -227,7 +282,7 @@ test("a rejected replacement cleans up its pending file and preserves the previo
 test("questionnaire answers and confirmed goal order autosave without interrupting desktop or phone typing", async ({ page }, info) => {
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 900 }); const accountId = await signIn(page, true); await section(page, "questionnaire");
-    const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+    const answer = page.getByLabel("What would be an incredible result for you over the next 180 days? What do you want to achieve?", { exact: true });
     await answer.fill(`A stronger body at ${width} `);
     await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible(); await expect(answer).toBeFocused();
     await expect(answer).toHaveValue(`A stronger body at ${width} `); await answer.pressSequentially("with Harry");
@@ -253,9 +308,9 @@ test("Continue during a held autosave flushes newer answers before showing the n
     page.on("request", count);
     await page.route("**/api/client/onboarding/save", async route => { const response = await route.fetch(); entered(); await hold; await route.fulfill({ response }); }, { times: 1 });
     try {
-      const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+      const answer = page.getByLabel("What would be an incredible result for you over the next 180 days? What do you want to achieve?", { exact: true });
       await answer.fill("First answer"); await reached; await expect(answer).toBeEnabled();
-      await answer.fill("Latest answer before Continue"); await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+      await answer.fill("Latest answer before Continue"); await page.getByRole("button", { name: "Complete", exact: true }).click();
       await expect(answer).toBeDisabled(); await expect(page.getByRole("heading", { name: SECTION_LABELS.questionnaire, exact: true })).toBeVisible();
       release(); await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
       const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Saved questionnaire unavailable");
@@ -268,15 +323,15 @@ test("Continue during a held autosave flushes newer answers before showing the n
 test("a failed questionnaire autosave keeps the draft and section until recovery saves it", async ({ page }) => {
   const accountId = await signIn(page, true); await section(page, "questionnaire");
   await page.route("**/api/client/onboarding/save", route => route.fulfill({ status: 503, json: { ok: false, error: { code: "unavailable", message: "Autosave is temporarily unavailable" } } }), { times: 1 });
-  const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+  const answer = page.getByLabel("What would be an incredible result for you over the next 180 days? What do you want to achieve?", { exact: true });
   await answer.fill("Keep this important answer");
   await expect(page.getByRole("alert")).toContainText("temporarily unavailable"); await expect(answer).toHaveValue("Keep this important answer");
-  await expect(page.getByRole("button", { name: "Save and continue", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Complete", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Reload saved progress", exact: true }).click();
   await expect(page.getByText("Saved to your account.", { exact: true })).toBeVisible();
   const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Autosave retry read failed");
   expect(saved.value.answers.questionnaire.transformation).toBe("Keep this important answer");
-  await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeFocused();
 });
 
@@ -285,7 +340,7 @@ test("Continue follows all eight sections with unfinished content while Finish k
     expect((await onboarding.configure({ content: { ...onboardingContent(), version: "browser-unconfigured", approved: false, welcomeVideo: "", consentText: "", measurementVideo: "", bookingUrl: "" } })).ok).toBe(true);
     const accountId = await signIn(page);
     for (const key of SECTIONS.slice(1)) {
-      await page.getByRole("button", { name: "Save and continue", exact: true }).click();
+      await page.getByRole("button", { name: "Complete", exact: true }).click();
       await expect(page.getByRole("heading", { name: SECTION_LABELS[key], exact: true })).toBeFocused();
     }
     await expect(page.getByText("0 of 8 sections ready", { exact: true })).toBeVisible();

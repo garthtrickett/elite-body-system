@@ -1,6 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 import { createDatabase } from "../src/platform/database/connection.ts";
 import type { AccountsId } from "../src/platform/database/generated/public/Accounts.ts";
 import { createOnboarding, createAssessmentMedia, mediaSlots, emptyAnswers, parseAnswers, parseContent, missingRequirements } from "../src/features/onboarding/index.ts";
@@ -93,6 +94,23 @@ test("unconfigured content cannot complete onboarding; saved answers resume with
   const other = await onboarding.get({ accountId: b.id }); assert.ok(other.ok); assert.equal(other.value.answers.questionnaire.now, "");
   const row = await db.selectFrom("onboarding_records").select("data").where("account_id", "=", a.id as AccountsId).executeTakeFirstOrThrow();
   assert.match(JSON.stringify(row.data), /signedAt/);
+});
+
+test("older saved questionnaires keep their answers and require the new final-thought answer", async () => {
+  const a = await account(), previous = await saved(a.id);
+  await sql`update onboarding_records set data = data #- '{answers,questionnaire,finalThought}' where account_id = ${a.id}`.execute(db);
+  const resumed = await onboarding.get({ accountId: a.id }); assert.ok(resumed.ok);
+  assert.equal(resumed.value.answers.questionnaire.finalThought, "");
+  assert.equal(resumed.value.answers.questionnaire.motivation, previous.answers.questionnaire.motivation);
+  assert.equal(resumed.value.answers.questionnaire.transformation, previous.answers.questionnaire.transformation);
+  assert.equal(resumed.value.missing.questionnaire.length, 1);
+  assert.match(resumed.value.missing.questionnaire[0]!, /final thought/);
+  assert.equal(parseAnswers({ ...resumed.value.answers, questionnaire: { ...resumed.value.answers.questionnaire, finalThought: 42 } }).ok, false);
+  const updated = await onboarding.save({ accountId: a.id, revision: resumed.value.revision, contentVersion: resumed.value.content.version, answers: { ...resumed.value.answers, questionnaire: { ...resumed.value.answers.questionnaire, finalThought: "I was ready for coaching" } } });
+  assert.ok(updated.ok); assert.deepEqual(updated.value.missing.questionnaire, []);
+  const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
+  assert.equal(reloaded.value.answers.questionnaire.finalThought, "I was ready for coaching");
+  assert.equal(reloaded.value.answers.questionnaire.motivation, previous.answers.questionnaire.motivation);
 });
 
 test("private media rejects other accounts, invalid bytes, oversized files and pending submissions; failed replacement preserves the ready file", async () => {

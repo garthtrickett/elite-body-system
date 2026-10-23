@@ -17,10 +17,9 @@ actually sent, retaining newer typing and ranking changes. Raw spaces remain in
 the active answer while saved status uses server-normalized values. An uncertain
 save also retains explicit reversions during recovery, while untouched fields
 can accept other-tab updates. A pending save remains
-protected against page unload. Other sections retain explicit Save progress and
-Save and continue controls.
+protected against page unload. Other sections save when Complete is selected.
 
-Save and continue saves the latest draft and moves to the next section in the
+Complete saves the latest draft and moves to the next section in the
 eight-section order. It can be requested during a background save; the current
 section stays visible until any newer answers are also saved. Failed saves retain
 the draft and section. Reload saved progress reconciles local edits with the

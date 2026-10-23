@@ -105,7 +105,7 @@ test("mobile More dismisses, content scroll resets, modified links keep href beh
   await expect(page).toHaveURL(app.origin + "/training"); await identity();
   expect(await page.locator("#workspace-content").evaluate(element => element.scrollTop)).toBe(0);
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Day 1 setup", exact: true }).click();
-  await expect(page).toHaveURL(app.origin + "/onboarding"); await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(app.origin + "/onboarding"); await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Day 1 setup", exact: true })).toHaveAttribute("aria-current", "page"); await identity();
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Scorecard", exact: true }).click();
   await expect(page).toHaveURL(app.origin + "/"); await identity();
@@ -230,7 +230,7 @@ test("mandatory onboarding and expired sessions remain authoritative during clie
     const session = await gated.auth.redeemLink({ token: new URL(await gated.readLink(email)).hash.slice(1) }); if (!session.ok) throw new Error("Fixture session failed");
     await page.context().addCookies([{ name: "ebs-session", value: session.value.sessionToken, url: gated.origin, httpOnly: true, sameSite: "Lax" }]);
     await page.setViewportSize({ width: 1440, height: 900 }); await page.goto(gated.origin); await expect(page).toHaveURL(gated.origin + "/onboarding");
-    await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible(); const identity = await stableNodes(page); const length = await page.evaluate(() => history.length);
+    await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible(); const identity = await stableNodes(page); const length = await page.evaluate(() => history.length);
     const response = await page.request.get(gated.origin + "/training", { headers: { Accept: "application/json" } }); expect(response.url()).toBe(gated.origin + "/onboarding"); expect((await response.json()).value.page).toBe("onboarding");
     await nav(page).getByRole("link", { name: "Training", exact: true }).click(); await expect(page.locator(".sc-route-status")).toBeHidden(); await expect(page).toHaveURL(gated.origin + "/onboarding"); await identity(); expect(await page.evaluate(() => history.length)).toBe(length);
     expect((await page.request.get(gated.origin + "/api/client/training")).status()).toBe(403);
@@ -264,7 +264,7 @@ test("background questionnaire saves block sidebar and Back navigation while pre
     const held = new Promise<void>(resolve => { release = resolve; }), saving = new Promise<void>(resolve => { reached = resolve; });
     await page.route("**/api/client/onboarding/save", async route => { const response = await route.fetch(); reached(); await held; await route.fulfill({ response }); }, { times: 1 });
     try {
-      const answer = page.getByLabel("What would you consider an incredible result or transformation in 180 days?", { exact: true });
+      const answer = page.getByLabel("What would be an incredible result for you over the next 180 days? What do you want to achieve?", { exact: true });
       await answer.fill("First answer"); await saving; await expect(answer).toBeEnabled(); await answer.fill(`Newest answer at ${width}`);
       const meals = width === 1440 ? nav(page).getByRole("link", { name: "Meals", exact: true }) : page.locator("#workspace-more-menu").getByRole("link", { name: "Meals", exact: true });
       if (width !== 1440) await page.getByRole("button", { name: "More navigation", exact: true }).click();
