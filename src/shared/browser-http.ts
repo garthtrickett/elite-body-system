@@ -2,11 +2,11 @@ import { isRecord } from "./validation.ts";
 import type { ClientResult } from "./client-result.ts";
 
 /** Same-origin transport. CSRF and the fetch dependency stay outside feature models. */
-export function createClientTransport(config: Readonly<{ csrf: string; send: typeof fetch }>) {
+export function createClientTransport(config: Readonly<{ csrf: string; send: typeof fetch; signal?: AbortSignal }>) {
   const send = config.send;
   return async <T>(input: Readonly<{ path: string; body?: unknown; parse: (value: unknown) => T | undefined; timeout?: number }>): Promise<ClientResult<T>> => {
     try {
-      const response = await send(input.path, { credentials: "same-origin", redirect: "error", signal: AbortSignal.timeout(input.timeout ?? 15000),
+      const response = await send(input.path, { credentials: "same-origin", redirect: "error", signal: AbortSignal.any([AbortSignal.timeout(input.timeout ?? 15000), ...(config.signal ? [config.signal] : [])]),
         ...(input.body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-CSRF-Token": config.csrf }, body: JSON.stringify(input.body) }) });
       const value: unknown = await response.json();
       if (response.ok && isRecord(value) && value.ok === true) { const parsed = input.parse(value.value); if (parsed !== undefined) return { ok: true, value: parsed }; }

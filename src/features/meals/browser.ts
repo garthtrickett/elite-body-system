@@ -1,3 +1,6 @@
+import { mealsNavigation } from "./browser-model.ts";
+export { mealsNavigation } from "./browser-model.ts";
+import type { RouteHost } from "../../shared/browser-route.ts";
 import { render } from "lit-html";
 import { createSamRuntime } from "../../shared/sam-runtime.ts";
 import { createClientTransport } from "../../shared/browser-http.ts";
@@ -11,11 +14,13 @@ export { parseMeal, parseMealSnapshot, mealTotals, emptyMeal } from "./data.ts";
 export type { MealEffect, MealModel, MealProposal } from "./browser-model.ts";
 export type { Meal, MealSnapshot } from "./data.ts";
 
-export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>) {
-  const call = createClientTransport({ csrf: config.csrf, send: fetch }), selections = new Map<number, readonly File[]>();
+export function mountMeals(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string }>) {
+  const scope = new AbortController();
+  const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal }), selections = new Map<number, readonly File[]>();
   let ingredientCount = 0;
   let sequence = 0, reviewing = false, validationAttempt = 0, shownError: string | null = null;
   function present(state: MealState): void {
+    config.navigationChanged(mealsNavigation(state));
     render(mealsView(state, { propose: proposal => runtime.propose(proposal), log: () => runtime.propose({ kind: "logRequested", requestId: crypto.randomUUID() }), photos: files => {
       const selection = ++sequence; selections.set(selection, Array.from(files ?? [])); runtime.propose({ kind: "photosRequested", selection });
       const pending = runtime.getModel().pending; if (pending?.kind !== "preparePhotos" || pending.selection !== selection) selections.delete(selection);
@@ -55,7 +60,7 @@ export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>
         const safe = destination.origin === location.origin;
         if (effect.kind === "confirmNavigation") return { kind: "navigationConfirmed", id: effect.id,
           leave: safe && window.confirm("Discard this unfinished meal? Your changes have not been logged.") };
-        if (safe) location.assign(destination.href);
+        if (safe) config.navigate(destination.href);
         return { kind: "navigationConfirmed", id: effect.id, leave: false };
       }
       if (effect.kind === "preparePhotos") {
@@ -68,8 +73,8 @@ export function mountMeals(root: HTMLElement, config: Readonly<{ csrf: string }>
         ...(effect.kind === "load" ? {} : { body: effect.kind === "log" ? { date: effect.date, requestId: effect.requestId, meal: effect.meal, favorite: effect.favorite } : { id: effect.mealId, date: effect.date } }) }) };
     },
   });
-  const protectUnsaved = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (model.pending?.kind !== "navigate" && (model.draft || model.description.trim() || model.photos.length || model.pending?.kind === "log" || model.retry?.kind === "log")) { event.preventDefault(); event.returnValue = ""; } };
+  const protectUnsaved = (event: BeforeUnloadEvent) => { if (mealsNavigation(runtime.getModel()).kind !== "ready") { event.preventDefault(); event.returnValue = ""; } };
   window.addEventListener("beforeunload", protectUnsaved);
   runtime.propose({ kind: "started" });
-  return { dispose: () => { window.removeEventListener("beforeunload", protectUnsaved); selections.clear(); runtime.dispose(); } } as const;
+  return { navigation: () => mealsNavigation(runtime.getModel()), dispose: () => { scope.abort(); window.removeEventListener("beforeunload", protectUnsaved); selections.clear(); runtime.dispose(); } } as const;
 }

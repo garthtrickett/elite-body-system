@@ -57,12 +57,12 @@ test("desktop scorecard keeps progress visible and account dialogs work across r
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByLabel("Calories eaten today").fill("2150"); await page.getByLabel("Calories eaten today").press("Enter");
   await expect(page.getByTestId("save-status")).toHaveText("Saved to your account");
-  await nav(page).getByRole("button", { name: "Profile", exact: true }).click();
+  await nav(page).getByRole("link", { name: "Profile", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   expect((await page.getByRole("dialog").boundingBox())!.width).toBeGreaterThan(600);
   await page.screenshot({ path: info.outputPath("profile-desktop.png"), fullPage: true });
   await page.keyboard.press("Escape");
-  await expect(nav(page).getByRole("button", { name: "Profile", exact: true })).toBeFocused();
+  await expect(nav(page).getByRole("link", { name: "Profile", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Open L to R" }).click();
   await sideBySide(page.getByLabel("Left · Brain dump"), page.getByLabel("Add a goal", { exact: true }));
   await page.getByLabel("Left · Brain dump").fill("Plan my training week");

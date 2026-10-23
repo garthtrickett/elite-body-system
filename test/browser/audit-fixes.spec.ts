@@ -112,7 +112,7 @@ test("profile prioritises targets and onboarding explains its sections and close
   await expect(page.getByLabel("Energy (kcal)")).toBeInViewport();
   await page.getByRole("button", { name: "Close dialog", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeHidden();
-  await page.getByRole("button", { name: "Day 1 setup", exact: true }).click();
+  await page.getByRole("link", { name: "Day 1 setup", exact: true }).click();
   await expect(page.getByRole("progressbar", { name: "Setup progress" })).toHaveAttribute("max", "34");
   await expect(page.locator('.sc-setup-sections [aria-current="step"]')).toHaveText("1. Your routine");
   await page.screenshot({ path: info.outputPath("setup-progress.png") });

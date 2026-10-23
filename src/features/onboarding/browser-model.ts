@@ -1,3 +1,4 @@
+import type { NavigationGuard } from "../../shared/browser-route.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import { SECTIONS, emptyAnswers, missingRequirements } from "./data.ts";
 import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
@@ -21,6 +22,7 @@ export type OnboardingModel = Readonly<{
   accountBusy: boolean; accountProblem: string; exiting: boolean;
 }>;
 export type OnboardingProposal =
+  | Readonly<{ kind: "navigationHandled"; id: number }>
   | Readonly<{ kind: "started" | "reload" | "save" | "next" | "complete" }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
@@ -60,6 +62,7 @@ function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: Onboa
   };
 }
 export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingProposal): OnboardingModel {
+  if (proposal.kind === "navigationHandled") return model.pending?.kind === "navigate" && model.pending.id === proposal.id ? { ...model, pending: undefined } : model;
   if (proposal.kind === "accountChanged") return { ...model, accountBusy: proposal.busy, accountProblem: proposal.problem, exiting: proposal.problem ? false : model.exiting };
   if (proposal.kind === "signOutConfirmed") return model.pending?.id === proposal.id && model.pending.kind === "signOut" ? { ...model, pending: undefined, exiting: proposal.accepted && !model.accountProblem } : model;
   if (proposal.kind === "uploadFinalizing") return model.pending?.id === proposal.id && model.pending.kind === "upload" ? { ...model, finalizing: true } : model;
@@ -109,4 +112,9 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
 }
 export function representOnboarding(model: OnboardingModel) {
   return { ...model, busy: !!model.pending || model.accountBusy, missing: model.snapshot ? missingRequirements({ ...model.snapshot, answers: model.draft }) : null } as const;
+}
+
+export function onboardingNavigation(model: OnboardingModel): NavigationGuard {
+  if (model.accountBusy || model.pending && model.pending.kind !== "load" && model.pending.kind !== "navigate") return { kind: "blocked", message: "Wait for your onboarding action to finish before leaving." };
+  return model.dirty ? { kind: "confirm", message: "Discard your unsaved onboarding answers? Cancel to save your progress first." } : { kind: "ready" };
 }

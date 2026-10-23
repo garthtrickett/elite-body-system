@@ -90,12 +90,12 @@ test("all current workflows fit narrow screens and 200 percent zoom reflow", asy
     await page.screenshot({ path: info.outputPath(`${path.replaceAll("/", "-") || "scorecard"}-320.png`), fullPage: true });
   }
   await page.goto(app.origin);
-  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
   await fits(page);
   await expect(page.getByRole("dialog")).toContainText("AlexandraMontgomery".repeat(4));
   await page.screenshot({ path: info.outputPath("profile-long-content.png") });
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Profile", exact: true })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Profile", exact: true })).toBeFocused();
   // Use a stable context so full-page capture cannot reset emulated metrics.
   // This reproduces the CSS viewport/pixel density of 200% on a 1440px display.
   const zoomed = await browser.newContext({ viewport: { width: 720, height: 500 }, deviceScaleFactor: 2, reducedMotion: "reduce" });

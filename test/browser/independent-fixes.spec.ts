@@ -65,7 +65,7 @@ test("unfinished meal navigation requires an explicit discard decision", async (
   await expect(page).toHaveURL(app.origin + "/meals");
   await expect(page.getByLabel("Meal name", { exact: true })).toHaveValue("Unfinished lunch");
   await expect(page.getByLabel("Ingredient 2 name", { exact: true })).toHaveValue("Ingredient");
-  const backDialog = page.waitForEvent("dialog").then(async dialog => { expect(dialog.type()).toBe("beforeunload"); await dialog.dismiss(); });
+  const backDialog = page.waitForEvent("dialog").then(async dialog => { expect(dialog.type()).toBe("confirm"); await dialog.dismiss(); });
   const back = page.goBack({ waitUntil: "commit", timeout: 5000 }).catch(() => null);
   await backDialog; await back;
   await expect(page).toHaveURL(app.origin + "/meals");
