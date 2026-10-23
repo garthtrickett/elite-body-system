@@ -14,11 +14,12 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
   const call = createClientTransport({ csrf: config.csrf, send: fetch });
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
   const uploads = new Map<number, Promise<void>>();
+  let autosaveTimer: number | undefined;
   let selection = 0, shownSection = "", shownError = "", shownMissing = false, shownPending: OnboardingEffect["kind"] | undefined, dragged: Goal | null = null;
   const unavailable = () => ({ ok: false, error: { code: "unavailable", message: "The file could not be uploaded. Reload saved progress, remove any unfinished upload and try again." } } as const);
   function moveTo(target: Goal) {
     const model = runtime.getModel();
-    if (!dragged || model.pending || model.snapshot?.completedAt) return;
+    if (!dragged || representOnboarding(model).busy || model.reloadRequired || model.snapshot?.completedAt) return;
     const goals = [...model.draft.goals], from = goals.indexOf(dragged), to = goals.indexOf(target);
     if (from !== to && from >= 0 && to >= 0) { goals.splice(from, 1); goals.splice(to, 0, dragged); runtime.propose({ kind: "edit", answers: { ...model.draft, goals, goalsConfirmed: false } }); }
   }
@@ -43,6 +44,9 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
       }
       if (state.error && state.error !== shownError || state.showMissing && state.missing?.[state.section].length && (!shownMissing || shownPending === "save" && !state.pending)) { const feedback = root.querySelector<HTMLElement>(".ob-feedback"); feedback?.focus({ preventScroll: true }); feedback?.scrollIntoView({ block: "center", behavior: "instant" }); }
       shownError = state.error; shownMissing = state.showMissing; shownPending = state.pending?.kind;
+      window.clearTimeout(autosaveTimer);
+      autosaveTimer = state.section === "questionnaire" && state.dirty && !state.pending && !state.error && !state.reloadRequired && !state.accountBusy && !state.snapshot?.completedAt
+        ? window.setTimeout(() => runtime.propose({ kind: "autosave" }), 600) : undefined;
     },
     failed: effect => ({ kind: "failed", id: effect.id }),
     perform: async effect => {
@@ -108,10 +112,10 @@ export function mountOnboarding(root: HTMLElement, config: Readonly<{ csrf: stri
     },
   });
   function load() { return call({ path: "/api/client/onboarding", parse: parseSnapshot }); }
-  const protect = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if ((model.dirty && !model.exiting) || model.pending?.kind === "upload") event.preventDefault(); };
+  const protect = (event: BeforeUnloadEvent) => { const model = runtime.getModel(); if (((model.dirty || model.pending?.kind === "save") && !model.exiting) || model.pending?.kind === "upload") event.preventDefault(); };
   window.addEventListener("beforeunload", protect);
   runtime.propose({ kind: "started" });
-  return { updateAccount: ({ account }: Readonly<{ account: Readonly<{ busy: boolean; problem: string }> }>) => runtime.propose({ kind: "accountChanged", busy: account.busy, problem: account.problem }), dispose: () => { for (const controller of controllers.values()) controller.abort(); files.clear(); window.removeEventListener("beforeunload", protect); runtime.dispose(); } } as const;
+  return { updateAccount: ({ account }: Readonly<{ account: Readonly<{ busy: boolean; problem: string }> }>) => runtime.propose({ kind: "accountChanged", busy: account.busy, problem: account.problem }), dispose: () => { window.clearTimeout(autosaveTimer); for (const controller of controllers.values()) controller.abort(); files.clear(); window.removeEventListener("beforeunload", protect); runtime.dispose(); } } as const;
 }
 function uploadFile(input: Readonly<{ file: File; url: string; headers: Readonly<Record<string, string>>; signal: AbortSignal; progress: (percent: number) => void }>): Promise<void> {
   return new Promise((resolve, reject) => {
