@@ -53,15 +53,18 @@ Store separate named answers, rather than overloading the old story keys:
 2. What are your main reasons for doing this now? Your “WHY”?
 3. What motivates you to stay committed to your fitness to achieve that result?
 4. What in particular struggles need solving to achieve your desired result? Free text; “none identified” is valid.
-5. Rank your fitness goals: Mobility, Strength, Gain muscle, Energy, Get fit, Get lean, Reduce pain, Consistency, Improve health markers. Store an ordered array of nine stable IDs, with no missing or duplicate entries. Use full-width cards supporting touch/drag and keyboard-accessible Move up/Move down controls. Require explicit confirmation of the order so an untouched default is not mistaken for a considered ranking.
+5. Rank your fitness goals in priority order: Mobility, Strength, Gain muscle, Energy, Get Cardio Fit, Get lean, Reduce pain, Consistency, Improve health markers. Store an ordered array of nine stable IDs, with no missing or duplicate entries. Use full-width cards supporting touch/drag and keyboard-accessible Move up/Move down controls. Require explicit confirmation of the order so an untouched default is not mistaken for a considered ranking.
 6. Why did you choose EBS to solve this over other options?
 7. What was the final thought that made you decide to sign up?
 8. What previous experience do you have with personal training or fitness programs and why did you stop? Free text; “none” is valid.
 9. When have you succeeded physically in the past, and what made you succeed? Free text; allow an honest “no example yet”.
+10. Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?
 
-Keep the stored `size` and `cardio` goal IDs for Gain muscle and Get fit. Older seven-goal records retain their saved order, append Consistency and Improve health markers, and require confirmation of the expanded ranking. Existing answers stay under their original keys. Previously completed onboarding stays completed.
+Keep the stored `size` and `cardio` goal IDs for Gain muscle and Get Cardio Fit. Older seven-goal records retain their saved order, append Consistency and Improve health markers, and require confirmation of the expanded ranking. Existing answers stay under their original keys. Previously completed onboarding stays completed.
 
 Use trimmed required text with explicit length limits and field-specific errors. Do not infer an answer from an older question with different meaning. In particular, a 12-week response is not a confirmed 180-day response.
+
+Store the final belief question under its own `belief` key. Older records load with this answer empty; clients still completing onboarding must answer it. Previously completed onboarding remains completed.
 
 ### Physical audit
 

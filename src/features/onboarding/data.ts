@@ -8,7 +8,7 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Wel
 const LEGACY_GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
 export const GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
 export type Goal = typeof GOALS[number];
-export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers" };
+export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get Cardio Fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers" };
 export const QUESTIONS = {
   transformation: "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
   now: "What are your main reasons for doing this now? Your “WHY”?",
@@ -18,6 +18,7 @@ export const QUESTIONS = {
   finalThought: "What was the final thought that made you decide to sign up?",
   experience: "What previous experience do you have with personal training or fitness programs and why did you stop?",
   success: "When have you succeeded physically in the past, and what made you succeed?",
+  belief: "Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?",
 } as const;
 export type Question = keyof typeof QUESTIONS;
 export const MEASUREMENTS = { bicepLeft: "Left bicep", bicepRight: "Right bicep", hamLeft: "Left ham / thigh", hamRight: "Right ham / thigh", forearmLeft: "Left forearm", forearmRight: "Right forearm", waist: "Waistline", neck: "Neck" } as const;
@@ -54,7 +55,7 @@ export type OnboardingSnapshot = Readonly<{
 
 export function emptyAnswers(): OnboardingAnswers {
   return { acknowledged: { welcome: false, communication: false, rhythm: false },
-    questionnaire: { transformation: "", motivation: "", experience: "", choice: "", now: "", finalThought: "", success: "", struggles: "" },
+    questionnaire: { transformation: "", motivation: "", experience: "", choice: "", now: "", finalThought: "", success: "", struggles: "", belief: "" },
     goals: [...GOALS], goalsConfirmed: false, health: Array.from({ length: 7 }, () => null), healthDetails: "",
     consent: { version: "", signedName: "", accepted: false, healthData: false, adult: false }, cardio: "run",
     measurements: { bicepLeft: "", bicepRight: "", hamLeft: "", hamRight: "", forearmLeft: "", forearmRight: "", waist: "", neck: "" },
@@ -83,9 +84,9 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
   const goals: readonly unknown[] = Array.isArray(value.goals) ? value.goals : [];
   // Preserve the seven-goal order, append the new choices and require confirmation again.
   const legacyRanking = goals.length === LEGACY_GOALS.length && LEGACY_GOALS.every(goal => goals.includes(goal));
-  // Saved questionnaires from before this prompt was added have no finalThought field.
+  // Saved questionnaires may predate the finalThought and belief prompts.
   if (!["welcome", "communication", "rhythm"].every(key => typeof acknowledged[key] === "boolean") ||
-      !Object.keys(QUESTIONS).every(key => (key === "finalThought" && questionnaire[key] === undefined) || isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
+      !Object.keys(QUESTIONS).every(key => ((key === "finalThought" || key === "belief") && questionnaire[key] === undefined) || isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
       !Array.isArray(value.goals) || (!legacyRanking && goals.length !== GOALS.length) || new Set(goals).size !== goals.length || !goals.every(goal => typeof goal === "string" && GOALS.includes(goal as Goal)) || typeof value.goalsConfirmed !== "boolean" ||
       !Array.isArray(value.health) || value.health.length !== 7 || !value.health.every(answer => answer === null || typeof answer === "boolean") || !isText(value.healthDetails, 2000) || !["run", "cross-trainer", "bike"].includes(String(value.cardio)) ||
       !isText(consent.version, 100) || !isText(consent.signedName, 100) || !["accepted", "healthData", "adult"].every(key => typeof consent[key] === "boolean") ||

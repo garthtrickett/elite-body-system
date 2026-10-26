@@ -255,7 +255,9 @@ test("background questionnaire saves block sidebar and Back navigation while pre
     await page.setViewportSize({ width, height: 900 }); await signIn(page, true); await page.goto(app.origin + "/meals");
     await page.locator('a[href="/?panel=setup"]').filter({ visible: true }).click(); await expect(page).toHaveURL(app.origin + "/onboarding");
     const chooseQuestionnaire = async () => {
-      const mobile = page.locator(".ob-nav-mobile"); if (await mobile.isVisible()) await mobile.locator("summary").click();
+      // The first loaded snapshot closes the mobile menu; wait for it before opening it.
+      await expect(page.getByRole("button", { name: "Complete", exact: true })).toBeEnabled();
+      const mobile = page.locator(".ob-nav-mobile"); if (await mobile.isVisible() && await mobile.getAttribute("open") === null) await mobile.locator("summary").click();
       await page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ }).click();
       await expect(page.getByRole("heading", { name: "Start Point Form", exact: true })).toBeVisible();
     };
