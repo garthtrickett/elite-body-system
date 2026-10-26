@@ -58,7 +58,7 @@ test("onboarding validates ranked permutations and draft data without accepting 
   assert.equal("completedAt" in parsed.value, false);
   const a = onboardingAnswers(), c = onboardingContent();
   const missing = missingRequirements({ answers: { ...a, goalsConfirmed: false, questionnaire: { ...a.questionnaire, experience: "" } }, content: c, media: [], booking: null, resolutions: [] });
-  assert.equal(missing.questionnaire.length, 2); assert.ok(missing.audit.length); assert.ok(missing.measurements.length); assert.ok(missing.call.length);
+  assert.equal(missing.questionnaire.length, 2); assert.equal(missing.audit.length, 0); assert.ok(missing.measurements.length); assert.ok(missing.call.length);
 });
 
 test("all accounts including legacy-complete profiles are gated on pages and APIs; health and sign-out remain accessible", async () => {
@@ -280,7 +280,7 @@ test("changed health answers invalidate prior clearance, and content archives re
   const b = await account(), readyState = await ready(b.id);
   const completed = await onboarding.complete({ accountId: b.id, revision: readyState.revision }); assert.ok(completed.ok);
   assert.equal((await onboarding.configure({ content: { ...onboardingContent(), welcomeText: "Different under same version" } })).ok, false);
-  assert.ok((await onboarding.configure({ content: { ...onboardingContent(), version: "fixture-v3", consentVersion: "fixture-consent-v3" } })).ok);
+  assert.ok((await onboarding.configure({ content: { ...onboardingContent(), version: "fixture-v3", consentVersion: "fixture-consent-v3", documents: { ...onboardingContent().documents!, participation: { ...onboardingContent().documents!.participation, version: "fixture-consent-v3" } } } })).ok);
   const unfinished = await onboarding.get({ accountId: a.id }); assert.ok(unfinished.ok); assert.equal(unfinished.value.answers.acknowledged.welcome, false); assert.equal(unfinished.value.answers.consent.accepted, false);
   const historical = await onboarding.get({ accountId: b.id }); assert.ok(historical.ok); assert.equal(historical.value.content.version, "fixture-v2"); assert.ok(historical.value.completedAt);
 });
@@ -290,13 +290,13 @@ test("a revised screening version or question requires fresh answers before sign
     for (const change of [{ parqVersion: "fixture-parq-revised" }, { healthQuestions: onboardingContent().healthQuestions.map((question, index) => index === 0 ? "A newly approved screening question" : question) }]) {
       assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
       const a = await account(); await saved(a.id);
-      const content = { ...onboardingContent(), version: `screening-${randomUUID()}`, ...change };
+      const content = { ...onboardingContent(), version: `screening-${randomUUID()}`, ...change, documents: { ...onboardingContent().documents!, parq: { ...onboardingContent().documents!.parq, version: "parqVersion" in change ? change.parqVersion! : onboardingContent().parqVersion } } };
       assert.ok((await onboarding.configure({ content })).ok);
       const loaded = await onboarding.get({ accountId: a.id }); assert.ok(loaded.ok);
       assert.deepEqual(loaded.value.answers.health, Array(7).fill(null)); assert.equal(loaded.value.consentSignedAt, null);
       const accepted = await onboarding.save({ accountId: a.id, revision: loaded.value.revision, contentVersion: content.version, answers: { ...loaded.value.answers, consent: { ...loaded.value.answers.consent, accepted: true } } });
       assert.ok(accepted.ok); assert.equal(accepted.value.consentSignedAt, null); assert.ok(accepted.value.missing.audit.includes("Answer every health screening question."));
-      const answered = await onboarding.save({ accountId: a.id, revision: accepted.value.revision, contentVersion: content.version, answers: { ...accepted.value.answers, health: Array(7).fill(false) } });
+      const answered = await onboarding.save({ accountId: a.id, revision: accepted.value.revision, contentVersion: content.version, answers: { ...accepted.value.answers, health: Array(7).fill(false), documents: { ...onboardingAnswers().documents!, parq: { ...onboardingAnswers().documents!.parq, version: content.parqVersion } } } });
       assert.ok(answered.ok); assert.ok(answered.value.consentSignedAt);
     }
   } finally { await onboarding.configure({ content: onboardingContent() }); }

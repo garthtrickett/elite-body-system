@@ -8,11 +8,22 @@ import { createProfiles, createPostgresProfileStore } from "../src/features/prof
 import { startTestApp, testDatabaseUrl } from "./support/app.ts";
 import { onboardingAnswers, onboardingContent } from "./support/onboarding.ts";
 import { isRecord } from "../src/shared/validation.ts";
+import { sql } from "kysely";
+import type OnboardingSettings from "../src/platform/database/generated/public/OnboardingSettings.ts";
+import type { OnboardingSettingsKey } from "../src/platform/database/generated/public/OnboardingSettings.ts";
 
 const db = createDatabase(testDatabaseUrl()), onboarding = createOnboarding({ db });
 let app: Awaited<ReturnType<typeof startTestApp>>;
-before(async () => { app = await startTestApp(); });
-after(async () => { await app.close(); await db.destroy(); });
+let previousContent: readonly OnboardingSettings[] = [];
+before(async () => { previousContent = await db.selectFrom("onboarding_settings").selectAll().where("key", "=", "content" as OnboardingSettingsKey).execute(); app = await startTestApp(); });
+after(async () => {
+  try {
+    await db.transaction().execute(async transaction => {
+      await transaction.deleteFrom("onboarding_settings").where("key", "=", "content" as OnboardingSettingsKey).execute();
+      if (previousContent.length) await transaction.insertInto("onboarding_settings").values(previousContent.map(row => ({ ...row, data: sql`cast(${JSON.stringify(row.data)} as jsonb)` }))).execute();
+    });
+  } finally { await app.close(); await db.destroy(); }
+});
 async function account() {
   const result = await app.auth.provisionAccount({ email: `documents-${randomUUID()}@example.test` });
   assert.ok(result.ok); return result.value.id;

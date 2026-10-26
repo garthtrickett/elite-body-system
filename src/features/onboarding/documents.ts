@@ -40,7 +40,7 @@ By signing, I confirm that I understand the activity, its risks and alternatives
     text: `Elite Body System — Fitness Participation Agreement
 
 Online service
-Elite Body System provides the online training, general nutrition and habit education, and remote coaching included in the service purchased. It does not provide in-person supervision or replace a physician, physiotherapist, registered dietitian or mental-health professional. Do not change prescribed treatment based on the program.
+Elite Body System is a United States business delivering an online fitness system to clients worldwide. It provides the online training, general nutrition and habit education, and remote coaching included in the service purchased. It does not provide in-person supervision or replace a physician, physiotherapist, registered dietitian or mental-health professional. Do not change prescribed treatment based on the program.
 
 Participation
 I will provide accurate information, follow the agreed program within my capabilities and medical restrictions, and promptly raise concerns. I may stop or request an alternative to an unsuitable activity. I remain responsible for choosing a suitable training environment and equipment. EBS remains responsible for the duties the law places on it.
