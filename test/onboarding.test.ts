@@ -134,6 +134,23 @@ test("seven-goal records preserve their order, append new goals and require conf
   assert.equal(reloaded.value.answers.goalsConfirmed, true);
 });
 
+test("older questionnaires resume with a required blank belief answer and preserve it after saving", async () => {
+  const a = await account(), previous = await saved(a.id);
+  await sql`update onboarding_records set data = data #- '{answers,questionnaire,belief}' where account_id = ${a.id}`.execute(db);
+  const resumed = await onboarding.get({ accountId: a.id }); assert.ok(resumed.ok);
+  assert.deepEqual(resumed.value.answers.questionnaire, { ...previous.answers.questionnaire, belief: "" });
+  assert.equal(resumed.value.missing.questionnaire.length, 1);
+  assert.match(resumed.value.missing.questionnaire[0]!, /Do you believe you're capable/);
+  for (const belief of [null, 42, "x".repeat(2001)]) {
+    assert.equal(parseAnswers({ ...resumed.value.answers, questionnaire: { ...resumed.value.answers.questionnaire, belief } }).ok, false);
+  }
+  const belief = "Not yet, because I need help building consistent habits.";
+  const updated = await onboarding.save({ accountId: a.id, revision: resumed.value.revision, contentVersion: resumed.value.content.version, answers: { ...resumed.value.answers, questionnaire: { ...resumed.value.answers.questionnaire, belief: `  ${belief}  ` } } });
+  assert.ok(updated.ok); assert.deepEqual(updated.value.missing.questionnaire, []);
+  const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
+  assert.deepEqual(reloaded.value.answers.questionnaire, { ...previous.answers.questionnaire, belief });
+});
+
 test("private media rejects other accounts, invalid bytes, oversized files and pending submissions; failed replacement preserves the ready file", async () => {
   const a = await account(), b = await account(); await saved(a.id); await saved(b.id);
   assert.equal((await media.request({ accountId: a.id, slot: "photo:front", mediaType: "image/jpeg", size: 13 * 1024 * 1024 })).ok, false);

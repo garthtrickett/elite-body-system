@@ -58,10 +58,13 @@ Store separate named answers, rather than overloading the old story keys:
 7. What was the final thought that made you decide to sign up?
 8. What previous experience do you have with personal training or fitness programs and why did you stop? Free text; “none” is valid.
 9. When have you succeeded physically in the past, and what made you succeed? Free text; allow an honest “no example yet”.
+10. Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?
 
 Keep the stored `size` and `cardio` goal IDs for Gain muscle and Get fit. Older seven-goal records retain their saved order, append Consistency and Improve health markers, and require confirmation of the expanded ranking. Existing answers stay under their original keys. Previously completed onboarding stays completed.
 
 Use trimmed required text with explicit length limits and field-specific errors. Do not infer an answer from an older question with different meaning. In particular, a 12-week response is not a confirmed 180-day response.
+
+Store the final belief question under its own `belief` key. Older records load with this answer empty; clients still completing onboarding must answer it. Previously completed onboarding remains completed.
 
 ### Physical audit
 

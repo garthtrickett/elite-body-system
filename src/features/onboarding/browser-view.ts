@@ -9,7 +9,7 @@ import { representOnboarding } from "./browser-model.ts";
 type State = ReturnType<typeof representOnboarding>;
 type Actions = Readonly<{ propose: (proposal: OnboardingProposal) => void; upload: (input: Readonly<{ slot: string; file: File | undefined }>) => void; signOut: () => void; rankStart: (event: PointerEvent, goal: Goal) => void; rankMove: (event: PointerEvent) => void; rankEnd: (event: PointerEvent) => void; drag: (goal: Goal) => void; drop: (goal: Goal) => void }>;
 const START_POINT_QUESTIONS: readonly Question[] = ["transformation", "now", "motivation", "struggles"];
-const OTHER_QUESTIONS: readonly Question[] = ["choice", "finalThought", "experience", "success"];
+const OTHER_QUESTIONS: readonly Question[] = ["choice", "finalThought", "experience", "success", "belief"];
 function edit(state: OnboardingModel, actions: Actions, answers: OnboardingAnswers) { actions.propose({ kind: "edit", answers }); }
 function textField(input: Readonly<{ label: string; value: string; change: (value: string) => void; area?: boolean; numeric?: boolean; max?: number; invalid?: boolean; error?: string }>) {
   const errorId = `onboarding-error-${input.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
