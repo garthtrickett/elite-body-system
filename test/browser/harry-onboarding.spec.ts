@@ -181,6 +181,10 @@ test("weekly rhythm has clear icons, direct coach access and the mutual commitme
     expect((await onboarding.configure({ content })).ok).toBe(true);
     await signIn(page); await section(page, "rhythm");
     await expect(page.locator(".ob-rhythm-icon svg")).toHaveCount(5);
+    expect(await page.locator(".ob-rhythm-icon svg").evaluateAll(items => items.every(item => {
+      const shapes = Array.from(item.children).filter(child => child.tagName === "path" || child.tagName === "rect");
+      return shapes.length > 0 && shapes.every(shape => shape.namespaceURI === "http://www.w3.org/2000/svg" && shape instanceof SVGGraphicsElement && shape.getBBox().width > 0);
+    }))).toBe(true);
     await expect(page.getByText(/before 06:00 GMT on Monday/)).toBeVisible();
     await expect(page.getByText(/Sunday evening at the latest/)).toBeVisible();
     const access = page.getByRole("region", { name: "Direct access to your coach", exact: true });
