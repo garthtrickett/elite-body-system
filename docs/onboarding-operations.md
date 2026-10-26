@@ -26,11 +26,32 @@ the draft and section. Reload saved progress reconciles local edits with the
 server before saving resumes. This uses the existing account storage and revision
 checks, with no browser storage of assessment answers.
 
-Section navigation is independent of completion eligibility. Clients may advance
+Section navigation is independent of completion eligibility except for a disclosed
+health concern. Clients may otherwise advance
 past incomplete answers, evidence or unconfigured guidance and return later. The
 ready counter continues to reflect actual requirements. Finish onboarding and the
 server gate still require every section, finalized evidence and a confirmed
 booking.
+
+Health screening appears first inside Health & Safety Agreement. Any Yes answer
+requires a short explanation and the separate declaration that a registered
+physician has cleared the client for physical activity. Until both are saved,
+Complete retains the draft in this section and navigation to later sections is
+blocked, including attempts from earlier sections. Returning to earlier answers,
+contacting Harry, signing out and withdrawing marketing permission remain available.
+All-No screening does not require the clearance checkbox. The seven draft EBS
+questions remain original wording, not an official PAR-Q+ form.
+
+The declaration is self-reported and stored with signed consent evidence and a
+server timestamp. Changing a health answer or its explanation clears the checkbox;
+recovery cannot transfer an earlier declaration to changed screening. Previous
+records default to unchecked, without altering historical completion or signed
+documents. The server rejects completion and assessment uploads for an unexplained
+or undeclared concern, even if a reviewer recorded an alternative. Harry's trusted
+clearance review remains separately required for physical assessments/training.
+This business rule does not claim that checking a box verifies a physician or
+establishes clinical safety. [ACSM screening guidance](https://www.exerciseismedicine.org/assets/page_documents/EIM%20exercise%20preparticipation%20screening.pdf)
+supports seeking medical clearance for concerning symptoms before exercise.
 
 | Before | After | Why |
 | --- | --- | --- |

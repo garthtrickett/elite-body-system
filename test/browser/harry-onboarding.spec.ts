@@ -126,6 +126,36 @@ test("Welcome completion saves before showing its check and keeps it after revis
   await expect(page.getByLabel("What should Harry call you?", { exact: true })).toHaveValue("Taylor");
   await expect(page.getByLabel("I’ve watched or read this guidance and understand what to do.", { exact: true })).toBeChecked();
 });
+for (const width of [1280, 390, 320]) test(`health screening comes first and holds concerning answers until physician clearance at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const accountId = await signIn(page, true); await section(page, "audit");
+  const headings = await page.locator(".ob-main > fieldset > section > h2").allTextContents();
+  expect(headings.slice(0, 2)).toEqual(["Health screening", "Your participation agreement"]);
+  const screening = page.getByRole("region", { name: "Health screening", exact: true });
+  await screening.getByRole("button", { name: "Yes", exact: true }).first().click();
+  const explanation = page.getByLabel("Briefly explain your Yes answers in a short sentence", { exact: true });
+  const clearance = page.getByLabel("I confirm that a registered physician has medically cleared me for physical activity in light of the health concerns I have disclosed.", { exact: true });
+  await expect(explanation).toBeVisible(); await expect(clearance).not.toBeChecked();
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("short sentence");
+  await expect(page.getByRole("heading", { name: "Health & Safety Agreement", exact: true })).toBeVisible();
+  await explanation.fill("My registered physician reviewed my blood pressure.");
+  await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("registered physician");
+  await page.reload(); await section(page, "audit");
+  await expect(explanation).toHaveValue("My registered physician reviewed my blood pressure."); await expect(clearance).not.toBeChecked();
+  const menu = page.locator(".ob-nav-mobile");
+  if (await menu.isVisible() && await menu.getAttribute("open") === null) await menu.locator("summary").click();
+  await page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Communication/ }).click();
+  await expect(page.getByRole("alert")).toContainText("registered physician");
+  if (await menu.isVisible() && await menu.getAttribute("open") !== null) await menu.locator("summary").click();
+  await clearance.check(); await page.getByRole("button", { name: "Complete", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Communication", exact: true })).toBeVisible();
+  const stored = await onboarding.get({ accountId }); expect(stored.ok && stored.value.answers.medicalClearance).toBe(true);
+  await page.reload(); await section(page, "audit"); await expect(clearance).toBeChecked();
+  await explanation.fill("My symptoms have changed."); await expect(clearance).not.toBeChecked();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test("Start Point Form places questions around full-width goal cards and saves their dragged order", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 }); await signIn(page, true); await section(page, "questionnaire");
   const labels = await page.locator(".ob-main > .ob-fields").evaluate(form => [...form.children].flatMap(child => {

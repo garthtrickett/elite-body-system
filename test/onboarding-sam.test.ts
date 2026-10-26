@@ -206,3 +206,32 @@ test("saving marketing preserves medical edits and saving answers preserves unsa
   model = finishSave(acceptOnboarding(model, { kind: "save" }));
   assert.equal(model.marketingDraft.limitations, "Keep my restrictions"); assert.equal(model.marketingDirty, true); assert.equal(model.dirty, false);
 });
+
+test("concerning screening saves drafts but blocks Complete and later-section jumps until explained and physician clearance confirmed", () => {
+  let model = acceptOnboarding(loaded(), { kind: "section", section: "audit" });
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, health: [true, false, false, false, false, false, false], medicalClearance: true } });
+  assert.equal(model.draft.medicalClearance, false);
+  model = finishSave(acceptOnboarding(model, { kind: "next" }));
+  assert.equal(model.section, "audit"); assert.equal(model.dirty, false); assert.match(model.error, /short sentence/);
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, healthDetails: "A physician reviewed my knee pain." } });
+  model = finishSave(acceptOnboarding(model, { kind: "section", section: "call" }));
+  assert.equal(model.section, "audit"); assert.match(model.error, /registered physician/);
+  model = acceptOnboarding(model, { kind: "section", section: "welcome" });
+  model = acceptOnboarding(model, { kind: "section", section: "measurements" }); assert.equal(model.section, "audit"); assert.equal(model.pending, undefined);
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, medicalClearance: true } });
+  model = finishSave(acceptOnboarding(model, { kind: "next" })); assert.equal(model.section, "communication");
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, healthDetails: "My condition changed." } }); assert.equal(model.draft.medicalClearance, false);
+});
+test("recovery cannot attach an old physician declaration to changed screening or other-tab concerns", () => {
+  let model = loaded();
+  const declared = { ...model.draft, health: [true, false, false, false, false, false, false], healthDetails: "Cleared for my knee pain.", medicalClearance: true };
+  model = { ...model, draft: declared, snapshot: { ...model.snapshot!, answers: declared } };
+  model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, routine: { ...model.draft.routine, name: "Keep draft" } } });
+  model = acceptOnboarding(model, { kind: "reload" });
+  const remote = { ...snapshot(), answers: { ...declared, healthDetails: "New symptoms reported elsewhere.", medicalClearance: false } };
+  model = acceptOnboarding(model, { kind: "completed", id: model.pending!.id, effectKind: "load", result: { ok: true, value: remote } });
+  assert.equal(model.draft.medicalClearance, false); assert.equal(model.draft.healthDetails, remote.answers.healthDetails); assert.equal(model.draft.routine.name, "Keep draft");
+  const loading = acceptOnboarding({ ...model, draft: declared, dirty: true }, { kind: "reload" });
+  const revised = { ...remote, content: { ...remote.content, parqVersion: "new-screening" }, answers: { ...remote.answers, health: Array(7).fill(null) } };
+  const updated = acceptOnboarding(loading, { kind: "completed", id: loading.pending!.id, effectKind: "load", result: { ok: true, value: revised } }); assert.equal(updated.draft.medicalClearance, false);
+});

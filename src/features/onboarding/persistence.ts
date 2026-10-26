@@ -4,7 +4,7 @@ import type Database from "../../platform/database/generated/Database.ts";
 import type { AccountsId } from "../../platform/database/generated/public/Accounts.ts";
 import type { OnboardingSettingsKey } from "../../platform/database/generated/public/OnboardingSettings.ts";
 import { isRecord } from "../../shared/validation.ts";
-import { emptyAnswers, emptyContent, parseAnswers, parseContent, missingRequirements } from "./data.ts";
+import { emptyAnswers, emptyContent, parseAnswers, parseContent, missingRequirements, consentSignature } from "./data.ts";
 import type { OnboardingSnapshot, OnboardingAnswers, OnboardingContent, Booking } from "./data.ts";
 import { createProfiles, createPostgresProfileStore } from "../profile/index.ts";
 import { readMarketingSnapshot } from "./marketing-store.ts";
@@ -46,7 +46,7 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
     if (record.data.contentVersion !== content.version) {
       const archived = typeof record.data.contentVersion === "string" ? await db.selectFrom("onboarding_settings").select("data").where("key", "=", `archive:${record.data.contentVersion}` as OnboardingSettingsKey).executeTakeFirst() : undefined;
       const previous = archived ? parseContent(archived.data) : undefined;
-      if (!previous || previous.parqVersion !== content.parqVersion || JSON.stringify(previous.healthQuestions) !== JSON.stringify(content.healthQuestions)) answers = { ...answers, health: Array.from({ length: 7 }, () => null) };
+      if (!previous || previous.parqVersion !== content.parqVersion || JSON.stringify(previous.healthQuestions) !== JSON.stringify(content.healthQuestions)) answers = { ...answers, health: Array.from({ length: 7 }, () => null), medicalClearance: false };
     }
   } else {
     const profile = await createProfiles({ store: createPostgresProfileStore(db) }).get({ accountId });
@@ -58,7 +58,7 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
   const evidence = { answers, content, media: media.filter(item => item.content_version === content.version).map(item => ({ id: item.id, slot: item.slot, mediaType: item.media_type, size: item.size, status: item.status === "ready" ? "ready" as const : "pending" as const })),
     booking, resolutions: resolutions.map(item => ({ requirement: item.requirement, reason: item.reason, resolvedBy: item.resolved_by, evidence: item.evidence })) };
   const acknowledgements: unknown[] = record && isRecord(record.data) && Array.isArray(record.data.evidence) ? record.data.evidence : [];
-  const signature = JSON.stringify([content.version, answers.consent, answers.health, answers.healthDetails]);
+  const signature = consentSignature({ contentVersion: content.version, answers });
   const acknowledgement = acknowledgements.find(item => isRecord(item) && item.signature === signature);
   const consentSignedAt = isRecord(acknowledgement) && typeof acknowledgement.signedAt === "string" && Number.isFinite(Date.parse(acknowledgement.signedAt)) ? acknowledgement.signedAt : null;
   const previousMedia = media.filter(item => item.content_version !== content.version).map(item => ({ id: item.id, slot: item.slot, mediaType: item.media_type, size: item.size, status: item.status === "ready" ? "ready" as const : "pending" as const }));

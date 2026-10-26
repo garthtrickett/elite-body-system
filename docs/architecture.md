@@ -29,6 +29,14 @@ clearance. A client profile save cannot forge the new completion version or
 change the server-owned clearance fields. Trusted review/resolution tools have
 no public client override endpoint.
 
+Concerning screening answers require both a short explanation and a separate
+self-reported physician-clearance declaration before advancing beyond Health &
+Safety Agreement. The same screening rule drives SAM navigation, completion
+requirements, consent evidence and server media authorization. Drafts remain
+saveable while blocked. The declaration is distinct from a trusted reviewer
+resolution; it cannot manufacture that resolution or bypass physical-audit review.
+Old records default to unchecked while retaining historical completion/evidence.
+
 Optional marketing permission has a separate document configuration, revision and
 append-only account event history. Its typed operations are exported from the same
 feature interface. Each grant/withdrawal retains its exact versioned release and
