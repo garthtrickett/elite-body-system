@@ -89,7 +89,13 @@ test("all accounts including legacy-complete profiles are gated on pages and API
 test("unconfigured content cannot complete onboarding; saved answers resume with account ownership and compare-and-swap", async () => {
   const a = await account(), b = await account();
   const initial = await onboarding.get({ accountId: a.id }); assert.ok(initial.ok); assert.equal(initial.value.content.approved, false);
+  assert.match(initial.value.content.consentText, /online fitness system to clients worldwide/);
+  assert.equal(initial.value.content.healthQuestions.length, 7);
   assert.equal((await onboarding.complete({ accountId: a.id, revision: 0 })).ok, false);
+  const draft = await onboarding.save({ accountId: a.id, revision: 0, contentVersion: initial.value.content.version, answers: { ...onboardingAnswers(), consent: { ...onboardingAnswers().consent, version: initial.value.content.consentVersion } } });
+  assert.ok(draft.ok); assert.equal(draft.value.consentSignedAt, null);
+  assert.ok(draft.value.missing.audit.length);
+  assert.equal((await media.request({ accountId: a.id, slot: "photo:front", mediaType: "image/jpeg", size: jpegBytes.length })).ok, false);
   assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
   const first = await saved(a.id);
   assert.ok(first.consentSignedAt);

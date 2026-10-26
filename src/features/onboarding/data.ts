@@ -1,10 +1,11 @@
 import { isRecord, isText } from "../../shared/validation.ts";
 import { err, ok } from "../../shared/result.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
+import { DRAFT_HEALTH_SAFETY } from "./health-safety.ts";
 
 export const SECTIONS = ["welcome", "questionnaire", "audit", "communication", "measurements", "lifestyle", "rhythm", "call"] as const;
 export type Section = typeof SECTIONS[number];
-export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Physical audit · week one", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
+export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Health & Safety Agreement", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
 const LEGACY_GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
 export const GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
 export type Goal = typeof GOALS[number];
@@ -63,7 +64,7 @@ export function emptyAnswers(): OnboardingAnswers {
     routine: { name: "", timezone: "UTC", weight: "", trainingDays: [1, 2, 4, 5], restDay: 0, equipment: "", emergencyName: "", emergencyPhone: "" } };
 }
 export function emptyContent(): OnboardingContent {
-  return { version: "unconfigured", approved: false, welcomeText: "", communication: "", contactUrl: "", consentVersion: "", consentText: "", parqVersion: "", healthQuestions: [], welcomeVideo: "", strengthVideo: "", cardioVideo: "", measurementVideo: "", cardioInstructions: "", measurementInstructions: "", techniqueInstructions: "", rhythmText: "", mobility: [], bookingUrl: "" };
+  return { version: "unconfigured", ...DRAFT_HEALTH_SAFETY, welcomeText: "", communication: "", contactUrl: "", welcomeVideo: "", strengthVideo: "", cardioVideo: "", measurementVideo: "", cardioInstructions: "", measurementInstructions: "", techniqueInstructions: "", rhythmText: "", mobility: [], bookingUrl: "" };
 }
 export function isHttps(value: unknown): value is string {
   if (typeof value !== "string" || value.length > 2048) return false;
