@@ -9,8 +9,7 @@ import { startTestApp, testDatabaseUrl } from "./support/app.ts";
 import { onboardingAnswers, onboardingContent } from "./support/onboarding.ts";
 import { isRecord } from "../src/shared/validation.ts";
 import { sql } from "kysely";
-import type OnboardingSettings from "../src/platform/database/generated/public/OnboardingSettings.ts";
-import type { OnboardingSettingsKey } from "../src/platform/database/generated/public/OnboardingSettings.ts";
+import type { OnboardingSettings, OnboardingSettingsKey } from "../src/platform/database/generated/public/OnboardingSettings.ts";
 
 const db = createDatabase(testDatabaseUrl()), onboarding = createOnboarding({ db });
 let app: Awaited<ReturnType<typeof startTestApp>>;
