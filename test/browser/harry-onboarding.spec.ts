@@ -142,7 +142,7 @@ test("Start Point Form places questions around full-width goal cards and saves t
     "Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?",
   ]);
   await expect(page.locator(".ob-rank-name")).toHaveText([
-    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers",
+    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers", "10. Mental wellness",
   ]);
   await page.locator('[data-goal="strength"] .ob-rank-handle').dragTo(page.locator('[data-goal="mobility"]'));
   await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
@@ -154,7 +154,8 @@ test("Start Point Form places questions around full-width goal cards and saves t
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.getByRole("button", { name: "Move Improve health markers up", exact: true }).click();
-  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Consistency"];
+  await page.getByRole("button", { name: "Move Mental wellness up", exact: true }).click();
+  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Mental wellness", "10. Consistency"];
   await expect(page.locator(".ob-rank-name")).toHaveText(rankedLabels);
   await page.getByLabel("This is my preferred goal order.").check();
   await page.getByRole("button", { name: "Complete", exact: true }).click();

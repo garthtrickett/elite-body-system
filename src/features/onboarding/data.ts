@@ -7,9 +7,10 @@ export const SECTIONS = ["welcome", "questionnaire", "audit", "communication", "
 export type Section = typeof SECTIONS[number];
 export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Health & Safety Agreement", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
 const LEGACY_GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
-export const GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
+const PREVIOUS_GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
+export const GOALS = [...PREVIOUS_GOALS, "mental-wellness"] as const;
 export type Goal = typeof GOALS[number];
-export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get Cardio Fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers" };
+export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get Cardio Fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers", "mental-wellness": "Mental wellness" };
 export const QUESTIONS = {
   transformation: "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
   now: "What are your main reasons for doing this now? Your “WHY”?",
@@ -83,12 +84,12 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
   if (!isRecord(value) || !isRecord(value.acknowledged) || !isRecord(value.questionnaire) || !isRecord(value.measurements) || !isRecord(value.lifestyle) || !isRecord(value.routine) || !isRecord(value.consent)) return invalid();
   const { acknowledged, questionnaire, measurements, lifestyle, routine, consent } = value;
   const goals: readonly unknown[] = Array.isArray(value.goals) ? value.goals : [];
-  // Preserve the seven-goal order, append the new choices and require confirmation again.
-  const legacyRanking = goals.length === LEGACY_GOALS.length && LEGACY_GOALS.every(goal => goals.includes(goal));
+  // Preserve earlier seven- and nine-goal orders and require confirmation of the new choices.
+  const earlierRanking = [LEGACY_GOALS, PREVIOUS_GOALS].some(previous => goals.length === previous.length && previous.every(goal => goals.includes(goal)));
   // Saved questionnaires may predate the finalThought and belief prompts.
   if (!["welcome", "communication", "rhythm"].every(key => typeof acknowledged[key] === "boolean") ||
       !Object.keys(QUESTIONS).every(key => ((key === "finalThought" || key === "belief") && questionnaire[key] === undefined) || isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
-      !Array.isArray(value.goals) || (!legacyRanking && goals.length !== GOALS.length) || new Set(goals).size !== goals.length || !goals.every(goal => typeof goal === "string" && GOALS.includes(goal as Goal)) || typeof value.goalsConfirmed !== "boolean" ||
+      !Array.isArray(value.goals) || (!earlierRanking && goals.length !== GOALS.length) || new Set(goals).size !== goals.length || !goals.every(goal => typeof goal === "string" && GOALS.includes(goal as Goal)) || typeof value.goalsConfirmed !== "boolean" ||
       !Array.isArray(value.health) || value.health.length !== 7 || !value.health.every(answer => answer === null || typeof answer === "boolean") || !isText(value.healthDetails, 2000) || !["run", "cross-trainer", "bike"].includes(String(value.cardio)) ||
       !isText(consent.version, 100) || !isText(consent.signedName, 100) || !["accepted", "healthData", "adult"].every(key => typeof consent[key] === "boolean") ||
       !isText(routine.name, 100) || !isText(routine.timezone, 100) || !isText(routine.weight, 12) || !isText(routine.equipment, 2000) || !isText(routine.emergencyName, 100) || !isText(routine.emergencyPhone, 50) ||
@@ -98,7 +99,7 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
     questionnaire: Object.fromEntries(Object.keys(QUESTIONS).map(key => [key, typeof questionnaire[key] === "string" ? questionnaire[key].trim() : ""])) as OnboardingAnswers["questionnaire"],
     measurements: Object.fromEntries(Object.keys(MEASUREMENTS).map(key => [key, (measurements[key] as string).trim()])) as OnboardingAnswers["measurements"],
     lifestyle: Object.fromEntries(Object.keys(LIFESTYLE).map(key => [key, (lifestyle[key] as string).trim()])) as OnboardingAnswers["lifestyle"],
-    goals: [...goals, ...GOALS.filter(goal => !goals.includes(goal))] as Goal[], goalsConfirmed: value.goalsConfirmed && !legacyRanking, health: [...value.health] as (boolean | null)[], healthDetails: value.healthDetails.trim(), cardio: value.cardio as OnboardingAnswers["cardio"],
+    goals: [...goals, ...GOALS.filter(goal => !goals.includes(goal))] as Goal[], goalsConfirmed: value.goalsConfirmed && !earlierRanking, health: [...value.health] as (boolean | null)[], healthDetails: value.healthDetails.trim(), cardio: value.cardio as OnboardingAnswers["cardio"],
     consent: { version: consent.version as string, signedName: (consent.signedName as string).trim(), accepted: consent.accepted as boolean, healthData: consent.healthData as boolean, adult: consent.adult as boolean },
     routine: { name: (routine.name as string).trim(), timezone: routine.timezone as string, weight: (routine.weight as string).trim(), equipment: (routine.equipment as string).trim(), emergencyName: (routine.emergencyName as string).trim(), emergencyPhone: (routine.emergencyPhone as string).trim(), trainingDays: [...routine.trainingDays] as number[], restDay: routine.restDay } });
 }
