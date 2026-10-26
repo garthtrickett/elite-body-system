@@ -6,10 +6,11 @@ import * as training from "./migrations/003_training.ts";
 import * as learning from "./migrations/004_learning.ts";
 import * as meals from "./migrations/005_meals.ts";
 import * as onboarding from "./migrations/006_onboarding.ts";
+import * as marketing from "./migrations/007_marketing_permissions.ts";
 
 export async function migrate<DB>(db: Kysely<DB>): Promise<void> {
   const outcome = await new Migrator({ db, provider: {
-    getMigrations: async () => ({ "001_auth": auth, "002_client_profiles": clients, "003_training": training, "004_learning": learning, "005_meals": meals, "006_onboarding": onboarding }),
+    getMigrations: async () => ({ "001_auth": auth, "002_client_profiles": clients, "003_training": training, "004_learning": learning, "005_meals": meals, "006_onboarding": onboarding, "007_marketing_permissions": marketing }),
   } }).migrateToLatest();
   if (outcome.error) throw outcome.error;
 }

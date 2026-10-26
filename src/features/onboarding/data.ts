@@ -2,6 +2,8 @@ import { isRecord, isText } from "../../shared/validation.ts";
 import { err, ok } from "../../shared/result.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import { DRAFT_HEALTH_SAFETY } from "./health-safety.ts";
+import { emptyMarketingSnapshot, parseMarketingSnapshot } from "./marketing-data.ts";
+import type { MarketingSnapshot } from "./marketing-data.ts";
 
 export const SECTIONS = ["welcome", "questionnaire", "audit", "communication", "measurements", "lifestyle", "rhythm", "call"] as const;
 export type Section = typeof SECTIONS[number];
@@ -53,6 +55,7 @@ export type OnboardingSnapshot = Readonly<{
   version: "harry-v2"; revision: number; answers: OnboardingAnswers; content: OnboardingContent;
   media: readonly MediaSummary[]; previousMedia?: readonly MediaSummary[]; booking: Booking | null; resolutions: readonly Resolution[];
   completedAt: string | null; consentSignedAt: string | null; missing: Readonly<Record<Section, readonly string[]>>;
+  marketing: MarketingSnapshot;
 }>;
 
 export function emptyAnswers(): OnboardingAnswers {
@@ -184,7 +187,8 @@ export function isMeetUrl(value: unknown): value is string {
 export function parseSnapshot(value: unknown): OnboardingSnapshot | undefined {
   if (!isRecord(value) || value.version !== "harry-v2" || typeof value.revision !== "number" || !Number.isSafeInteger(value.revision) || value.revision < 0 || !Array.isArray(value.media) || !Array.isArray(value.resolutions) || ![value.completedAt, value.consentSignedAt].every(date => date === null || (typeof date === "string" && Number.isFinite(Date.parse(date))))) return undefined;
   const answers = parseAnswers(value.answers), content = parseContent(value.content);
-  if (!answers.ok || !content) return undefined;
+  const marketing = value.marketing === undefined ? emptyMarketingSnapshot() : parseMarketingSnapshot(value.marketing);
+  if (!answers.ok || !content || !marketing) return undefined;
   if (value.previousMedia !== undefined && !Array.isArray(value.previousMedia)) return undefined;
   const media: MediaSummary[] = [], previousMedia: MediaSummary[] = [], resolutions: Resolution[] = [];
   for (const [items, target] of [[value.media, media], [value.previousMedia ?? [], previousMedia]] as const) for (const item of items) {
@@ -202,5 +206,5 @@ export function parseSnapshot(value: unknown): OnboardingSnapshot | undefined {
     booking = { providerId: b.providerId, eventVersion: b.eventVersion, status: b.status as Booking["status"], startsAt: b.startsAt, timezone: b.timezone, meetUrl: b.meetUrl };
   }
   const evidence = { answers: answers.value, content, media, booking, resolutions };
-  return { version: "harry-v2", revision: value.revision, ...evidence, previousMedia, completedAt: value.completedAt as string | null, consentSignedAt: value.consentSignedAt as string | null, missing: missingRequirements(evidence) };
+  return { version: "harry-v2", revision: value.revision, ...evidence, previousMedia, marketing, completedAt: value.completedAt as string | null, consentSignedAt: value.consentSignedAt as string | null, missing: missingRequirements(evidence) };
 }

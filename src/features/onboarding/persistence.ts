@@ -7,6 +7,7 @@ import { isRecord } from "../../shared/validation.ts";
 import { emptyAnswers, emptyContent, parseAnswers, parseContent, missingRequirements } from "./data.ts";
 import type { OnboardingSnapshot, OnboardingAnswers, OnboardingContent, Booking } from "./data.ts";
 import { createProfiles, createPostgresProfileStore } from "../profile/index.ts";
+import { readMarketingSnapshot } from "./marketing-store.ts";
 
 export const jsonData = (value: unknown) => sql`cast(${JSON.stringify(value)} as jsonb)`;
 export async function lockAccount(transaction: Transaction<Database>, accountId: string): Promise<void> {
@@ -21,12 +22,13 @@ export async function readContent(db: Kysely<Database>): Promise<OnboardingConte
 }
 export async function readSnapshot(db: Kysely<Database>, accountId: string): Promise<OnboardingSnapshot> {
   const owner = accountId as AccountsId;
-  const [record, currentContent, media, bookingRow, resolutions] = await Promise.all([
+  const [record, currentContent, media, bookingRow, resolutions, marketing] = await Promise.all([
     db.selectFrom("onboarding_records").selectAll().where("account_id", "=", owner).executeTakeFirst(),
     readContent(db),
     db.selectFrom("assessment_media").selectAll().where("account_id", "=", owner).where("status", "!=", "deleted").orderBy("created_at", "desc").execute(),
     db.selectFrom("onboarding_bookings").selectAll().where("account_id", "=", owner).executeTakeFirst(),
     db.selectFrom("onboarding_resolutions").selectAll().where("account_id", "=", owner).execute(),
+    readMarketingSnapshot({ db, accountId }),
   ]);
   let content = currentContent;
   if (record?.completed_at && isRecord(record.data) && typeof record.data.contentVersion === "string" && record.data.contentVersion !== currentContent.version) {
@@ -60,5 +62,5 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
   const acknowledgement = acknowledgements.find(item => isRecord(item) && item.signature === signature);
   const consentSignedAt = isRecord(acknowledgement) && typeof acknowledgement.signedAt === "string" && Number.isFinite(Date.parse(acknowledgement.signedAt)) ? acknowledgement.signedAt : null;
   const previousMedia = media.filter(item => item.content_version !== content.version).map(item => ({ id: item.id, slot: item.slot, mediaType: item.media_type, size: item.size, status: item.status === "ready" ? "ready" as const : "pending" as const }));
-  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, previousMedia, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
+  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, previousMedia, marketing, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
 }

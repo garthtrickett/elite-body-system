@@ -1,12 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { initialOnboardingModel, acceptOnboarding, representOnboarding } from "../src/features/onboarding/browser.ts";
-import { missingRequirements } from "../src/features/onboarding/index.ts";
+import { missingRequirements, emptyMarketingSnapshot, emptyMarketingPermission } from "../src/features/onboarding/index.ts";
 import type { OnboardingSnapshot } from "../src/features/onboarding/index.ts";
 import { onboardingAnswers, onboardingContent } from "./support/onboarding.ts";
 function snapshot(): OnboardingSnapshot {
   const evidence = { answers: onboardingAnswers(), content: onboardingContent(), media: [], booking: null, resolutions: [] };
-  return { version: "harry-v2", revision: 1, ...evidence, completedAt: null, consentSignedAt: null, missing: missingRequirements(evidence) };
+  return { version: "harry-v2", revision: 1, ...evidence, marketing: emptyMarketingSnapshot(), completedAt: null, consentSignedAt: null, missing: missingRequirements(evidence) };
 }
 function loaded() {
   const initial = acceptOnboarding(initialOnboardingModel(), { kind: "started" });
@@ -159,4 +159,50 @@ test("autosave preserves raw spaces while semantic saved status uses server-norm
   assert.equal(model.draft.questionnaire.transformation, raw); assert.equal(model.dirty, false); assert.equal(acceptOnboarding(model, { kind: "autosave" }), model);
   model = acceptOnboarding(model, { kind: "edit", answers: { ...model.draft, questionnaire: { ...model.draft.questionnaire, transformation: model.draft.questionnaire.transformation + "train" } } });
   model = acceptOnboarding(model, { kind: "autosave" }); assert.ok(model.pending?.kind === "save"); assert.equal(model.pending.answers.questionnaire.transformation, "I want to train");
+});
+
+function marketingPermission() {
+  return { ...emptyMarketingPermission(), choices: { ...emptyMarketingPermission().choices, results: true, website: true }, accepted: true, adult: true, signedName: "Alex Example" };
+}
+test("optional marketing saves independently after completion and leaves assessment drafts intact", () => {
+  let model = loaded();
+  model = { ...model, snapshot: { ...model.snapshot!, completedAt: "2026-10-26T10:00:00Z" } };
+  assert.equal(acceptOnboarding(model, { kind: "edit", answers: onboardingAnswers() }), model);
+  model = acceptOnboarding(model, { kind: "editMarketing", permission: marketingPermission() });
+  assert.equal(model.marketingDirty, true);
+  const navigating = acceptOnboarding(model, { kind: "section", section: "call" }); assert.equal(navigating.section, model.section); assert.match(navigating.error, /Save or discard/);
+  const leaving = acceptOnboarding(model, { kind: "signOut" }); assert.ok(leaving.pending?.kind === "signOut" && leaving.pending.confirm);
+  model = acceptOnboarding(model, { kind: "saveMarketing" }); const effect = model.pending; assert.ok(effect?.kind === "saveMarketing"); assert.equal(effect.revision, 0);
+  const release = { ...model.snapshot!.marketing.release, approved: true };
+  const saved = { ...model.snapshot!, marketing: { release, revision: 1, record: { revision: 1, action: "granted" as const, permission: effect.permission, release, recordedAt: "2026-10-26T10:01:00Z" } } };
+  const completed = acceptOnboarding(model, { kind: "completed", id: effect.id, effectKind: "saveMarketing", result: { ok: true, value: saved } });
+  assert.equal(completed.marketingDirty, false); assert.equal(completed.snapshot?.completedAt, saved.completedAt); assert.deepEqual(completed.draft, model.draft);
+  const withdrawing = acceptOnboarding(completed, { kind: "withdrawMarketing" }); assert.ok(withdrawing.pending?.kind === "saveMarketing");
+  assert.deepEqual(withdrawing.pending.permission, emptyMarketingPermission(release.version)); assert.equal(withdrawing.pending.revision, 1);
+  assert.equal(acceptOnboarding(withdrawing, { kind: "completed", id: effect.id, effectKind: "saveMarketing", result: { ok: true, value: saved } }), withdrawing);
+});
+test("marketing failures retain choices, require reload, and reset agreement when the document changes", () => {
+  let model = acceptOnboarding(loaded(), { kind: "editMarketing", permission: marketingPermission() });
+  model = acceptOnboarding(model, { kind: "saveMarketing" });
+  model = acceptOnboarding(model, { kind: "completed", id: model.pending!.id, effectKind: "saveMarketing", result: { ok: false, error: { code: "unavailable", message: "Lost response" } } });
+  assert.equal(model.marketingDirty, true); assert.equal(model.reloadRequired, true); assert.deepEqual(model.marketingDraft, marketingPermission());
+  assert.equal(acceptOnboarding(model, { kind: "saveMarketing" }).pending, undefined);
+  model = acceptOnboarding(model, { kind: "reload" });
+  const remote = { ...snapshot(), marketing: { ...emptyMarketingSnapshot(), release: { ...emptyMarketingSnapshot().release, version: "revised-marketing" } } };
+  model = acceptOnboarding(model, { kind: "completed", id: model.pending!.id, effectKind: "load", result: { ok: true, value: remote } });
+  assert.equal(model.marketingDraft.version, "revised-marketing"); assert.equal(model.marketingDraft.accepted, false); assert.equal(model.marketingDraft.choices.results, true); assert.equal(model.marketingDirty, true);
+  model = acceptOnboarding(model, { kind: "discardMarketing" }); assert.equal(model.marketingDirty, false); assert.deepEqual(model.marketingDraft, emptyMarketingPermission("revised-marketing"));
+  assert.equal(acceptOnboarding(model, { kind: "section", section: "audit" }).section, "audit");
+});
+test("saving marketing preserves medical edits and saving answers preserves unsaved marketing choices", () => {
+  let model = acceptOnboarding(loaded(), { kind: "edit", answers: { ...onboardingAnswers(), routine: { ...onboardingAnswers().routine, name: "Keep my draft" } } });
+  model = acceptOnboarding(model, { kind: "editMarketing", permission: marketingPermission() });
+  model = acceptOnboarding(model, { kind: "saveMarketing" });
+  const release = { ...emptyMarketingSnapshot().release, approved: true };
+  const remote = { ...snapshot(), marketing: { release, revision: 1, record: { revision: 1, action: "granted" as const, permission: marketingPermission(), release, recordedAt: "2026-10-26T10:01:00Z" } } };
+  model = acceptOnboarding(model, { kind: "completed", id: model.pending!.id, effectKind: "saveMarketing", result: { ok: true, value: remote } });
+  assert.equal(model.draft.routine.name, "Keep my draft"); assert.equal(model.dirty, true); assert.equal(model.marketingDirty, false);
+  model = acceptOnboarding(model, { kind: "editMarketing", permission: { ...marketingPermission(), limitations: "Keep my restrictions" } });
+  model = finishSave(acceptOnboarding(model, { kind: "save" }));
+  assert.equal(model.marketingDraft.limitations, "Keep my restrictions"); assert.equal(model.marketingDirty, true); assert.equal(model.dirty, false);
 });

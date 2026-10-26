@@ -18,6 +18,7 @@ import type { default as AuthSessionsTable } from './AuthSessions.js';
 import type { default as MealEntriesTable } from './MealEntries.js';
 import type { default as AssessmentMediaTable } from './AssessmentMedia.js';
 import type { default as OnboardingBookingsTable } from './OnboardingBookings.js';
+import type { default as OnboardingMarketingPermissionsTable } from './OnboardingMarketingPermissions.js';
 import type { default as ContentMediaTable } from './ContentMedia.js';
 
 export default interface PublicSchema {
@@ -56,6 +57,8 @@ export default interface PublicSchema {
   assessment_media: AssessmentMediaTable;
 
   onboarding_bookings: OnboardingBookingsTable;
+
+  onboarding_marketing_permissions: OnboardingMarketingPermissionsTable;
 
   content_media: ContentMediaTable;
 }

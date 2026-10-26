@@ -2,6 +2,8 @@ import type { NavigationGuard } from "../../shared/browser-route.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers } from "./data.ts";
 import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
+import { emptyMarketingPermission, marketingDraft as savedMarketingDraft, marketingGrantProblem } from "./marketing-data.ts";
+import type { MarketingPermission } from "./marketing-data.ts";
 
 type SaveInput = Readonly<{ answers: OnboardingAnswers; revision: number; contentVersion: string }>;
 export type OnboardingEffect = Readonly<{ id: number }> & (
@@ -11,6 +13,7 @@ export type OnboardingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "signOut"; confirm: boolean }>
   | (Readonly<{ kind: "save"; next: Section | null; mode: "background" | "explicit" }> & SaveInput)
   | Readonly<{ kind: "complete"; revision: number }>
+  | Readonly<{ kind: "saveMarketing"; revision: number; permission: MarketingPermission }>
   | (Readonly<{ kind: "upload"; selection: number; slot: string }> & SaveInput)
   | Readonly<{ kind: "remove"; mediaId: string }>
   | Readonly<{ kind: "read"; mediaId: string }>
@@ -20,12 +23,15 @@ export type OnboardingModel = Readonly<{
   dirty: boolean; recoveryAnswers: OnboardingAnswers | null; sequence: number; pending: OnboardingEffect | undefined;
   error: string; message: string; showMissing: boolean; progress: number; finalizing: boolean; reloadRequired: boolean;
   accountBusy: boolean; accountProblem: string; exiting: boolean;
+  marketingDraft: MarketingPermission; marketingDirty: boolean;
 }>;
 export type OnboardingProposal =
   | Readonly<{ kind: "navigationHandled"; id: number }>
   | Readonly<{ kind: "started" | "reload" | "save" | "autosave" | "next" | "complete" }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
+  | Readonly<{ kind: "saveMarketing" | "withdrawMarketing" | "discardMarketing" }>
+  | Readonly<{ kind: "editMarketing"; permission: MarketingPermission }>
   | Readonly<{ kind: "signOut" }>
   | Readonly<{ kind: "accountChanged"; busy: boolean; problem: string }>
   | Readonly<{ kind: "signOutConfirmed"; id: number; accepted: boolean }>
@@ -39,7 +45,7 @@ export type OnboardingProposal =
   | Readonly<{ kind: "fileOpened"; id: number; result: ClientResult<Readonly<{ opened: true }>> }>
   | Readonly<{ kind: "failed"; id: number }>;
 
-export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, recoveryAnswers: null, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false });
+export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, recoveryAnswers: null, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false, marketingDraft: emptyMarketingPermission(), marketingDirty: false });
 function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0, finalizing: false }; }
 function saveDraft(model: OnboardingModel, input: Readonly<{ next: Section | null; mode: "background" | "explicit" }>): OnboardingModel {
   if (!model.snapshot) return model;
@@ -91,27 +97,44 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     const saving = effect.kind === "save";
     const section = saving && effect.next ? effect.next : model.section;
     const cancelled = effect.kind === "cancelUpload";
-    const retained = saving || cancelled || effect.kind === "load" && effect.preserveDraft;
+    const retained = saving || effect.kind === "saveMarketing" || cancelled || effect.kind === "load" && effect.preserveDraft;
     const base = saving && model.snapshot ? { ...model.snapshot, answers: effect.answers } : model.snapshot;
     const reconciled = retained && base ? reconcileDraft({ base, draft: model.draft, saved: snapshot, attempted: saving ? null : model.recoveryAnswers }) : snapshot.answers;
     const draft = saving && effect.mode === "background" ? { ...reconciled, questionnaire: model.draft.questionnaire } : reconciled;
     const dirty = !!retained && answersDiffer(draft, snapshot.answers);
-    const updated = { ...model, snapshot, draft, dirty, recoveryAnswers: null, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
+    const storedMarketing = savedMarketingDraft(snapshot.marketing);
+    const keepMarketing = effect.kind !== "saveMarketing" && model.marketingDirty;
+    const changedRelease = model.snapshot?.marketing.release.version !== snapshot.marketing.release.version;
+    const marketingDraft = keepMarketing ? { ...model.marketingDraft, ...(changedRelease ? { version: snapshot.marketing.release.version, accepted: false } : {}) } : storedMarketing;
+    const marketingDirty = keepMarketing && JSON.stringify(marketingDraft) !== JSON.stringify(storedMarketing);
+    const updated = { ...model, snapshot, draft, dirty, marketingDraft, marketingDirty, recoveryAnswers: null, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: effect.kind === "saveMarketing" ? snapshot.marketing.record?.action === "granted" ? "Your optional marketing permission is saved." : "No marketing use is permitted. Your choice is saved." : cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty || marketingDirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
     if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
+  }
+  if (proposal.kind === "editMarketing") {
+    if (!model.snapshot || model.reloadRequired || model.accountBusy || model.pending && !(model.pending.kind === "save" && model.pending.mode === "background")) return model;
+    return { ...model, marketingDraft: proposal.permission, marketingDirty: JSON.stringify(proposal.permission) !== JSON.stringify(savedMarketingDraft(model.snapshot.marketing)), error: "", message: "" };
   }
   if (proposal.kind === "edit") {
     if (!model.snapshot || model.snapshot.completedAt || model.reloadRequired || model.accountBusy || model.pending && !(model.pending.kind === "save" && model.pending.mode === "background")) return model;
     return { ...model, draft: proposal.answers, dirty: model.pending?.kind === "save" || answersDiffer(proposal.answers, model.snapshot.answers), error: "", message: "" };
   }
+  if (model.marketingDirty && (proposal.kind === "section" || proposal.kind === "next" || proposal.kind === "complete")) return { ...model, error: "Save or discard your optional marketing changes before leaving this section. Giving permission is not required." };
   if (!model.accountBusy && model.pending?.kind === "save" && model.pending.mode === "background" && (proposal.kind === "next" || proposal.kind === "section" || proposal.kind === "save")) {
     return { ...model, pending: { ...model.pending, mode: "explicit", next: proposal.kind === "next" ? followingSection(model.section) : proposal.kind === "section" ? proposal.section : null } };
   }
   if (model.pending || model.accountBusy) return model;
   const id = model.sequence + 1;
-  if (proposal.kind === "signOut") return queue(model, { kind: "signOut", id, confirm: model.dirty });
-  if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty });
+  if (proposal.kind === "signOut") return queue(model, { kind: "signOut", id, confirm: model.dirty || model.marketingDirty });
+  if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty || model.marketingDirty });
   if (!model.snapshot) return model;
+  if (proposal.kind === "discardMarketing") return { ...model, marketingDraft: savedMarketingDraft(model.snapshot.marketing), marketingDirty: false, error: "", message: "Unsaved marketing changes discarded." };
+  if (proposal.kind === "saveMarketing" || proposal.kind === "withdrawMarketing") {
+    if (model.reloadRequired) return { ...model, error: "Reload saved progress before changing marketing permission." };
+    const permission = proposal.kind === "withdrawMarketing" ? emptyMarketingPermission(model.snapshot.marketing.release.version) : model.marketingDraft;
+    const problem = marketingGrantProblem(permission);
+    return problem ? { ...model, error: problem } : queue({ ...model, marketingDraft: permission, marketingDirty: true }, { kind: "saveMarketing", id, revision: model.snapshot.marketing.revision, permission });
+  }
   if (proposal.kind === "refreshBooking") return model.dirty ? { ...model, error: "Save your answers before refreshing your booking." } : queue(model, { kind: "refreshBooking", id });
   if (proposal.kind === "read" || proposal.kind === "remove") return model.dirty ? { ...model, error: "Save your answers before managing assessment files." } : queue(model, { ...proposal, id });
   if (proposal.kind === "complete") {
@@ -134,5 +157,5 @@ export function representOnboarding(model: OnboardingModel) {
 
 export function onboardingNavigation(model: OnboardingModel): NavigationGuard {
   if (model.accountBusy || model.pending && model.pending.kind !== "load" && model.pending.kind !== "navigate") return { kind: "blocked", message: "Wait for your onboarding action to finish before leaving." };
-  return model.dirty ? { kind: "confirm", message: "Discard your unsaved onboarding answers? Cancel to save your progress first." } : { kind: "ready" };
+  return model.dirty || model.marketingDirty ? { kind: "confirm", message: "Discard your unsaved onboarding answers or marketing choices? Cancel to save your progress first." } : { kind: "ready" };
 }

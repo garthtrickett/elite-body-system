@@ -9,11 +9,12 @@ import { createTraining, trainingComplete } from "../features/training/index.ts"
 import { createLearning } from "../features/learning/index.ts";
 import { createContentMedia } from "../features/content/index.ts";
 import { createMeals, createOpenAiMealAnalyzer } from "../features/meals/index.ts";
-import { createOnboarding, createAssessmentMedia } from "../features/onboarding/index.ts";
+import { createOnboarding, createAssessmentMedia, createMarketingPermissions } from "../features/onboarding/index.ts";
 import type { AssessmentStorage, BookingProvider } from "../features/onboarding/index.ts";
 
 export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
   const onboarding = createOnboarding({ db: config.db });
+  const marketing = createMarketingPermissions({ db: config.db });
   const assessmentMedia = createAssessmentMedia({ db: config.db, ...(config.assessmentStorage ? { storage: config.assessmentStorage } : {}) });
   const profiles = createProfiles({ store: createPostgresProfileStore(config.db) });
   const scorecards = createScorecards(config.db);
@@ -27,6 +28,7 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
       json(response, status, result);
     }
     if (url.pathname === "/api/client/onboarding" && request.method === "GET") { send(await onboarding.get({ accountId: account.id })); return; }
+    if (url.pathname === "/api/client/onboarding/marketing" && request.method === "POST") { send(await marketing.save({ accountId: account.id, revision: body.revision, permission: body.permission })); return; }
     if (url.pathname === "/api/client/onboarding/booking/refresh" && request.method === "POST") {
       if (!config.bookingProvider) { send({ ok: false, error: { code: "not_configured", message: "Booking confirmation is not connected yet. Contact Harry after booking." } }); return; }
       const current = await onboarding.get({ accountId: account.id }); if (!current.ok) { send(current); return; }
