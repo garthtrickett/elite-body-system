@@ -71,11 +71,16 @@ test("a fully submitted assessment with a confirmed booking finishes onboarding 
   await page.getByRole("button", { name: "Finish onboarding", exact: true }).click();
   await expect(page).toHaveURL(app.origin + "/");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  await sql`update onboarding_records set data = data #- '{answers,questionnaire,finalThought}' where account_id = ${accountId}`.execute(db);
+  const legacyGoals = ["cardio", "size", "strength", "reduce-pain", "mobility", "get-lean", "energy"];
+  await sql`update onboarding_records set data = jsonb_set(data #- '{answers,questionnaire,finalThought}', '{answers,goals}', cast(${JSON.stringify(legacyGoals)} as jsonb)) where account_id = ${accountId}`.execute(db);
   await page.goto(app.origin + "/onboarding"); await section(page, "questionnaire");
   const finalThought = page.getByLabel("What was the final thought that made you decide to sign up?", { exact: true });
   await expect(finalThought).toHaveValue(""); await expect(finalThought).toBeDisabled();
+  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Get fit");
+  await expect(page.getByLabel("This is my preferred goal order.")).not.toBeChecked();
+  await expect(page.getByLabel("This is my preferred goal order.")).toBeDisabled();
   await expect(page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ })).toContainText("✓");
+  await page.goto(app.origin + "/"); await expect(page).toHaveURL(app.origin + "/");
 });
 test("Welcome completion saves before showing its check and keeps it after revisiting and reloading", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 }); await signIn(page);
@@ -102,13 +107,16 @@ test("Start Point Form places questions around full-width goal cards and saves t
   expect(labels).toEqual([
     "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
     "What are your main reasons for doing this now? Your “WHY”?",
+    "What motivates you to stay committed to your fitness to achieve that result?",
+    "What in particular struggles need solving to achieve your desired result?",
+    "Rank your fitness goals",
     "Why did you choose EBS to solve this over other options?",
     "What was the final thought that made you decide to sign up?",
-    "Rank your fitness goals",
-    "What previous experience do you have with personal training or fitness programs?",
-    "What motivates you to stay committed to your fitness to achieve that result?",
+    "What previous experience do you have with personal training or fitness programs and why did you stop?",
     "When have you succeeded physically in the past, and what made you succeed?",
-    "What particular struggles need solving to achieve your desired result?",
+  ]);
+  await expect(page.locator(".ob-rank-name")).toHaveText([
+    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers",
   ]);
   await page.locator('[data-goal="strength"] .ob-rank-handle').dragTo(page.locator('[data-goal="mobility"]'));
   await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
@@ -119,11 +127,14 @@ test("Start Point Form places questions around full-width goal cards and saves t
     for (const size of sizes) expect(Math.abs(size.list - size.card)).toBeLessThan(1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+  await page.getByRole("button", { name: "Move Improve health markers up", exact: true }).click();
+  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Consistency"];
+  await expect(page.locator(".ob-rank-name")).toHaveText(rankedLabels);
   await page.getByLabel("This is my preferred goal order.").check();
   await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("heading", { name: SECTION_LABELS.audit, exact: true })).toBeVisible();
   await page.reload(); await section(page, "questionnaire");
-  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
+  await expect(page.locator(".ob-rank-name")).toHaveText(rankedLabels);
   await expect(page.getByLabel("This is my preferred goal order.")).toBeChecked();
 });
 test("goal ranking supports keyboard controls and preserves order after saving and reloading", async ({ page }) => {
