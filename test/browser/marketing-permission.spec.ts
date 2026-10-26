@@ -43,7 +43,7 @@ async function audit(page: Page) {
   await expect(page.locator(".ob-main > fieldset.ob-fields")).toBeVisible();
   const menu = page.locator(".ob-nav-mobile");
   if (await menu.isVisible() && await menu.getAttribute("open") === null) await menu.locator("summary").click();
-  await page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Health & Safety Agreement/ }).click();
+  await page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Fitness Participation Agreement/ }).click();
   await expect(page.getByRole("heading", { name: "Media & Testimonial Release" })).toBeVisible();
 }
 function panel(page: Page) { return page.getByRole("region", { name: "Optional marketing permission" }); }
@@ -105,7 +105,7 @@ test("completed assessment stays locked while marketing withdrawal remains avail
   const booked = await onboarding.recordBooking({ accountId: id, booking: { providerId: randomUUID(), eventVersion: 1, status: "confirmed", startsAt: "2026-11-01T10:00:00Z", timezone: "UTC", meetUrl: "https://meet.google.com/abc-defg-hij" } }); if (!booked.ok) throw new Error("Booking failed");
   expect((await onboarding.complete({ accountId: id, revision: booked.value.revision })).ok).toBe(true);
   await page.reload(); await audit(page); await choose(page);
-  await expect(page.getByLabel("I have read and agree to the Health & Safety Agreement.", { exact: true })).toBeDisabled();
+  await expect(page.getByLabel("I have read the Fitness Participation Agreement, understand the exercise risks and voluntarily give my informed consent to participate.", { exact: true })).toBeDisabled();
   await panel(page).getByRole("button", { name: "Save marketing choices" }).click();
   await expect(page.getByText("Your optional marketing permission is saved.", { exact: true })).toBeVisible();
   expect((await marketing.configure({ release: { ...release, version: "browser-marketing-v2-draft", approved: false } })).ok).toBe(true);

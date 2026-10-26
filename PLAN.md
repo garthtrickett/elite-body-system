@@ -2,7 +2,7 @@
 
 ## Harry’s revised onboarding
 
-Health screening is first within Health & Safety Agreement. A Yes answer requires
+Health screening is first within Fitness Participation Agreement. A Yes answer requires
 a short explanation and confirmation of medical clearance from a registered
 physician before progressing beyond that section. Draft saving and prior-section
 review remain available while blocked; trusted physical-assessment clearance is
@@ -12,7 +12,7 @@ The operator authorized implementing the [eight-section onboarding plan](docs/ha
 
 ## Active client-platform goal
 
-The requested optional Media & Testimonial Release lives in Health & Safety
+The requested optional Media & Testimonial Release lives in Fitness Participation
 Agreement with separate choices for material, channels, identity and restrictions.
 Its own versioned approval and append-only permission history are independent of
 participation consent and completion. Clients can withdraw after onboarding;

@@ -29,6 +29,6 @@ export function marketingPermissionView(input: Readonly<{ model: OnboardingModel
       <button class="sc-secondary" ?disabled=${!!model.pending || !model.marketingDirty} @click=${() => propose({ kind: "saveMarketing" })}>Save marketing choices</button>
     </fieldset>
     <div class="flex flex-wrap gap-2 mt-3">${active ? html`<button class="sc-secondary" ?disabled=${input.busy || model.reloadRequired} @click=${() => propose({ kind: "withdrawMarketing" })}>Withdraw all marketing permission</button>` : html``}${model.marketingDirty ? html`<button class="sc-secondary" ?disabled=${input.busy} @click=${() => propose({ kind: "discardMarketing" })}>Discard marketing changes</button>` : html``}</div>
-    <p class="sc-copy text-xs mt-3">Return to Onboarding → Health & Safety Agreement any time to review or withdraw permission. For questions or removal requests, use Contact Harry in this section.</p>
+    <p class="sc-copy text-xs mt-3">Return to Onboarding → Fitness Participation Agreement any time to review or withdraw permission. For questions or removal requests, use Contact Harry in this section.</p>
   </section>`;
 }

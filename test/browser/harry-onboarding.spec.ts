@@ -86,17 +86,17 @@ test("a fully submitted assessment with a confirmed booking finishes onboarding 
   await expect(page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ })).toContainText("✓");
   await page.goto(app.origin + "/"); await expect(page).toHaveURL(app.origin + "/");
 });
-test("Health & Safety Agreement presents the online-system draft without recording an unapproved signature", async ({ page }) => {
+test("Fitness Participation Agreement presents the online-system draft without recording an unapproved signature", async ({ page }) => {
   try {
     expect((await onboarding.configure({ content: { ...onboardingContent(), ...DRAFT_HEALTH_SAFETY, version: "health-safety-draft-browser" } })).ok).toBe(true);
     const accountId = await signIn(page);
     await section(page, "audit");
-    await expect(page.getByRole("heading", { name: "Health & Safety Agreement", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Fitness Participation Agreement", exact: true })).toBeVisible();
     await expect(page.getByText(/Draft for review\. This agreement is not available for signing yet/)).toBeVisible();
     await expect(page.getByText(DRAFT_HEALTH_SAFETY.consentText, { exact: true })).toBeVisible();
-    await expect(page.getByLabel("I have read and agree to the Health & Safety Agreement.", { exact: true })).toBeDisabled();
+    await expect(page.getByLabel("I have read the Fitness Participation Agreement, understand the exercise risks and voluntarily give my informed consent to participate.", { exact: true })).toBeDisabled();
     await expect(page.getByRole("checkbox", { name: /^I explicitly consent to Elite Body System/ })).toBeDisabled();
-    await expect(page.getByLabel("Full name for consent", { exact: true })).toBeDisabled();
+    await expect(page.getByLabel("Full name (electronic signature)", { exact: true })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Yes", exact: true })).toHaveCount(7);
     for (const button of await page.getByRole("button", { name: "Yes", exact: true }).all()) await expect(button).toBeDisabled();
     await expect(page.getByLabel("Upload push-ups", { exact: true })).toHaveCount(0);
@@ -138,7 +138,7 @@ for (const width of [1280, 390, 320]) test(`health screening comes first and hol
   await expect(explanation).toBeVisible(); await expect(clearance).not.toBeChecked();
   await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("short sentence");
-  await expect(page.getByRole("heading", { name: "Health & Safety Agreement", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fitness Participation Agreement", exact: true })).toBeVisible();
   await explanation.fill("My registered physician reviewed my blood pressure.");
   await page.getByRole("button", { name: "Complete", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("registered physician");

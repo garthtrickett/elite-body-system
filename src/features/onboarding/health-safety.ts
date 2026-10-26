@@ -2,8 +2,8 @@
 // Keep the version and text together so an approval never silently changes signed terms.
 export const DRAFT_HEALTH_SAFETY = {
   approved: false,
-  consentVersion: "ebs-health-safety-draft-2026-10-26",
-  consentText: `Elite Body System — Health & Safety Agreement
+  consentVersion: "ebs-fitness-participation-draft-2026-10-26",
+  consentText: `Elite Body System — Fitness Participation Agreement
 
 1. The service and its limits
 Elite Body System is a United States business delivering an online fitness system to clients worldwide. It provides digital exercise programs, instructional material and general education about nutrition, recovery and habits, with remote coaching or technique feedback where included in the service purchased. Exercises and assessments are performed in my own location; buying access does not provide in-person supervision. Self-reported or uploaded assessments help establish a starting point and are not medical examinations or a diagnosis. The system does not replace a physician, physical therapist, registered dietitian or mental-health professional. I will not change prescribed treatment or medication based on its content. Results vary; no particular physique, performance or health outcome is guaranteed.
@@ -38,7 +38,7 @@ Before signing, I must have access to EBS's current privacy notice, identifying 
 I may use the EBS contact route supplied with my service to request access, a copy, correction, deletion, restrictions on use, withdrawal of health-data consent or an explanation of any refusal. Applicable law determines the precise rights, exceptions and complaint or appeal routes, including access to my relevant data-protection authority. I can withhold or withdraw consent to future health-data processing; EBS will explain any effect on services that genuinely need that information and discuss alternatives. Refusing publicity or exercising privacy rights does not waive consumer protections. A separate authorisation is needed for any optional sharing that requires its own consent.
 
 11. Adult declaration and electronic acknowledgement
-I confirm that I am at least 18, have the legal capacity to enter this agreement where I live and am completing it for myself. I have had an opportunity to read the terms, understand the risks, ask questions and request alternatives. By selecting the participation agreement checkbox and typing my full name, I intend to record my electronic acknowledgement of this version. The health-data consent is a separate choice. I can request a copy of the document and recorded acknowledgement through EBS's contact route. The recorded date and document version identify the terms acknowledged; my signature is not a medical clearance or a statement that all exercise is safe.`,
+I confirm that I am at least 18, have the legal capacity to enter this agreement where I live and am completing it for myself. I have had an opportunity to read the terms, understand the risks, ask questions and request alternatives. By selecting the informed-consent and exercise-risk acknowledgement checkbox and typing my full name in the electronic-signature field, I intend to sign this version of the Fitness Participation Agreement electronically. The health-data consent is a separate choice. I can request a copy of the document and recorded acknowledgement through EBS's contact route. The recorded date and document version identify the terms acknowledged; my signature is not a medical clearance or a statement that all exercise is safe.`,
   parqVersion: "ebs-health-screening-draft-2026-10-26",
   healthQuestions: [
     "Has a healthcare professional told you that you have a heart, circulation or blood-pressure condition, or that you should exercise only under medical supervision?",

@@ -7,7 +7,7 @@ import type { MarketingSnapshot } from "./marketing-data.ts";
 
 export const SECTIONS = ["welcome", "questionnaire", "audit", "communication", "measurements", "lifestyle", "rhythm", "call"] as const;
 export type Section = typeof SECTIONS[number];
-export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Health & Safety Agreement", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
+export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Welcome video", questionnaire: "Start Point Form", audit: "Fitness Participation Agreement", communication: "Communication", measurements: "Your measurements", lifestyle: "Lifestyle audit", rhythm: "Rhythm for success", call: "Your onboarding call" };
 const LEGACY_GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
 const PREVIOUS_GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
 export const GOALS = [...PREVIOUS_GOALS, "mental-wellness"] as const;
