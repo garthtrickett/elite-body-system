@@ -35,5 +35,15 @@ Run `bash scripts/with-postgres.sh npm run verify` for full isolated verificatio
 fixing a failure. CI also verifies generated schema types have no diff.
 Do not bypass checks or weaken tests to obtain a pass.
 
+## Harry's live preview editing sessions
+
+The operator requested a local app and isolated database exposed through ngrok.
+See `docs/local-preview.md` for the running checkout, private configuration and
+tracked service names. During Harry's editing sessions, apply requested changes
+and let the preview watchers rebuild. Do not run tests or push for CI after each
+edit. Batch verification, fixes and CI at the end of the session before merging.
+Run verification in an isolated checkout so it cannot overwrite live preview
+assets. Tell Harry to refresh after an update; there is no automatic page reload.
+
 Use the current host's shared-compute and job visibility conventions when working
 on the operator's shared machine. Do not access unrelated `.env` files or databases.

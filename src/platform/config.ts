@@ -30,7 +30,9 @@ export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Rea
     const mode = env.EMAIL_MODE ?? "outbox";
     if (mode === "outbox" && (production || !loopback || origin.protocol !== "http:" ||
         !["127.0.0.1", "localhost", "::1"].includes(env.HOST ?? "127.0.0.1"))) return fail();
-    if (mode !== "outbox" && mode !== "resend") return fail();
+    if (mode !== "outbox" && mode !== "resend" && mode !== "disabled") return fail();
+    if (mode === "disabled" && (production || env.AUTH_HARRY_PREVIEW !== "true" ||
+        !["127.0.0.1", "localhost", "::1"].includes(env.HOST ?? "127.0.0.1"))) return fail();
     if (mode === "resend" && (!env.RESEND_API_KEY || !env.EMAIL_FROM || /[\r\n]/.test(env.EMAIL_FROM))) return fail();
     if (env.AUTH_HARRY_PREVIEW !== undefined && !["true", "false"].includes(env.AUTH_HARRY_PREVIEW)) return fail();
     if (env.ONBOARDING_ENABLED !== undefined && !["true", "false"].includes(env.ONBOARDING_ENABLED)) return fail();
@@ -43,7 +45,7 @@ export function readConfig(env: Readonly<NodeJS.ProcessEnv>): Result<Config, Rea
     const googleKeys = ["ONBOARDING_GOOGLE_CALENDAR_ID", "ONBOARDING_GOOGLE_CLIENT_ID", "ONBOARDING_GOOGLE_CLIENT_SECRET", "ONBOARDING_GOOGLE_REFRESH_TOKEN"] as const;
     if (googleKeys.some(key => !!env[key]) && !googleKeys.every(key => !!env[key])) return fail();
     const googleBooking = googleKeys.every(key => !!env[key]) ? { calendarId: env.ONBOARDING_GOOGLE_CALENDAR_ID!, clientId: env.ONBOARDING_GOOGLE_CLIENT_ID!, clientSecret: env.ONBOARDING_GOOGLE_CLIENT_SECRET!, refreshToken: env.ONBOARDING_GOOGLE_REFRESH_TOKEN! } : undefined;
-    const delivery: DeliveryConfig = mode === "outbox" ? { mode, directory: ".data/outbox" }
+    const delivery: DeliveryConfig = mode === "disabled" ? { mode } : mode === "outbox" ? { mode, directory: ".data/outbox" }
       : { mode, from: env.EMAIL_FROM!, apiKey: env.RESEND_API_KEY! };
     return ok({ databaseUrl: env.DATABASE_URL!, publicOrigin: origin.origin, rateKey: env.AUTH_RATE_KEY!,
       host: env.HOST ?? "127.0.0.1", port, delivery, harryPreview: env.AUTH_HARRY_PREVIEW === "true", onboardingEnabled: env.ONBOARDING_ENABLED === "true", ...(googleBooking ? { googleBooking } : {}), ...(assessmentStorage ? { assessmentStorage } : {}), ...(env.OPENAI_API_KEY ? { openAiApiKey: env.OPENAI_API_KEY } : {}) });

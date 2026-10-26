@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "npm run build && node --env-file-if-exists=.env --watch src/server.ts",
+    "dev:preview": "node scripts/dev-preview.ts",
     "start": "node --env-file-if-exists=.env src/server.ts",
     "build": "node scripts/build.ts",
     "typecheck": "tsc --noEmit",
