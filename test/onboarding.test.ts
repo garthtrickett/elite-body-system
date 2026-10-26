@@ -47,7 +47,11 @@ async function ready(accountId: string): Promise<OnboardingSnapshot> {
 test("onboarding validates ranked permutations and draft data without accepting forged completion fields", () => {
   assert.ok(parseAnswers(emptyAnswers()).ok);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: Array(7).fill("strength") }).ok, false);
+  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: Array(9).fill("strength") }).ok, false);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: ["strength"] }).ok, false);
+  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: onboardingAnswers().goals.slice(1) }).ok, false);
+  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: ["unknown", ...onboardingAnswers().goals.slice(1)] }).ok, false);
+  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: ["consistency", ...onboardingAnswers().goals.slice(1, 7)] }).ok, false);
   assert.equal(parseAnswers({ ...onboardingAnswers(), routine: { ...onboardingAnswers().routine, timezone: "bad/zone" } }).ok, false);
   assert.equal(parseContent({ ...onboardingContent(), strengthVideo: "" }), undefined);
   const parsed = parseAnswers({ ...onboardingAnswers(), completedAt: "2020-01-01", accountId: randomUUID() }); assert.ok(parsed.ok);
@@ -111,6 +115,23 @@ test("older saved questionnaires keep their answers and require the new final-th
   const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
   assert.equal(reloaded.value.answers.questionnaire.finalThought, "I was ready for coaching");
   assert.equal(reloaded.value.answers.questionnaire.motivation, previous.answers.questionnaire.motivation);
+});
+
+test("seven-goal records preserve their order, append new goals and require confirmation before saving the expanded ranking", async () => {
+  const a = await account(), previous = await saved(a.id);
+  const legacyGoals = ["cardio", "size", "strength", "reduce-pain", "mobility", "get-lean", "energy"];
+  await sql`update onboarding_records set data = jsonb_set(data, '{answers,goals}', cast(${JSON.stringify(legacyGoals)} as jsonb)) where account_id = ${a.id}`.execute(db);
+  const resumed = await onboarding.get({ accountId: a.id }); assert.ok(resumed.ok);
+  assert.deepEqual(resumed.value.answers.goals, [...legacyGoals, "consistency", "health-markers"]);
+  assert.equal(resumed.value.answers.goalsConfirmed, false);
+  assert.deepEqual(resumed.value.answers.questionnaire, previous.answers.questionnaire);
+  assert.deepEqual(resumed.value.missing.questionnaire, ["Confirm your goal ranking."]);
+  const goals = [...resumed.value.answers.goals].reverse();
+  const updated = await onboarding.save({ accountId: a.id, revision: resumed.value.revision, contentVersion: resumed.value.content.version, answers: { ...resumed.value.answers, goals, goalsConfirmed: true } });
+  assert.ok(updated.ok); assert.deepEqual(updated.value.missing.questionnaire, []);
+  const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
+  assert.deepEqual(reloaded.value.answers.goals, goals);
+  assert.equal(reloaded.value.answers.goalsConfirmed, true);
 });
 
 test("private media rejects other accounts, invalid bytes, oversized files and pending submissions; failed replacement preserves the ready file", async () => {
