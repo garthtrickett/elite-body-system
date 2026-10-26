@@ -5,7 +5,7 @@ import { createAuth, createAuthHttp, createLinkDelivery, createPostgresAuthStore
 import { createDatabase } from "./database/connection.ts";
 import type { Config } from "./config.ts";
 import { createClientHttp } from "./client-http.ts";
-import { createOnboarding, createS3AssessmentStorage, createGoogleBookingProvider, assessmentUploadOrigin } from "../features/onboarding/index.ts";
+import { createOnboarding, createS3AssessmentStorage, createGoogleBookingProvider, assessmentUploadOrigin, accountSetupProblem } from "../features/onboarding/index.ts";
 import type { AssessmentStorage } from "../features/onboarding/index.ts";
 
 export function createApplication(config: Config, dependencies: Readonly<{ assessmentStorage?: AssessmentStorage }> = {}) {
@@ -13,11 +13,19 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
   const auth = createAuth({ store: createPostgresAuthStore(db), deliverLink: createLinkDelivery(config.delivery),
     publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
   const onboarding = createOnboarding({ db });
-  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), ...(config.onboardingEnabled ? { pageAccess: async ({ accountId, path }: Readonly<{ accountId: string; path: string }>) => {
-    if (path === "/onboarding" || path === "/account/media" || path === "/account/setup") return { allowed: true };
-    const access = await onboarding.eligible({ accountId });
-    return access.ok ? { allowed: access.value.eligible } : { allowed: false, unavailable: true };
-  } } : {}) });
+  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), pageAccess: async ({ accountId, path }) => {
+    if (path === "/account/media" || path === "/account/setup") return { allowed: true };
+    if (path !== "/onboarding") {
+      if (!config.onboardingEnabled) return { allowed: true };
+      const access = await onboarding.eligible({ accountId });
+      if (!access.ok) return { allowed: false, unavailable: true };
+      if (access.value.eligible) return { allowed: true };
+    }
+    const current = await onboarding.get({ accountId });
+    if (!current.ok) return { allowed: false, unavailable: true };
+    const setupRequired = !current.value.completedAt && !!accountSetupProblem(current.value.answers.routine);
+    return { allowed: path === "/onboarding" && !setupRequired, redirect: setupRequired ? "/account/setup" : "/onboarding" };
+  } });
   const handleClient = createClientHttp({ auth, db, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
     ...(config.googleBooking ? { bookingProvider: createGoogleBookingProvider(config.googleBooking) } : {}),
     ...(dependencies.assessmentStorage ? { assessmentStorage: dependencies.assessmentStorage } : config.assessmentStorage ? { assessmentStorage: createS3AssessmentStorage(config.assessmentStorage) } : {}), ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });

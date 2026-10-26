@@ -136,6 +136,63 @@ test("Welcome completion saves before showing its check and keeps it after revis
   await expect(page.getByLabel("What do you prefer to be called?", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("checkbox")).toHaveCount(0);
 });
+test("participation documents sign separately, download exact records and reset only an edited form", async ({ page }) => {
+  await signIn(page); await section(page, "audit");
+  const readiness = page.getByRole("form", { name: "PAR-Q · Health screening", exact: true });
+  for (const radio of await readiness.getByRole("radio", { name: "No", exact: true }).all()) await radio.check();
+  await readiness.getByLabel("Full name — PAR-Q signature", { exact: true }).fill("Taylor Example");
+  await readiness.getByRole("checkbox", { name: /^My answers are accurate/ }).check();
+  await readiness.getByRole("button", { name: "Sign and save", exact: true }).click();
+  const formCard = (title: string) => page.locator(".ob-document").filter({ has: page.locator("summary").filter({ hasText: title }) });
+  await expect(formCard("PAR-Q").locator(".ob-doc-status")).toHaveText("Signed");
+  await page.locator(".ob-document > summary").filter({ hasText: "Informed Consent" }).click();
+  const informed = page.getByRole("form", { name: "Informed Consent", exact: true });
+  await informed.getByLabel("Emergency contact’s name", { exact: true }).fill("Sam Example");
+  await informed.getByLabel("Emergency contact’s phone (include country code)", { exact: true }).fill("+447000000000");
+  await informed.getByRole("checkbox", { name: /^I explicitly consent to EBS/ }).check();
+  await informed.getByLabel("Full name — Informed Consent signature", { exact: true }).fill("Taylor Example");
+  await informed.getByRole("checkbox", { name: /^I have read the Informed Consent/ }).check();
+  await informed.getByRole("button", { name: "Sign and save", exact: true }).click();
+  await expect(formCard("Informed Consent").locator(".ob-doc-status")).toHaveText("Signed");
+  const downloaded = page.waitForEvent("download"); await informed.getByRole("link", { name: "Download signed copy", exact: true }).click();
+  const file = await downloaded; expect(file.suggestedFilename()).toBe("ebs-informed-signed.txt");
+  const stream = await file.createReadStream(), chunks: Buffer[] = [];
+  if (!stream) throw new Error("Signed copy unavailable");
+  for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+  const text = Buffer.concat(chunks).toString("utf8"); expect(text).toContain(onboardingContent().documents!.informed.text); expect(text).toContain("Taylor Example"); expect(text).toContain("Sam Example");
+  await page.locator(".ob-document > summary").filter({ hasText: "Participation Agreement" }).click();
+  const participation = page.getByRole("form", { name: "Participation Agreement", exact: true });
+  await participation.getByRole("checkbox", { name: /^I am at least 18/ }).check();
+  await participation.getByLabel("Full name — Participation Agreement signature", { exact: true }).fill("Taylor Example");
+  await participation.getByRole("checkbox", { name: /^I have read the Participation Agreement/ }).check();
+  await participation.getByRole("button", { name: "Sign and save", exact: true }).click();
+  await expect(formCard("Participation Agreement").locator(".ob-doc-status")).toHaveText("Signed");
+  await informed.getByLabel("Emergency contact’s name", { exact: true }).fill("A different contact");
+  await expect(formCard("Informed Consent").locator(".ob-doc-status")).toHaveText("Review & sign");
+  await expect(formCard("PAR-Q").locator(".ob-doc-status")).toHaveText("Signed");
+  await expect(formCard("Participation Agreement").locator(".ob-doc-status")).toHaveText("Signed");
+  await expect(informed.getByRole("checkbox", { name: /^I have read the Informed Consent/ })).not.toBeChecked();
+  await expect(informed.getByRole("button", { name: "Sign and save", exact: true })).toBeDisabled();
+});
+
+test("weekly rhythm has clear icons, direct coach access and the mutual commitment beneath it", async ({ page }) => {
+  try {
+    const content = { ...onboardingContent(), version: "browser-coaching-draft", documents: { ...onboardingContent().documents!, coaching: DRAFT_DOCUMENTS.coaching } };
+    expect((await onboarding.configure({ content })).ok).toBe(true);
+    await signIn(page); await section(page, "rhythm");
+    await expect(page.locator(".ob-rhythm-icon svg")).toHaveCount(5);
+    await expect(page.getByText(/before 06:00 GMT on Monday/)).toBeVisible();
+    await expect(page.getByText(/Sunday evening at the latest/)).toBeVisible();
+    const access = page.getByRole("region", { name: "Direct access to your coach", exact: true });
+    await expect(access).toContainText("WhatsApp"); await expect(access).toContainText("48 hours"); await expect(access).toContainText("09:00–17:00 GMT");
+    await expect(page.getByRole("form", { name: "Trainer–Client Agreement", exact: true })).toBeVisible();
+    await expect(page.locator(".ob-doc-coach strong")).toHaveText("Harry Baldwin");
+    await expect(page.getByRole("form", { name: "Trainer–Client Agreement", exact: true }).getByRole("button", { name: "Sign and save", exact: true })).toBeDisabled();
+    const order = await page.locator(".ob-main > fieldset > *").evaluateAll(items => items.map(item => item.className));
+    expect(order.indexOf("ob-coach-access")).toBeLessThan(order.indexOf("ob-document"));
+    for (const width of [1440, 390, 320]) { await page.setViewportSize({ width, height: 900 }); expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true); }
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
 for (const width of [1280, 390, 320]) test(`health screening comes first and holds concerning answers until physician clearance at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   const accountId = await signIn(page, true); await section(page, "audit");

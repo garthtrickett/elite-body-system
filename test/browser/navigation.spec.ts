@@ -229,10 +229,10 @@ test("mandatory onboarding and expired sessions remain authoritative during clie
     await gated.auth.requestLink({ email, clientKey: randomUUID() });
     const session = await gated.auth.redeemLink({ token: new URL(await gated.readLink(email)).hash.slice(1) }); if (!session.ok) throw new Error("Fixture session failed");
     await page.context().addCookies([{ name: "ebs-session", value: session.value.sessionToken, url: gated.origin, httpOnly: true, sameSite: "Lax" }]);
-    await page.setViewportSize({ width: 1440, height: 900 }); await page.goto(gated.origin); await expect(page).toHaveURL(gated.origin + "/onboarding");
-    await expect(page.getByRole("heading", { name: "Welcome video", exact: true })).toBeVisible(); const identity = await stableNodes(page); const length = await page.evaluate(() => history.length);
-    const response = await page.request.get(gated.origin + "/training", { headers: { Accept: "application/json" } }); expect(response.url()).toBe(gated.origin + "/onboarding"); expect((await response.json()).value.page).toBe("onboarding");
-    await nav(page).getByRole("link", { name: "Training", exact: true }).click(); await expect(page.locator(".sc-route-status")).toBeHidden(); await expect(page).toHaveURL(gated.origin + "/onboarding"); await identity(); expect(await page.evaluate(() => history.length)).toBe(length);
+    await page.setViewportSize({ width: 1440, height: 900 }); await page.goto(gated.origin); await expect(page).toHaveURL(gated.origin + "/account/setup");
+    await expect(page.getByRole("heading", { name: "Account setup", exact: true })).toBeVisible(); const identity = await stableNodes(page); const length = await page.evaluate(() => history.length);
+    const response = await page.request.get(gated.origin + "/training", { headers: { Accept: "application/json" } }); expect(response.url()).toBe(gated.origin + "/account/setup"); expect((await response.json()).value.page).toBe("account-setup");
+    await nav(page).getByRole("link", { name: "Training", exact: true }).click(); await expect(page.locator(".sc-route-status")).toBeHidden(); await expect(page).toHaveURL(gated.origin + "/account/setup"); await identity(); expect(await page.evaluate(() => history.length)).toBe(length);
     expect((await page.request.get(gated.origin + "/api/client/training")).status()).toBe(403);
     await page.context().clearCookies(); await nav(page).getByRole("link", { name: "Meals", exact: true }).click(); await expect(page).toHaveURL(gated.origin + "/sign-in");
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();

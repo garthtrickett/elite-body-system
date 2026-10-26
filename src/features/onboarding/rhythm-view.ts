@@ -15,5 +15,5 @@ function rhythmIcon(id: typeof WEEKLY_COACHING[number]["id"]) {
 export function weeklyRhythmView() {
   const communication = WEEKLY_COACHING.find(section => section.id === "communication")!;
   return html`<p class="sc-copy">${WEEKLY_INTRODUCTION}</p><div class="ob-weekly-guide">${WEEKLY_COACHING.filter(section => section.id !== "communication").map(section => html`<section class="ob-rhythm-part"><span class="ob-rhythm-icon">${rhythmIcon(section.id)}</span><div><h2>${section.title}</h2>${section.paragraphs.map(paragraph => html`<p>${paragraph}</p>`)}</div></section>`)}</div>
-    <section class="ob-coach-access"><span class="ob-rhythm-icon">${rhythmIcon("communication")}</span><div><p class="sc-eyebrow">Communication</p><h2>Direct access to your coach</h2><p>You have direct access to Harry through WhatsApp throughout your Elite Body System coaching.</p>${communication.paragraphs.map(paragraph => html`<p>${paragraph}</p>`)}</div></section>`;
+    <section class="ob-coach-access" aria-label="Direct access to your coach"><span class="ob-rhythm-icon">${rhythmIcon("communication")}</span><div><p class="sc-eyebrow">Communication</p><h2>Direct access to your coach</h2><p>You have direct access to Harry through WhatsApp throughout your Elite Body System coaching.</p>${communication.paragraphs.map(paragraph => html`<p>${paragraph}</p>`)}</div></section>`;
 }
