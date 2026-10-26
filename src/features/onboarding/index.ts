@@ -2,7 +2,7 @@ export { createOnboarding } from "./operations.ts";
 export { createAssessmentMedia } from "./media.ts";
 export { createS3AssessmentStorage, assessmentUploadOrigin } from "./storage.ts";
 export type { AssessmentStorage, AssessmentStorageConfig } from "./storage.ts";
-export { parseContent, emptyContent, emptyAnswers, parseAnswers, missingRequirements, SECTIONS, mediaSlots } from "./data.ts";
+export { parseContent, emptyContent, emptyAnswers, parseAnswers, missingRequirements, healthScreeningProblem, SECTIONS, mediaSlots } from "./data.ts";
 export { DRAFT_HEALTH_SAFETY } from "./health-safety.ts";
 export { createMarketingPermissions } from "./marketing.ts";
 export { DRAFT_MARKETING_RELEASE, emptyMarketingPermission, emptyMarketingSnapshot } from "./marketing-data.ts";

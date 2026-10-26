@@ -1,6 +1,6 @@
 import type { NavigationGuard } from "../../shared/browser-route.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
-import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers } from "./data.ts";
+import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers, healthScreeningProblem } from "./data.ts";
 import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
 import { emptyMarketingPermission, marketingDraft as savedMarketingDraft, marketingGrantProblem } from "./marketing-data.ts";
 import type { MarketingPermission } from "./marketing-data.ts";
@@ -65,6 +65,10 @@ function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: Onboa
   const changedContent = base.content.version !== saved.content.version;
   const changedScreening = base.content.parqVersion !== saved.content.parqVersion || JSON.stringify(base.content.healthQuestions) !== JSON.stringify(saved.content.healthQuestions);
   const changedRanking = JSON.stringify([base.answers.goals, base.answers.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]) || !!attempted && JSON.stringify([attempted.goals, attempted.goalsConfirmed]) !== JSON.stringify([draft.goals, draft.goalsConfirmed]);
+  const health = changedScreening ? saved.answers.health : saved.answers.health.map((answer, index) => retain(base.answers.health[index], draft.health[index], answer, attempted?.health[index]) ?? null);
+  const screening = (answers: OnboardingAnswers) => JSON.stringify([answers.health, answers.healthDetails, answers.medicalClearance]);
+  const localDeclaration = screening(base.answers) !== screening(draft) || !!attempted && screening(attempted) !== screening(draft);
+  const declaration = localDeclaration ? draft : saved.answers;
   return { ...merged,
     goals: changedRanking ? draft.goals : saved.answers.goals,
     goalsConfirmed: changedRanking ? draft.goalsConfirmed : saved.answers.goalsConfirmed,
@@ -74,7 +78,8 @@ function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: Onboa
     measurements: fields(base.answers.measurements, draft.measurements, saved.answers.measurements, attempted?.measurements),
     lifestyle: fields(base.answers.lifestyle, draft.lifestyle, saved.answers.lifestyle, attempted?.lifestyle),
     routine: fields(base.answers.routine, draft.routine, saved.answers.routine, attempted?.routine),
-    health: changedScreening ? saved.answers.health : saved.answers.health.map((answer, index) => retain(base.answers.health[index], draft.health[index], answer, attempted?.health[index]) ?? null),
+    health,
+    medicalClearance: !changedScreening && declaration.medicalClearance && JSON.stringify([health, merged.healthDetails]) === JSON.stringify([declaration.health, declaration.healthDetails]),
   };
 }
 export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingProposal): OnboardingModel {
@@ -102,12 +107,13 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     const reconciled = retained && base ? reconcileDraft({ base, draft: model.draft, saved: snapshot, attempted: saving ? null : model.recoveryAnswers }) : snapshot.answers;
     const draft = saving && effect.mode === "background" ? { ...reconciled, questionnaire: model.draft.questionnaire } : reconciled;
     const dirty = !!retained && answersDiffer(draft, snapshot.answers);
+    const screeningProblem = !snapshot.completedAt && draft.health.some(Boolean) && SECTIONS.indexOf(section) > SECTIONS.indexOf("audit") ? healthScreeningProblem({ answers: draft }) : null;
     const storedMarketing = savedMarketingDraft(snapshot.marketing);
     const keepMarketing = effect.kind !== "saveMarketing" && model.marketingDirty;
     const changedRelease = model.snapshot?.marketing.release.version !== snapshot.marketing.release.version;
     const marketingDraft = keepMarketing ? { ...model.marketingDraft, ...(changedRelease ? { version: snapshot.marketing.release.version, accepted: false } : {}) } : storedMarketing;
     const marketingDirty = keepMarketing && JSON.stringify(marketingDraft) !== JSON.stringify(storedMarketing);
-    const updated = { ...model, snapshot, draft, dirty, marketingDraft, marketingDirty, recoveryAnswers: null, pending: undefined, section: saving && dirty ? model.section : section, showMissing: saving && !effect.next && model.showMissing, error: "", message: effect.kind === "saveMarketing" ? snapshot.marketing.record?.action === "granted" ? "Your optional marketing permission is saved." : "No marketing use is permitted. Your choice is saved." : cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty || marketingDirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
+    const updated = { ...model, snapshot, draft, dirty, marketingDraft, marketingDirty, recoveryAnswers: null, pending: undefined, section: screeningProblem ? "audit" as const : saving && dirty ? model.section : section, showMissing: !!screeningProblem || saving && !effect.next && model.showMissing, error: screeningProblem || "", message: effect.kind === "saveMarketing" ? snapshot.marketing.record?.action === "granted" ? "Your optional marketing permission is saved." : "No marketing use is permitted. Your choice is saved." : cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty || marketingDirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
     if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
   }
@@ -117,7 +123,9 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   }
   if (proposal.kind === "edit") {
     if (!model.snapshot || model.snapshot.completedAt || model.reloadRequired || model.accountBusy || model.pending && !(model.pending.kind === "save" && model.pending.mode === "background")) return model;
-    return { ...model, draft: proposal.answers, dirty: model.pending?.kind === "save" || answersDiffer(proposal.answers, model.snapshot.answers), error: "", message: "" };
+    const healthChanged = JSON.stringify([model.draft.health, model.draft.healthDetails]) !== JSON.stringify([proposal.answers.health, proposal.answers.healthDetails]);
+    const draft = healthChanged ? { ...proposal.answers, medicalClearance: false } : proposal.answers;
+    return { ...model, draft, dirty: model.pending?.kind === "save" || answersDiffer(draft, model.snapshot.answers), error: "", message: "" };
   }
   if (model.marketingDirty && (proposal.kind === "section" || proposal.kind === "next" || proposal.kind === "complete")) return { ...model, error: "Save or discard your optional marketing changes before leaving this section. Giving permission is not required." };
   if (!model.accountBusy && model.pending?.kind === "save" && model.pending.mode === "background" && (proposal.kind === "next" || proposal.kind === "section" || proposal.kind === "save")) {
@@ -128,6 +136,11 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (proposal.kind === "signOut") return queue(model, { kind: "signOut", id, confirm: model.dirty || model.marketingDirty });
   if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty || model.marketingDirty });
   if (!model.snapshot) return model;
+  const destination = proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? followingSection(model.section) : proposal.kind === "complete" ? "call" : null;
+  if (!model.snapshot.completedAt && destination && SECTIONS.indexOf(destination) > SECTIONS.indexOf("audit") && model.draft.health.some(Boolean)) {
+    const problem = healthScreeningProblem({ answers: model.draft });
+    if (problem) return model.dirty && !model.reloadRequired ? saveDraft(model, { next: destination, mode: "explicit" }) : { ...model, section: "audit", showMissing: true, error: problem };
+  }
   if (proposal.kind === "discardMarketing") return { ...model, marketingDraft: savedMarketingDraft(model.snapshot.marketing), marketingDirty: false, error: "", message: "Unsaved marketing changes discarded." };
   if (proposal.kind === "saveMarketing" || proposal.kind === "withdrawMarketing") {
     if (model.reloadRequired) return { ...model, error: "Reload saved progress before changing marketing permission." };

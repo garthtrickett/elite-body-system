@@ -2,6 +2,12 @@
 
 ## Harry’s revised onboarding
 
+Health screening is first within Health & Safety Agreement. A Yes answer requires
+a short explanation and confirmation of medical clearance from a registered
+physician before progressing beyond that section. Draft saving and prior-section
+review remain available while blocked; trusted physical-assessment clearance is
+separate from the client's declaration.
+
 The operator authorized implementing the [eight-section onboarding plan](docs/harry-onboarding-implementation-plan.md). Confirmed decisions: all clients must complete the new flow, including clients who completed the old setup; a confirmed Google Meet booking satisfies the call section. Preserve existing program dates and history. The implementation uses a dedicated onboarding slice with versioned answers/content, private assessment media, booking confirmation and a rollout-controlled server gate. Approved videos/legal wording, the actual scheduling bridge and production storage/calendar configuration remain external launch dependencies. See [onboarding operations](docs/onboarding-operations.md) for configuration, review tools and release checks. Production rollout is not authorized by this implementation task.
 
 ## Active client-platform goal

@@ -33,7 +33,7 @@ export type OnboardingAnswers = Readonly<{
   acknowledged: Readonly<Record<"welcome" | "communication" | "rhythm", boolean>>;
   questionnaire: Readonly<Record<Question, string>>;
   goals: readonly Goal[]; goalsConfirmed: boolean;
-  health: readonly (boolean | null)[]; healthDetails: string;
+  health: readonly (boolean | null)[]; healthDetails: string; medicalClearance: boolean;
   consent: Readonly<{ version: string; signedName: string; accepted: boolean; healthData: boolean; adult: boolean }>;
   cardio: "run" | "cross-trainer" | "bike";
   measurements: Readonly<Record<Measurement, string>>;
@@ -61,7 +61,7 @@ export type OnboardingSnapshot = Readonly<{
 export function emptyAnswers(): OnboardingAnswers {
   return { acknowledged: { welcome: false, communication: false, rhythm: false },
     questionnaire: { transformation: "", motivation: "", experience: "", choice: "", now: "", finalThought: "", success: "", struggles: "", belief: "" },
-    goals: [...GOALS], goalsConfirmed: false, health: Array.from({ length: 7 }, () => null), healthDetails: "",
+    goals: [...GOALS], goalsConfirmed: false, health: Array.from({ length: 7 }, () => null), healthDetails: "", medicalClearance: false,
     consent: { version: "", signedName: "", accepted: false, healthData: false, adult: false }, cardio: "run",
     measurements: { bicepLeft: "", bicepRight: "", hamLeft: "", hamRight: "", forearmLeft: "", forearmRight: "", waist: "", neck: "" },
     lifestyle: { diet: "", feeling: "", symptoms: "", sleep: "" },
@@ -93,7 +93,7 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
   if (!["welcome", "communication", "rhythm"].every(key => typeof acknowledged[key] === "boolean") ||
       !Object.keys(QUESTIONS).every(key => ((key === "finalThought" || key === "belief") && questionnaire[key] === undefined) || isText(questionnaire[key], 2000)) || !Object.keys(MEASUREMENTS).every(key => isText(measurements[key], 12)) || !Object.keys(LIFESTYLE).every(key => isText(lifestyle[key], 2000)) ||
       !Array.isArray(value.goals) || (!earlierRanking && goals.length !== GOALS.length) || new Set(goals).size !== goals.length || !goals.every(goal => typeof goal === "string" && GOALS.includes(goal as Goal)) || typeof value.goalsConfirmed !== "boolean" ||
-      !Array.isArray(value.health) || value.health.length !== 7 || !value.health.every(answer => answer === null || typeof answer === "boolean") || !isText(value.healthDetails, 2000) || !["run", "cross-trainer", "bike"].includes(String(value.cardio)) ||
+      !Array.isArray(value.health) || value.health.length !== 7 || !value.health.every(answer => answer === null || typeof answer === "boolean") || !isText(value.healthDetails, 2000) || (value.medicalClearance !== undefined && typeof value.medicalClearance !== "boolean") || !["run", "cross-trainer", "bike"].includes(String(value.cardio)) ||
       !isText(consent.version, 100) || !isText(consent.signedName, 100) || !["accepted", "healthData", "adult"].every(key => typeof consent[key] === "boolean") ||
       !isText(routine.name, 100) || !isText(routine.timezone, 100) || !isText(routine.weight, 12) || !isText(routine.equipment, 2000) || !isText(routine.emergencyName, 100) || !isText(routine.emergencyPhone, 50) ||
       !Array.isArray(routine.trainingDays) || routine.trainingDays.length > 4 || new Set(routine.trainingDays).size !== routine.trainingDays.length || !routine.trainingDays.every(day => Number.isInteger(day) && day >= 0 && day <= 6) || typeof routine.restDay !== "number" || !Number.isInteger(routine.restDay) || routine.restDay < 0 || routine.restDay > 6) return invalid();
@@ -102,7 +102,7 @@ export function parseAnswers(value: unknown): ClientResult<OnboardingAnswers> {
     questionnaire: Object.fromEntries(Object.keys(QUESTIONS).map(key => [key, typeof questionnaire[key] === "string" ? questionnaire[key].trim() : ""])) as OnboardingAnswers["questionnaire"],
     measurements: Object.fromEntries(Object.keys(MEASUREMENTS).map(key => [key, (measurements[key] as string).trim()])) as OnboardingAnswers["measurements"],
     lifestyle: Object.fromEntries(Object.keys(LIFESTYLE).map(key => [key, (lifestyle[key] as string).trim()])) as OnboardingAnswers["lifestyle"],
-    goals: [...goals, ...GOALS.filter(goal => !goals.includes(goal))] as Goal[], goalsConfirmed: value.goalsConfirmed && !earlierRanking, health: [...value.health] as (boolean | null)[], healthDetails: value.healthDetails.trim(), cardio: value.cardio as OnboardingAnswers["cardio"],
+    goals: [...goals, ...GOALS.filter(goal => !goals.includes(goal))] as Goal[], goalsConfirmed: value.goalsConfirmed && !earlierRanking, health: [...value.health] as (boolean | null)[], healthDetails: value.healthDetails.trim(), medicalClearance: value.medicalClearance === true, cardio: value.cardio as OnboardingAnswers["cardio"],
     consent: { version: consent.version as string, signedName: (consent.signedName as string).trim(), accepted: consent.accepted as boolean, healthData: consent.healthData as boolean, adult: consent.adult as boolean },
     routine: { name: (routine.name as string).trim(), timezone: routine.timezone as string, weight: (routine.weight as string).trim(), equipment: (routine.equipment as string).trim(), emergencyName: (routine.emergencyName as string).trim(), emergencyPhone: (routine.emergencyPhone as string).trim(), trainingDays: [...routine.trainingDays] as number[], restDay: routine.restDay } });
 }
@@ -131,6 +131,19 @@ export function mediaSlots(content: OnboardingContent): readonly Readonly<{ id: 
     ...["front", "back", "side"].map(id => ({ id: `photo:${id}`, label: `${id[0]?.toUpperCase()}${id.slice(1)} photo`, kind: "image" as const }))];
 }
 
+export function healthScreeningProblem(input: Readonly<{ answers: OnboardingAnswers }>): string | null {
+  const a = input.answers;
+  if (a.health.some(answer => answer === null)) return "Answer every health screening question.";
+  if (!a.health.some(Boolean)) return null;
+  if (!a.healthDetails.trim()) return "Briefly explain your Yes answers in a short sentence.";
+  return a.medicalClearance ? null : "You cannot proceed until a registered physician has cleared you for physical activity and you tick the medical-clearance box.";
+}
+export function consentSignature(input: Readonly<{ contentVersion: string; answers: OnboardingAnswers }>): string {
+  const a = input.answers;
+  // Preserve historical acknowledgements that predate the separate declaration.
+  return JSON.stringify([input.contentVersion, a.consent, a.health, a.healthDetails, ...(a.medicalClearance ? [true] : [])]);
+}
+
 export function missingRequirements(input: Readonly<{ answers: OnboardingAnswers; content: OnboardingContent; media: readonly MediaSummary[]; booking: Booking | null; resolutions: readonly Resolution[] }>): Readonly<Record<Section, readonly string[]>> {
   const { answers: a, content: c } = input;
   const missing: Record<Section, string[]> = { welcome: [], questionnaire: [], audit: [], communication: [], measurements: [], lifestyle: [], rhythm: [], call: [] };
@@ -144,9 +157,9 @@ export function missingRequirements(input: Readonly<{ answers: OnboardingAnswers
   if (!a.goalsConfirmed) missing.questionnaire.push("Confirm your goal ranking.");
   if (!c.consentVersion || !c.consentText || !c.parqVersion || c.healthQuestions.length !== 7) missing.audit.push("Approved consent and health screening are needed.");
   if (a.consent.version !== c.consentVersion || !a.consent.accepted || !a.consent.healthData || !a.consent.adult || !a.consent.signedName) missing.audit.push("Read, acknowledge and sign the current consent.");
-  if (a.health.some(answer => answer === null)) missing.audit.push("Answer every health screening question.");
+  const screeningProblem = healthScreeningProblem(input);
+  if (screeningProblem) missing.audit.push(screeningProblem);
   if (a.health.some(Boolean)) {
-    text("audit", a.healthDetails, "Explain your health concerns to Harry.");
     if (!hasResolution({ ...input, requirement: "health-clearance" }) && !hasResolution({ ...input, requirement: "health-audit-alternative" })) missing.audit.push("Contact Harry before exercising: health clearance or an approved alternative is needed.");
   }
   if (!c.mobility.length || !c.strengthVideo || !c.cardioVideo || !c.cardioInstructions) missing.audit.push("Harry’s physical-audit protocol and videos are needed.");
@@ -175,6 +188,7 @@ export function hasResolution(input: Readonly<{ answers: OnboardingAnswers; cont
 export function assessmentSubmissionProblem(input: Readonly<{ answers: OnboardingAnswers; content: OnboardingContent; resolutions: readonly Resolution[]; slot: string }>): string | null {
   const { answers: a, content: c } = input;
   if (!c.approved || !a.consent.accepted || a.consent.version !== c.consentVersion || !a.consent.healthData || !a.consent.adult || !a.consent.signedName) return "Save your signed consent and agreement to storing health information before uploading.";
+  if (a.health.some(Boolean)) { const problem = healthScreeningProblem(input); if (problem) return problem; }
   if (!input.slot.startsWith("photo:") && (a.health.some(answer => answer === null) || (a.health.some(Boolean) && !hasResolution({ ...input, requirement: "health-clearance" })))) return "Complete health screening and contact Harry about any health concerns before the physical audit.";
   return null;
 }

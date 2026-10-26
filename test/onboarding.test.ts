@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { createDatabase } from "../src/platform/database/connection.ts";
 import type { AccountsId } from "../src/platform/database/generated/public/Accounts.ts";
-import { createOnboarding, createAssessmentMedia, mediaSlots, emptyAnswers, parseAnswers, parseContent, missingRequirements } from "../src/features/onboarding/index.ts";
+import { createOnboarding, createAssessmentMedia, mediaSlots, emptyAnswers, parseAnswers, parseContent, missingRequirements, healthScreeningProblem } from "../src/features/onboarding/index.ts";
 import type { OnboardingSnapshot } from "../src/features/onboarding/index.ts";
 import { createProfiles, createPostgresProfileStore } from "../src/features/profile/index.ts";
 import { createScorecards } from "../src/features/scorecard/index.ts";
@@ -217,7 +217,7 @@ test("a pending assessment cannot finalize after its consent has changed", async
 
 test("health-related audit alternatives allow onboarding without granting medical clearance or accepting exercise uploads", async () => {
   const a = await account(), initial = await onboarding.get({ accountId: a.id }); assert.ok(initial.ok);
-  const answers = { ...onboardingAnswers(), health: [true, false, false, false, false, false, false], healthDetails: "Needs review" };
+  const answers = { ...onboardingAnswers(), health: [true, false, false, false, false, false, false], healthDetails: "Physician cleared activity with restrictions; assessment needs review", medicalClearance: true };
   const savedState = await onboarding.save({ accountId: a.id, revision: 0, contentVersion: initial.value.content.version, answers }); assert.ok(savedState.ok);
   assert.equal((await media.request({ accountId: a.id, slot: "strength:pushups", mediaType: "video/mp4", size: videoBytes.length })).ok, false);
   for (const requirement of ["health-audit-alternative", ...mediaSlots(onboardingContent()).filter(slot => !slot.id.startsWith("photo:")).map(slot => slot.id)]) assert.ok((await onboarding.resolveRequirement({ accountId: a.id, requirement, reason: "Assessment deferred pending clinician advice", resolvedBy: "Harry fixture" })).ok);
@@ -227,6 +227,27 @@ test("health-related audit alternatives allow onboarding without granting medica
   const training = await createTraining({ db, profiles: createProfiles({ store: createPostgresProfileStore(db) }) }).get({ accountId: a.id }); assert.ok(training.ok); assert.equal(training.value.blocked, "clearance_required");
   assert.ok((await onboarding.resolveRequirement({ accountId: a.id, requirement: "health-clearance", reason: "Clinician clearance now confirmed", resolvedBy: "Harry fixture" })).ok);
   const cleared = await createTraining({ db, profiles: createProfiles({ store: createPostgresProfileStore(db) }) }).get({ accountId: a.id }); assert.ok(cleared.ok); assert.equal(cleared.value.blocked, null);
+});
+
+test("concerning screening answers require an explanation and physician declaration even with reviewer resolutions", async () => {
+  const a = await account(), prepared = await ready(a.id);
+  const concerns = { ...prepared.answers, health: [true, false, false, false, false, false, false], healthDetails: "", medicalClearance: false };
+  assert.match(healthScreeningProblem({ answers: concerns })!, /short sentence/);
+  assert.equal(healthScreeningProblem({ answers: onboardingAnswers() }), null);
+  for (const medicalClearance of ["true", 1, null]) assert.equal(parseAnswers({ ...concerns, medicalClearance }).ok, false);
+  const legacy = { ...concerns, medicalClearance: undefined }, parsed = parseAnswers(legacy); assert.ok(parsed.ok); assert.equal(parsed.value.medicalClearance, false);
+  const described = { ...concerns, healthDetails: "My physician is reviewing my knee pain." };
+  const saved = await onboarding.save({ accountId: a.id, revision: prepared.revision, contentVersion: prepared.content.version, answers: described }); assert.ok(saved.ok); assert.equal(saved.value.consentSignedAt, null);
+  assert.match(saved.value.missing.audit.join(" "), /registered physician/);
+  for (const requirement of ["health-clearance", "health-audit-alternative"]) assert.ok((await onboarding.resolveRequirement({ accountId: a.id, requirement, reason: "Fixture review", resolvedBy: "Harry fixture" })).ok);
+  const held = await onboarding.get({ accountId: a.id }); assert.ok(held.ok);
+  assert.equal((await onboarding.complete({ accountId: a.id, revision: held.value.revision })).ok, false);
+  for (const [slot, mediaType, bytes] of [["photo:front", "image/jpeg", jpegBytes], ["strength:pushups", "video/mp4", videoBytes]] as const) assert.equal((await media.request({ accountId: a.id, slot, mediaType, size: bytes.length })).ok, false);
+  const cleared = await onboarding.save({ accountId: a.id, revision: held.value.revision, contentVersion: held.value.content.version, answers: { ...held.value.answers, medicalClearance: true } }); assert.ok(cleared.ok);
+  assert.ok(cleared.value.consentSignedAt); assert.equal(cleared.value.answers.medicalClearance, true);
+  const row = await db.selectFrom("onboarding_records").select("data").where("account_id", "=", a.id as AccountsId).executeTakeFirstOrThrow();
+  assert.match(JSON.stringify(row.data), /"medicalClearance":true/);
+  assert.ok((await onboarding.complete({ accountId: a.id, revision: cleared.value.revision })).ok);
 });
 
 test("booking cancellation and media deletion invalidate readiness, and stale event versions cannot restore it", async () => {

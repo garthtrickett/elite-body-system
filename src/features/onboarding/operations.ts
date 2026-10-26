@@ -9,7 +9,7 @@ import type { ClientResult } from "../../shared/client-result.ts";
 import { err, ok } from "../../shared/result.ts";
 import { isRecord, isRevision, isText } from "../../shared/validation.ts";
 import { createProfiles, createPostgresProfileStore, clientDay } from "../profile/index.ts";
-import { parseAnswers, parseContent, SECTIONS, mediaSlots, hasResolution, resolutionEvidence, isMeetUrl } from "./data.ts";
+import { parseAnswers, parseContent, SECTIONS, mediaSlots, hasResolution, resolutionEvidence, isMeetUrl, healthScreeningProblem, consentSignature } from "./data.ts";
 import type { OnboardingSnapshot, Booking } from "./data.ts";
 import { jsonData, lockAccount, readSnapshot } from "./persistence.ts";
 
@@ -43,10 +43,10 @@ export function createOnboarding(config: Readonly<{ db: Kysely<Database>; now?: 
         const prior = await transaction.selectFrom("onboarding_records").select("data").where("account_id", "=", input.accountId as AccountsId).executeTakeFirst();
         const previousEvidence = prior && isRecord(prior.data) && Array.isArray(prior.data.evidence) ? prior.data.evidence : [];
         const a = parsed.value;
-        const consentReady = current.content.approved && a.consent.version === current.content.consentVersion && a.consent.accepted && a.consent.healthData && a.consent.adult && a.consent.signedName && !a.health.some(answer => answer === null);
-        const signature = JSON.stringify([current.content.version, a.consent, a.health, a.healthDetails]);
+        const consentReady = current.content.approved && a.consent.version === current.content.consentVersion && a.consent.accepted && a.consent.healthData && a.consent.adult && a.consent.signedName && !healthScreeningProblem({ answers: a });
+        const signature = consentSignature({ contentVersion: current.content.version, answers: a });
         const evidence = consentReady && !previousEvidence.some(item => isRecord(item) && item.signature === signature)
-          ? [...previousEvidence, { signature, consentVersion: current.content.consentVersion, parqVersion: current.content.parqVersion, contentVersion: current.content.version, consent: a.consent, health: a.health, healthDetails: a.healthDetails, signedAt: now().toISOString() }] : previousEvidence;
+          ? [...previousEvidence, { signature, consentVersion: current.content.consentVersion, parqVersion: current.content.parqVersion, contentVersion: current.content.version, consent: a.consent, health: a.health, healthDetails: a.healthDetails, medicalClearance: a.medicalClearance, signedAt: now().toISOString() }] : previousEvidence;
         const data = jsonData({ answers: a, contentVersion: current.content.version, evidence });
         if (revision === 0) await transaction.insertInto("onboarding_records").values({ account_id: input.accountId as AccountsId, data, completed_at: null }).execute();
         else await transaction.updateTable("onboarding_records").set({ data, revision: revision + 1, updated_at: now() }).where("account_id", "=", input.accountId as AccountsId).execute();
