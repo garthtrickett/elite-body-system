@@ -12,8 +12,11 @@ The operator authorized implementing the [eight-section onboarding plan](docs/ha
 
 ## Active client-platform goal
 
-The requested optional Media & Testimonial Release lives in Fitness Participation
-Agreement with separate choices for material, channels, identity and restrictions.
+The optional Media & Testimonial Release is requested after meaningful progress,
+through a specific story invitation chosen by Harry. Onboarding contains no media
+permission request. Media preferences in the account preserves withdrawal access.
+Clients review the exact proposed results, testimonial and owned files, choose
+channels (including paid ads separately), and explicitly approve that story.
 Its own versioned approval and append-only permission history are independent of
 participation consent and completion. Clients can withdraw after onboarding;
 external campaign/post removal remains an operator action. The original release

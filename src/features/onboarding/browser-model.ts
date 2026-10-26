@@ -111,7 +111,8 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     const storedMarketing = savedMarketingDraft(snapshot.marketing);
     const keepMarketing = effect.kind !== "saveMarketing" && model.marketingDirty;
     const changedRelease = model.snapshot?.marketing.release.version !== snapshot.marketing.release.version;
-    const marketingDraft = keepMarketing ? { ...model.marketingDraft, ...(changedRelease ? { version: snapshot.marketing.release.version, accepted: false } : {}) } : storedMarketing;
+    const changedStory = model.snapshot?.marketing.story?.id !== snapshot.marketing.story?.id;
+    const marketingDraft = keepMarketing && !changedStory ? { ...model.marketingDraft, ...(changedRelease ? { version: snapshot.marketing.release.version, accepted: false } : {}) } : storedMarketing;
     const marketingDirty = keepMarketing && JSON.stringify(marketingDraft) !== JSON.stringify(storedMarketing);
     const updated = { ...model, snapshot, draft, dirty, marketingDraft, marketingDirty, recoveryAnswers: null, pending: undefined, section: screeningProblem ? "audit" as const : saving && dirty ? model.section : section, showMissing: !!screeningProblem || saving && !effect.next && model.showMissing, error: screeningProblem || "", message: effect.kind === "saveMarketing" ? snapshot.marketing.record?.action === "granted" ? "Your optional marketing permission is saved." : "No marketing use is permitted. Your choice is saved." : cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty || marketingDirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
     if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });

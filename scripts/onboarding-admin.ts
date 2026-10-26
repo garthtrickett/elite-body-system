@@ -7,7 +7,7 @@ import { isRecord } from "../src/shared/validation.ts";
 const [command, accountOrFile, detailsFile] = process.argv.slice(2);
 const configuration = readConfig(process.env);
 if (!configuration.ok || !command) {
-  console.error("Configure this app’s environment, then use onboarding:admin configure CONTENT.json | configure-marketing RELEASE.json | review ACCOUNT_ID OUTPUT.json | review-marketing ACCOUNT_ID OUTPUT.json | download ACCOUNT_ID DETAILS.json | resolve ACCOUNT_ID DETAILS.json | sync-booking ACCOUNT_ID | cleanup");
+  console.error("Configure this app’s environment, then use onboarding:admin configure CONTENT.json | configure-marketing RELEASE.json | request-story ACCOUNT_ID STORY.json | review ACCOUNT_ID OUTPUT.json | review-marketing ACCOUNT_ID OUTPUT.json | download ACCOUNT_ID DETAILS.json | resolve ACCOUNT_ID DETAILS.json | sync-booking ACCOUNT_ID | cleanup");
   process.exitCode = 1;
 } else {
   const config = configuration.value, db = createDatabase(config.databaseUrl), onboarding = createOnboarding({ db }), marketing = createMarketingPermissions({ db });
@@ -27,6 +27,10 @@ if (!configuration.ok || !command) {
       const result = await marketing.history({ accountId });
       if (!result.ok) { console.error(result.error.message); process.exitCode = 1; }
       else { await writeFile(detailsFile, JSON.stringify(result.value, null, 2), { mode: 0o600, flag: "wx" }); console.log("Private marketing permission history written to the requested new file."); }
+    } else if (command === "request-story" && detailsFile) {
+      const story: unknown = JSON.parse(await readFile(detailsFile, "utf8"));
+      const result = await marketing.requestStory({ accountId, story });
+      console.log(JSON.stringify(result.ok ? { ok: true, id: result.value.id, reviewPath: "/account/media" } : result)); if (!result.ok) process.exitCode = 1;
     } else if (command === "review" && detailsFile) {
       const result = await onboarding.get({ accountId });
       if (!result.ok) { console.error(result.error.message); process.exitCode = 1; }
