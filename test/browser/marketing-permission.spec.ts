@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 import { createDatabase } from "../../src/platform/database/connection.ts";
+import type { OnboardingSettings, OnboardingSettingsKey } from "../../src/platform/database/generated/public/OnboardingSettings.ts";
 import { createOnboarding, createAssessmentMedia, createMarketingPermissions, DRAFT_MARKETING_RELEASE, emptyMarketingPermission, mediaSlots } from "../../src/features/onboarding/index.ts";
 import { startTestApp, testDatabaseUrl } from "../support/app.ts";
 import { onboardingContent, onboardingAnswers, memoryAssessmentStorage, videoBytes, jpegBytes } from "../support/onboarding.ts";
@@ -10,9 +12,22 @@ const db = createDatabase(testDatabaseUrl()), memory = memoryAssessmentStorage()
 const onboarding = createOnboarding({ db }), marketing = createMarketingPermissions({ db }), media = createAssessmentMedia({ db, storage: memory.storage });
 const release = { ...DRAFT_MARKETING_RELEASE, version: "browser-marketing-v1", approved: true, text: "TEST ONLY: optional release fixture." };
 let app: Awaited<ReturnType<typeof startTestApp>>;
-test.beforeAll(async () => { app = await startTestApp({ onboardingEnabled: true, assessmentStorage: memory.storage }); expect((await onboarding.configure({ content: onboardingContent() })).ok).toBe(true); });
+const settingsKeys = ["content", "marketing-release"] as OnboardingSettingsKey[];
+let previousSettings: readonly OnboardingSettings[] = [];
+test.beforeAll(async () => {
+  previousSettings = await db.selectFrom("onboarding_settings").selectAll().where("key", "in", settingsKeys).execute();
+  app = await startTestApp({ onboardingEnabled: true, assessmentStorage: memory.storage });
+  expect((await onboarding.configure({ content: onboardingContent() })).ok).toBe(true);
+});
 test.beforeEach(async () => { expect((await marketing.configure({ release })).ok).toBe(true); });
-test.afterAll(async () => { await app.close(); await db.destroy(); });
+test.afterAll(async () => {
+  try {
+    await db.transaction().execute(async transaction => {
+      await transaction.deleteFrom("onboarding_settings").where("key", "in", settingsKeys).execute();
+      if (previousSettings.length) await transaction.insertInto("onboarding_settings").values(previousSettings.map(row => ({ ...row, data: sql`cast(${JSON.stringify(row.data)} as jsonb)` }))).execute();
+    });
+  } finally { await app.close(); await db.destroy(); }
+});
 async function signIn(page: Page) {
   const email = `marketing-browser-${randomUUID()}@example.test`;
   const provisioned = await app.auth.provisionAccount({ email }); if (!provisioned.ok) throw new Error("Provisioning failed");

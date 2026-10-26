@@ -1,7 +1,9 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { sql } from "kysely";
 import { createDatabase } from "../src/platform/database/connection.ts";
+import type { OnboardingSettings, OnboardingSettingsKey } from "../src/platform/database/generated/public/OnboardingSettings.ts";
 import { createOnboarding, createAssessmentMedia, createMarketingPermissions, DRAFT_MARKETING_RELEASE, emptyMarketingPermission, mediaSlots } from "../src/features/onboarding/index.ts";
 import { startTestApp, testDatabaseUrl } from "./support/app.ts";
 import { onboardingContent, onboardingAnswers, memoryAssessmentStorage, jpegBytes, videoBytes } from "./support/onboarding.ts";
@@ -11,8 +13,21 @@ const onboarding = createOnboarding({ db }), marketing = createMarketingPermissi
 const release = { ...DRAFT_MARKETING_RELEASE, version: "marketing-fixture-v1", approved: true, text: "TEST ONLY optional marketing release." };
 const permission = () => ({ ...emptyMarketingPermission(release.version), choices: { ...emptyMarketingPermission().choices, results: true, website: true }, accepted: true, adult: true, signedName: "Alex Example", limitations: "Only my final measurements, no weight." });
 let app: Awaited<ReturnType<typeof startTestApp>>;
-before(async () => { app = await startTestApp({ onboardingEnabled: true, assessmentStorage: memory.storage }); assert.ok((await onboarding.configure({ content: onboardingContent() })).ok); });
-after(async () => { await app.close(); await db.destroy(); });
+const settingsKeys = ["content", "marketing-release"] as OnboardingSettingsKey[];
+let previousSettings: readonly OnboardingSettings[] = [];
+before(async () => {
+  previousSettings = await db.selectFrom("onboarding_settings").selectAll().where("key", "in", settingsKeys).execute();
+  app = await startTestApp({ onboardingEnabled: true, assessmentStorage: memory.storage });
+  assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
+});
+after(async () => {
+  try {
+    await db.transaction().execute(async transaction => {
+      await transaction.deleteFrom("onboarding_settings").where("key", "in", settingsKeys).execute();
+      if (previousSettings.length) await transaction.insertInto("onboarding_settings").values(previousSettings.map(row => ({ ...row, data: sql`cast(${JSON.stringify(row.data)} as jsonb)` }))).execute();
+    });
+  } finally { await app.close(); await db.destroy(); }
+});
 async function account() {
   const email = `marketing-${randomUUID()}@example.test`;
   const provisioned = await app.auth.provisionAccount({ email }); assert.ok(provisioned.ok);
