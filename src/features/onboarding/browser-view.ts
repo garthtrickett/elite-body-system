@@ -1,7 +1,7 @@
 import { html, nothing } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import { repeat } from "lit-html/directives/repeat.js";
-import { SECTIONS, SECTION_LABELS, QUESTIONS, GOAL_LABELS, MEASUREMENTS, LIFESTYLE, mediaSlots, assessmentSubmissionProblem, validTimezone, measurementProblem } from "./data.ts";
+import { SECTIONS, SECTION_LABELS, QUESTIONS, GOAL_LABELS, MEASUREMENTS, LIFESTYLE, mediaSlots, hasResolution, assessmentSubmissionProblem, validTimezone, measurementProblem } from "./data.ts";
 import type { OnboardingAnswers, Section, Question, Measurement, Lifestyle, Goal } from "./data.ts";
 import type { OnboardingModel, OnboardingProposal } from "./browser-model.ts";
 import { representOnboarding } from "./browser-model.ts";
