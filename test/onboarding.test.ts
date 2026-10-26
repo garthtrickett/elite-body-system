@@ -47,7 +47,7 @@ async function ready(accountId: string): Promise<OnboardingSnapshot> {
 test("onboarding validates ranked permutations and draft data without accepting forged completion fields", () => {
   assert.ok(parseAnswers(emptyAnswers()).ok);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: Array(7).fill("strength") }).ok, false);
-  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: Array(9).fill("strength") }).ok, false);
+  assert.equal(parseAnswers({ ...onboardingAnswers(), goals: Array(10).fill("strength") }).ok, false);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: ["strength"] }).ok, false);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: onboardingAnswers().goals.slice(1) }).ok, false);
   assert.equal(parseAnswers({ ...onboardingAnswers(), goals: ["unknown", ...onboardingAnswers().goals.slice(1)] }).ok, false);
@@ -89,7 +89,13 @@ test("all accounts including legacy-complete profiles are gated on pages and API
 test("unconfigured content cannot complete onboarding; saved answers resume with account ownership and compare-and-swap", async () => {
   const a = await account(), b = await account();
   const initial = await onboarding.get({ accountId: a.id }); assert.ok(initial.ok); assert.equal(initial.value.content.approved, false);
+  assert.match(initial.value.content.consentText, /online fitness system to clients worldwide/);
+  assert.equal(initial.value.content.healthQuestions.length, 7);
   assert.equal((await onboarding.complete({ accountId: a.id, revision: 0 })).ok, false);
+  const draft = await onboarding.save({ accountId: a.id, revision: 0, contentVersion: initial.value.content.version, answers: { ...onboardingAnswers(), consent: { ...onboardingAnswers().consent, version: initial.value.content.consentVersion } } });
+  assert.ok(draft.ok); assert.equal(draft.value.consentSignedAt, null);
+  assert.ok(draft.value.missing.audit.length);
+  assert.equal((await media.request({ accountId: a.id, slot: "photo:front", mediaType: "image/jpeg", size: jpegBytes.length })).ok, false);
   assert.ok((await onboarding.configure({ content: onboardingContent() })).ok);
   const first = await saved(a.id);
   assert.ok(first.consentSignedAt);
@@ -122,7 +128,7 @@ test("seven-goal records preserve their order, append new goals and require conf
   const legacyGoals = ["cardio", "size", "strength", "reduce-pain", "mobility", "get-lean", "energy"];
   await sql`update onboarding_records set data = jsonb_set(data, '{answers,goals}', cast(${JSON.stringify(legacyGoals)} as jsonb)) where account_id = ${a.id}`.execute(db);
   const resumed = await onboarding.get({ accountId: a.id }); assert.ok(resumed.ok);
-  assert.deepEqual(resumed.value.answers.goals, [...legacyGoals, "consistency", "health-markers"]);
+  assert.deepEqual(resumed.value.answers.goals, [...legacyGoals, "consistency", "health-markers", "mental-wellness"]);
   assert.equal(resumed.value.answers.goalsConfirmed, false);
   assert.deepEqual(resumed.value.answers.questionnaire, previous.answers.questionnaire);
   assert.deepEqual(resumed.value.missing.questionnaire, ["Confirm your goal ranking."]);
@@ -131,6 +137,23 @@ test("seven-goal records preserve their order, append new goals and require conf
   assert.ok(updated.ok); assert.deepEqual(updated.value.missing.questionnaire, []);
   const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
   assert.deepEqual(reloaded.value.answers.goals, goals);
+  assert.equal(reloaded.value.answers.goalsConfirmed, true);
+});
+
+test("nine-goal records keep their order and require confirmation after Mental wellness is added", async () => {
+  const a = await account(), previous = await saved(a.id);
+  const goals = ["health-markers", "consistency", "cardio", "size", "strength", "reduce-pain", "mobility", "get-lean", "energy"];
+  await sql`update onboarding_records set data = jsonb_set(data, '{answers,goals}', cast(${JSON.stringify(goals)} as jsonb)) where account_id = ${a.id}`.execute(db);
+  const resumed = await onboarding.get({ accountId: a.id }); assert.ok(resumed.ok);
+  assert.deepEqual(resumed.value.answers.goals, [...goals, "mental-wellness"]);
+  assert.deepEqual(resumed.value.answers.questionnaire, previous.answers.questionnaire);
+  assert.equal(resumed.value.answers.goalsConfirmed, false);
+  assert.deepEqual(resumed.value.missing.questionnaire, ["Confirm your goal ranking."]);
+  const ranking = [...resumed.value.answers.goals].reverse();
+  const updated = await onboarding.save({ accountId: a.id, revision: resumed.value.revision, contentVersion: resumed.value.content.version, answers: { ...resumed.value.answers, goals: ranking, goalsConfirmed: true } });
+  assert.ok(updated.ok);
+  const reloaded = await onboarding.get({ accountId: a.id }); assert.ok(reloaded.ok);
+  assert.deepEqual(reloaded.value.answers.goals, ranking);
   assert.equal(reloaded.value.answers.goalsConfirmed, true);
 });
 

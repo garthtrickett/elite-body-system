@@ -36,7 +36,7 @@ Present the sections in Harry’s order. Allow clients to revisit saved sections
 | --- | --- | --- |
 | 1. Welcome | Harry’s welcome video, introduction and overview | Explicit “I’ve watched/read this” acknowledgement; do not pretend playback proves comprehension |
 | 2. Questionnaire | Seven free-text questions and one goal-ranking question below | Every required answer valid and every goal ranked once |
-| 3. Physical audit — week one | Approved consent/PAR-Q, mobility videos, push-up/pull-up/squat videos, cardio screenshot | Acknowledgements and screening recorded; every applicable submission uploaded and finalized, or explicitly resolved by an authorized exception |
+| 3. Health & Safety Agreement | Approved participation agreement and health screening, mobility videos, push-up/pull-up/squat videos, cardio screenshot | Acknowledgements and screening recorded; every applicable submission uploaded and finalized, or explicitly resolved by an authorized exception |
 | 4. Communication | Approved text explaining channel, expectations and how to contact Harry | Explicit acknowledgement; actual contact details configured |
 | 5. Measurements | Instruction video, predefined fields and three progress photos | Required valid fields plus finalized front/back/side photos |
 | 6. Lifestyle audit | Diet, response/symptoms and sleep-hygiene free text | Required answers saved, including explicit “none” where appropriate |
@@ -53,27 +53,27 @@ Store separate named answers, rather than overloading the old story keys:
 2. What are your main reasons for doing this now? Your “WHY”?
 3. What motivates you to stay committed to your fitness to achieve that result?
 4. What in particular struggles need solving to achieve your desired result? Free text; “none identified” is valid.
-5. Rank your fitness goals in priority order: Mobility, Strength, Gain muscle, Energy, Get Cardio Fit, Get lean, Reduce pain, Consistency, Improve health markers. Store an ordered array of nine stable IDs, with no missing or duplicate entries. Use full-width cards supporting touch/drag and keyboard-accessible Move up/Move down controls. Require explicit confirmation of the order so an untouched default is not mistaken for a considered ranking.
+5. Rank your fitness goals in priority order: Mobility, Strength, Gain muscle, Energy, Get Cardio Fit, Get lean, Reduce pain, Consistency, Improve health markers, Mental wellness. Store an ordered array of ten stable IDs, with no missing or duplicate entries. Use full-width cards supporting touch/drag and keyboard-accessible Move up/Move down controls. Require explicit confirmation of the order so an untouched default is not mistaken for a considered ranking.
 6. Why did you choose EBS to solve this over other options?
 7. What was the final thought that made you decide to sign up?
 8. What previous experience do you have with personal training or fitness programs and why did you stop? Free text; “none” is valid.
 9. When have you succeeded physically in the past, and what made you succeed? Free text; allow an honest “no example yet”.
 10. Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?
 
-Keep the stored `size` and `cardio` goal IDs for Gain muscle and Get Cardio Fit. Older seven-goal records retain their saved order, append Consistency and Improve health markers, and require confirmation of the expanded ranking. Existing answers stay under their original keys. Previously completed onboarding stays completed.
+Keep the stored `size` and `cardio` goal IDs for Gain muscle and Get Cardio Fit. Older seven- and nine-goal records retain their saved order, append the new choices they do not yet contain, and require confirmation of the expanded ranking. Mental wellness uses the stable `mental-wellness` ID. Existing answers stay under their original keys. Previously completed onboarding stays completed.
 
 Use trimmed required text with explicit length limits and field-specific errors. Do not infer an answer from an older question with different meaning. In particular, a 12-week response is not a confirmed 180-day response.
 
 Store the final belief question under its own `belief` key. Older records load with this answer empty; clients still completing onboarding must answer it. Previously completed onboarding remains completed.
 
-### Physical audit
+### Health & Safety Agreement
 
-- Legal: approved informed consent and PAR-Q content, content version, signed name, acknowledgements and server timestamps. Existing draft records remain historical evidence, not approval of a new document.
+- Legal: approved participation agreement and health-screening content, content version, signed name, separate health-data consent, acknowledgements and server timestamps. The original EBS draft is in `src/features/onboarding/health-safety.ts`; it is not an official PAR-Q instrument. It covers an online fitness system delivered by Elite Body System, a US business with worldwide clients. Existing draft records remain historical evidence, not approval of a new document.
 - Mobility: Harry’s teaching video followed by the specified movement submissions. Harry must supply the movement list and per-test instructions.
 - Strength: teaching guidance and separate client video slots for push-ups, pull-ups and squats. Clarify whether reps/results are also required and how inability to perform a movement is handled.
 - Cardio: teach the run protocol, with cross trainer as first fallback and bike as the next. Record the selected modality and a treadmill/machine or fitness-app screenshot. Confirm duration, effort and any numerical result fields before implementation of validation.
 - Do not demand exercise to unlock support when screening raises concerns. Represent `clearance_required` and a visible contact-Harry path; trusted resolution must record who approved an alternative or exemption and why. Client self-selection alone must not silently waive required assessments.
-- Keep “week one” visible without inventing a seven-day expiry. The dashboard lock must not prevent access to audit activities or associated support.
+- The section title is “Health & Safety Agreement”; physical assessments remain in this section without a seven-day expiry. The dashboard lock must not prevent access to associated support.
 
 ### Measurements
 

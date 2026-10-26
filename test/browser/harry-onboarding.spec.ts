@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
 import { createDatabase } from "../../src/platform/database/connection.ts";
-import { createOnboarding, createAssessmentMedia, mediaSlots } from "../../src/features/onboarding/index.ts";
+import { createOnboarding, createAssessmentMedia, mediaSlots, DRAFT_HEALTH_SAFETY } from "../../src/features/onboarding/index.ts";
 import { SECTIONS, SECTION_LABELS, QUESTIONS } from "../../src/features/onboarding/data.ts";
 import { startTestApp, testDatabaseUrl } from "../support/app.ts";
 import { onboardingContent, onboardingAnswers, memoryAssessmentStorage, jpegBytes, videoBytes } from "../support/onboarding.ts";
@@ -25,6 +25,8 @@ async function signIn(page: Page, seeded = false) {
   return provisioned.value.id;
 }
 async function section(page: Page, key: typeof SECTIONS[number]) {
+  // Loading the saved snapshot closes the phone menu; wait before opening it.
+  await expect(page.locator(".ob-main > fieldset.ob-fields")).toBeVisible();
   const mobile = page.locator(".ob-nav-mobile");
   if (await mobile.isVisible() && await mobile.getAttribute("open") === null) await mobile.locator("summary").click();
   const button = page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: new RegExp(SECTION_LABELS[key]) });
@@ -84,6 +86,29 @@ test("a fully submitted assessment with a confirmed booking finishes onboarding 
   await expect(page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ })).toContainText("✓");
   await page.goto(app.origin + "/"); await expect(page).toHaveURL(app.origin + "/");
 });
+test("Health & Safety Agreement presents the online-system draft without recording an unapproved signature", async ({ page }) => {
+  try {
+    expect((await onboarding.configure({ content: { ...onboardingContent(), ...DRAFT_HEALTH_SAFETY, version: "health-safety-draft-browser" } })).ok).toBe(true);
+    const accountId = await signIn(page);
+    await section(page, "audit");
+    await expect(page.getByRole("heading", { name: "Health & Safety Agreement", exact: true })).toBeVisible();
+    await expect(page.getByText(/Draft for review\. This agreement is not available for signing yet/)).toBeVisible();
+    await expect(page.getByText(DRAFT_HEALTH_SAFETY.consentText, { exact: true })).toBeVisible();
+    await expect(page.getByLabel("I have read and agree to the Health & Safety Agreement.", { exact: true })).toBeDisabled();
+    await expect(page.getByRole("checkbox", { name: /^I explicitly consent to Elite Body System/ })).toBeDisabled();
+    await expect(page.getByLabel("Full name for consent", { exact: true })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Yes", exact: true })).toHaveCount(7);
+    for (const button of await page.getByRole("button", { name: "Yes", exact: true }).all()) await expect(button).toBeDisabled();
+    await expect(page.getByLabel("Upload push-ups", { exact: true })).toHaveCount(0);
+    for (const width of [1440, 390, 320]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+    await page.getByRole("button", { name: "Complete", exact: true }).click();
+    const saved = await onboarding.get({ accountId }); if (!saved.ok) throw new Error("Draft onboarding read failed");
+    expect(saved.value.consentSignedAt).toBeNull(); expect(saved.value.completedAt).toBeNull();
+  } finally { await onboarding.configure({ content: onboardingContent() }); }
+});
 test("Welcome completion saves before showing its check and keeps it after revisiting and reloading", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 }); await signIn(page);
   const welcome = page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Welcome video/ });
@@ -119,7 +144,7 @@ test("Start Point Form places questions around full-width goal cards and saves t
     "Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?",
   ]);
   await expect(page.locator(".ob-rank-name")).toHaveText([
-    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers",
+    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers", "10. Mental wellness",
   ]);
   await page.locator('[data-goal="strength"] .ob-rank-handle').dragTo(page.locator('[data-goal="mobility"]'));
   await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
@@ -131,7 +156,8 @@ test("Start Point Form places questions around full-width goal cards and saves t
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.getByRole("button", { name: "Move Improve health markers up", exact: true }).click();
-  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Consistency"];
+  await page.getByRole("button", { name: "Move Mental wellness up", exact: true }).click();
+  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Mental wellness", "10. Consistency"];
   await expect(page.locator(".ob-rank-name")).toHaveText(rankedLabels);
   await page.getByLabel("This is my preferred goal order.").check();
   await page.getByRole("button", { name: "Complete", exact: true }).click();
