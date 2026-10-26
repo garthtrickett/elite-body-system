@@ -35,7 +35,7 @@ export function documentForm({ model, kind, propose }: Input) {
         ${check("I explicitly consent to EBS using my health answers, measurements and private assessment media for readiness screening, personalised coaching and progress review as described in this form and the privacy notice.", a.consent.healthData, value => edit(reset({ ...a, consent: { ...a.consent, healthData: value } }, ["informed"])))}
       </section>` : nothing}
       ${kind === "participation" ? check("I am at least 18 and legally able to enter this agreement where I live.", a.consent.adult, value => edit({ ...a, consent: { ...a.consent, adult: value, accepted: false } })) : nothing}
-      ${kind === "coaching" ? html`<div class="ob-doc-coach"><span>Coach commitment</span><strong>Harry Baldwin</strong><span>Elite Body System</span></div>` : nothing}
+      ${kind === "coaching" ? html`<div class="ob-doc-coach"><span>Coach’s signature</span><strong>Harry Baldwin</strong><span>Elite Body System</span></div>` : nothing}
       <div class="ob-doc-signing">
         ${field(`Full name — ${kind === "parq" ? "PAR-Q" : kind === "informed" ? "Informed Consent" : kind === "participation" ? "Participation Agreement" : "Trainer–Client Agreement"} signature`, signed.signedName, value => edit(withSignature(a, { signedName: value, accepted: false })), true)}
         ${check(kind === "parq" ? "My answers are accurate to the best of my knowledge. I have read this form and intend my typed name to be my electronic signature." : `I have read the ${document.title}, accept it and intend my typed name to be my electronic signature.`, signed.accepted && signed.version === document.version, checked => edit(withSignature(a, { version: document.version, accepted: checked })), !document.approved)}

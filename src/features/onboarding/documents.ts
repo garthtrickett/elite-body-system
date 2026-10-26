@@ -69,7 +69,9 @@ Four-week guarantee — draft proposal
 Follow this agreement throughout your first four weeks and become stronger, leaner and more energised. The measurement criteria, review process and remedy must be confirmed before this guarantee can be offered or this agreement signed. No refund, claim deadline or additional charge is created by this draft.
 
 Our agreement
-We each commit to clear communication, honest feedback and the work agreed together. This commitment does not replace the Participation Agreement, Informed Consent, privacy choices or mandatory consumer rights. By accepting and typing my full name, I intend to sign the client commitment electronically. The coach’s commitment above is presented in Harry Baldwin’s name at his request; this draft is not an executed coach signature.` },
+We each commit to clear communication, honest feedback and the work agreed together. This commitment does not replace the Participation Agreement, Informed Consent, privacy choices or mandatory consumer rights. By accepting and typing my full name, I intend to sign the client commitment electronically.
+
+Coach’s signature: Harry Baldwin` },
 };
 
 export function legalDocument(content: OnboardingContent, kind: DocumentKind): LegalDocument { return content.documents?.[kind] ?? DRAFT_DOCUMENTS[kind]; }
