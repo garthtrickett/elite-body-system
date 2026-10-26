@@ -2,6 +2,23 @@
 
 ## Harry’s revised onboarding
 
+Preferred name and time zone are collected in Account setup before the eight
+onboarding sections. The welcome section contains the introduction, video and
+Complete action; Complete records the welcome acknowledgement. Preparation
+notices are omitted throughout onboarding. The Start Point introduction asks
+for detailed, honest answers about the next 180 days.
+
+The participation section contains three expandable paper-style forms: EBS's
+readiness questionnaire, Informed Consent with emergency contacts, and the
+Participation Agreement. Each has its own electronic acknowledgement, signature,
+server timestamp and downloadable signed record. Physical assessments are grouped
+with measurements. Our Weekly Rhythm uses clear icons, four-week Monday program
+delivery, technique feedback and Sunday check-in deadlines, with WhatsApp access
+shown separately. A mutual Trainer–Client Agreement follows it. Its proposed
+four-week guarantee remains a draft until the operator specifies measurements and
+the remedy. All new legal documents default to unapproved pending legal review;
+no production rollout is authorised. Tests and CI remain batched at session end.
+
 Health screening is first within Fitness Participation Agreement. A Yes answer requires
 a short explanation and confirmation of medical clearance from a registered
 physician before progressing beyond that section. Draft saving and prior-section

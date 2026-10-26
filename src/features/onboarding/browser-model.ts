@@ -1,15 +1,17 @@
 import type { NavigationGuard } from "../../shared/browser-route.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
-import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers, healthScreeningProblem } from "./data.ts";
+import { SECTIONS, emptyAnswers, missingRequirements, parseAnswers, healthScreeningProblem, accountSetupProblem } from "./data.ts";
 import type { OnboardingAnswers, OnboardingSnapshot, Section } from "./data.ts";
 import { emptyMarketingPermission, marketingDraft as savedMarketingDraft, marketingGrantProblem } from "./marketing-data.ts";
 import type { MarketingPermission } from "./marketing-data.ts";
+import { emptyDocumentAcknowledgements, legalDocument } from "./documents.ts";
 
 type SaveInput = Readonly<{ answers: OnboardingAnswers; revision: number; contentVersion: string }>;
 export type OnboardingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "load"; preserveDraft?: boolean }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
+  | Readonly<{ kind: "saveAccountSetup"; revision: number; contentVersion: string; name: string; timezone: string }>
   | Readonly<{ kind: "signOut"; confirm: boolean }>
   | (Readonly<{ kind: "save"; next: Section | null; mode: "background" | "explicit" }> & SaveInput)
   | Readonly<{ kind: "complete"; revision: number }>
@@ -19,6 +21,7 @@ export type OnboardingEffect = Readonly<{ id: number }> & (
   | Readonly<{ kind: "read"; mediaId: string }>
   | Readonly<{ kind: "navigate"; href: string }>);
 export type OnboardingModel = Readonly<{
+  mode: "onboarding" | "account-setup" | "media";
   snapshot: OnboardingSnapshot | null; draft: OnboardingAnswers; section: Section;
   dirty: boolean; recoveryAnswers: OnboardingAnswers | null; sequence: number; pending: OnboardingEffect | undefined;
   error: string; message: string; showMissing: boolean; progress: number; finalizing: boolean; reloadRequired: boolean;
@@ -27,7 +30,7 @@ export type OnboardingModel = Readonly<{
 }>;
 export type OnboardingProposal =
   | Readonly<{ kind: "navigationHandled"; id: number }>
-  | Readonly<{ kind: "started" | "reload" | "save" | "autosave" | "next" | "complete" }>
+  | Readonly<{ kind: "started" | "reload" | "save" | "autosave" | "next" | "complete" | "startOnboarding" }>
   | Readonly<{ kind: "cancelUpload" }>
   | Readonly<{ kind: "refreshBooking" }>
   | Readonly<{ kind: "saveMarketing" | "withdrawMarketing" | "discardMarketing" }>
@@ -45,7 +48,7 @@ export type OnboardingProposal =
   | Readonly<{ kind: "fileOpened"; id: number; result: ClientResult<Readonly<{ opened: true }>> }>
   | Readonly<{ kind: "failed"; id: number }>;
 
-export const initialOnboardingModel = (): OnboardingModel => ({ snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, recoveryAnswers: null, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false, marketingDraft: emptyMarketingPermission(), marketingDirty: false });
+export const initialOnboardingModel = (): OnboardingModel => ({ mode: "onboarding", snapshot: null, draft: emptyAnswers(), section: "welcome", dirty: false, recoveryAnswers: null, sequence: 0, pending: undefined, error: "", message: "", showMissing: false, progress: 0, finalizing: false, reloadRequired: false, accountBusy: false, accountProblem: "", exiting: false, marketingDraft: emptyMarketingPermission(), marketingDirty: false });
 function queue(model: OnboardingModel, effect: OnboardingEffect): OnboardingModel { return { ...model, sequence: effect.id, pending: effect, error: "", message: "", progress: 0, finalizing: false }; }
 function saveDraft(model: OnboardingModel, input: Readonly<{ next: Section | null; mode: "background" | "explicit" }>): OnboardingModel {
   if (!model.snapshot) return model;
@@ -70,6 +73,11 @@ function reconcileDraft(input: Readonly<{ base: OnboardingSnapshot; draft: Onboa
   const localDeclaration = screening(base.answers) !== screening(draft) || !!attempted && screening(attempted) !== screening(draft);
   const declaration = localDeclaration ? draft : saved.answers;
   return { ...merged,
+    ...((draft.documents || saved.answers.documents) ? { documents: Object.fromEntries((["parq", "informed", "coaching"] as const).map(kind => {
+      const defaults = emptyDocumentAcknowledgements();
+      const signature = fields(base.answers.documents?.[kind] ?? defaults[kind], draft.documents?.[kind] ?? defaults[kind], saved.answers.documents?.[kind] ?? defaults[kind], attempted?.documents?.[kind]);
+      return [kind, changedContent ? { ...signature, accepted: false, version: legalDocument(saved.content, kind).version } : signature];
+    })) as NonNullable<OnboardingAnswers["documents"]> } : {}),
     goals: changedRanking ? draft.goals : saved.answers.goals,
     goalsConfirmed: changedRanking ? draft.goalsConfirmed : saved.answers.goalsConfirmed,
     acknowledged: changedContent ? saved.answers.acknowledged : fields(base.answers.acknowledged, draft.acknowledged, saved.answers.acknowledged, attempted?.acknowledged),
@@ -99,6 +107,7 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     if (!effect || effect.id !== proposal.id || effect.kind !== proposal.effectKind) return model;
     if (!proposal.result.ok) return { ...model, ...(effect.kind === "save" ? { dirty: true, recoveryAnswers: effect.answers } : {}), ...(proposal.saved ? { snapshot: proposal.saved, draft: proposal.saved.answers, dirty: false } : {}), pending: undefined, error: proposal.result.error.message, reloadRequired: proposal.result.error.code === "conflict" || proposal.result.error.code === "unavailable" };
     const snapshot = proposal.result.value;
+    if (effect.kind === "saveAccountSetup") return queue({ ...model, snapshot, draft: snapshot.answers, dirty: false, recoveryAnswers: null, reloadRequired: false }, { kind: "navigate", id: model.sequence + 1, href: "/onboarding" });
     const saving = effect.kind === "save";
     const section = saving && effect.next ? effect.next : model.section;
     const cancelled = effect.kind === "cancelUpload";
@@ -115,6 +124,7 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
     const marketingDraft = keepMarketing && !changedStory ? { ...model.marketingDraft, ...(changedRelease ? { version: snapshot.marketing.release.version, accepted: false } : {}) } : storedMarketing;
     const marketingDirty = keepMarketing && JSON.stringify(marketingDraft) !== JSON.stringify(storedMarketing);
     const updated = { ...model, snapshot, draft, dirty, marketingDraft, marketingDirty, recoveryAnswers: null, pending: undefined, section: screeningProblem ? "audit" as const : saving && dirty ? model.section : section, showMissing: !!screeningProblem || saving && !effect.next && model.showMissing, error: screeningProblem || "", message: effect.kind === "saveMarketing" ? snapshot.marketing.record?.action === "granted" ? "Your optional marketing permission is saved." : "No marketing use is permitted. Your choice is saved." : cancelled ? "Upload cancelled. Check your answers and save any remaining changes." : effect.kind === "load" ? dirty || marketingDirty ? "Saved progress reloaded. Your unsaved edits are kept; review them and save to retry." : "" : dirty ? "" : "Saved to your account.", reloadRequired: false };
+    if (effect.kind === "load" && model.mode === "onboarding" && !snapshot.completedAt && accountSetupProblem(draft.routine)) return queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/account/setup" });
     if (saving && dirty && effect.mode === "explicit") return saveDraft(updated, { next: effect.next, mode: "explicit" });
     return effect.kind === "complete" && snapshot.completedAt ? queue(updated, { kind: "navigate", id: model.sequence + 1, href: "/" }) : updated;
   }
@@ -137,6 +147,11 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   if (proposal.kind === "signOut") return queue(model, { kind: "signOut", id, confirm: model.dirty || model.marketingDirty });
   if (proposal.kind === "started" || proposal.kind === "reload") return queue(model, { kind: "load", id, preserveDraft: model.dirty || model.marketingDirty });
   if (!model.snapshot) return model;
+  if (proposal.kind === "startOnboarding") {
+    if (model.mode !== "account-setup" || model.reloadRequired || model.snapshot.completedAt) return model;
+    const problem = accountSetupProblem(model.draft.routine);
+    return problem ? { ...model, error: problem } : queue(model, { kind: "saveAccountSetup", id, revision: model.snapshot.revision, contentVersion: model.snapshot.content.version, name: model.draft.routine.name, timezone: model.draft.routine.timezone });
+  }
   const destination = proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? followingSection(model.section) : proposal.kind === "complete" ? "call" : null;
   if (!model.snapshot.completedAt && destination && SECTIONS.indexOf(destination) > SECTIONS.indexOf("audit") && model.draft.health.some(Boolean)) {
     const problem = healthScreeningProblem({ answers: model.draft });
@@ -161,7 +176,10 @@ export function acceptOnboarding(model: OnboardingModel, proposal: OnboardingPro
   const saved = { answers: model.draft, revision: model.snapshot.revision, contentVersion: model.snapshot.content.version };
   if (proposal.kind === "upload") return queue(model, { kind: "upload", id, ...saved, slot: proposal.slot, selection: proposal.selection });
   if (proposal.kind === "autosave") return model.section === "questionnaire" && model.dirty && !model.error && !model.snapshot.completedAt ? saveDraft(model, { next: null, mode: "background" }) : model;
-  if (proposal.kind === "save" || proposal.kind === "next" || proposal.kind === "section") return saveDraft(model, { mode: "explicit", next: proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? followingSection(model.section) : null });
+  if (proposal.kind === "save" || proposal.kind === "next" || proposal.kind === "section") {
+    const ready = proposal.kind === "next" && model.section === "welcome" ? { ...model, draft: { ...model.draft, acknowledged: { ...model.draft.acknowledged, welcome: true } } } : model;
+    return saveDraft(ready, { mode: "explicit", next: proposal.kind === "section" ? proposal.section : proposal.kind === "next" ? followingSection(model.section) : null });
+  }
   return model;
 }
 export function representOnboarding(model: OnboardingModel) {

@@ -4,6 +4,12 @@ import { matchesMediaType } from "../../src/features/onboarding/storage.ts";
 
 export function onboardingContent(): OnboardingContent {
   return { ...emptyContent(), version: "fixture-v2", approved: true, welcomeText: "Fixture welcome", communication: "Fixture coaching instructions", contactUrl: "https://example.test/contact",
+    documents: {
+      parq: { version: "fixture-parq", title: "PAR-Q · Health screening", text: "TEST ONLY: readiness declaration, not approved for clients.", approved: true },
+      informed: { version: "fixture-informed", title: "Informed Consent", text: "TEST ONLY: exercise risks and informed consent, not approved for clients.", approved: true },
+      participation: { version: "fixture-consent", title: "Participation Agreement", text: "TEST ONLY: consent fixture, not approved for clients.", approved: true },
+      coaching: { version: "fixture-coaching", title: "Trainer–Client Agreement", text: "TEST ONLY: mutual coaching commitment, not approved for clients.", approved: true },
+    },
     consentVersion: "fixture-consent", consentText: "TEST ONLY: consent fixture, not approved for clients.", parqVersion: "fixture-parq", healthQuestions: Array.from({ length: 7 }, (_, index) => `Fixture health question ${index + 1}`),
     welcomeVideo: "https://example.test/welcome.mp4", strengthVideo: "https://example.test/strength.mp4", cardioVideo: "https://example.test/cardio.mp4", measurementVideo: "https://example.test/measurements.mp4",
     cardioInstructions: "Fixture cardio protocol", measurementInstructions: "Fixture measurement locations", techniqueInstructions: "Fixture filming and trimming guidance", rhythmText: "Check-in feedback informs the next program.",
@@ -12,6 +18,7 @@ export function onboardingContent(): OnboardingContent {
 export function onboardingAnswers(): OnboardingAnswers {
   const empty = emptyAnswers();
   return { ...empty, acknowledged: { welcome: true, communication: true, rhythm: true }, questionnaire: { transformation: "A stronger 180 days", motivation: "Family", experience: "None", choice: "Coaching", now: "Ready", finalThought: "Ready to commit", success: "Walking regularly", struggles: "Time", belief: "Yes, consistent training has helped me before." },
+    documents: { parq: { version: "fixture-parq", signedName: "Alex Example", accepted: true }, informed: { version: "fixture-informed", signedName: "Alex Example", accepted: true }, coaching: { version: "fixture-coaching", signedName: "Alex Example", accepted: true } },
     goalsConfirmed: true, health: [false, false, false, false, false, false, false], consent: { version: "fixture-consent", signedName: "Alex Example", accepted: true, healthData: true, adult: true },
     measurements: { bicepLeft: "30", bicepRight: "31", hamLeft: "50", hamRight: "51", forearmLeft: "24", forearmRight: "24", waist: "80", neck: "35" },
     lifestyle: { diet: "Regular meals", feeling: "Good", symptoms: "None", sleep: "Consistent bedtime" }, routine: { ...empty.routine, name: "Alex", timezone: "Europe/London", weight: "80", equipment: "Gym", emergencyName: "Sam", emergencyPhone: "+447000000000" } };

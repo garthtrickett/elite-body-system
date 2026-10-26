@@ -9,9 +9,10 @@ import type { ClientResult } from "../../shared/client-result.ts";
 import { err, ok } from "../../shared/result.ts";
 import { isRecord, isRevision, isText } from "../../shared/validation.ts";
 import { createProfiles, createPostgresProfileStore, clientDay } from "../profile/index.ts";
-import { parseAnswers, parseContent, SECTIONS, mediaSlots, hasResolution, resolutionEvidence, isMeetUrl, healthScreeningProblem, consentSignature } from "./data.ts";
+import { parseAnswers, parseContent, SECTIONS, mediaSlots, hasResolution, resolutionEvidence, isMeetUrl, consentSignature, accountSetupProblem } from "./data.ts";
 import type { OnboardingSnapshot, Booking } from "./data.ts";
 import { jsonData, lockAccount, readSnapshot } from "./persistence.ts";
+import { DOCUMENT_KINDS, acknowledgement, documentFingerprint, documentProblem, legalDocument } from "./documents.ts";
 
 const unavailable = () => err({ code: "unavailable", message: "Onboarding could not be updated. Your saved progress is safe; try again." } as const);
 const conflict = () => err({ code: "conflict", message: "Your onboarding changed in another tab. Reload saved progress before continuing." } as const);
@@ -25,6 +26,43 @@ export function createOnboarding(config: Readonly<{ db: Kysely<Database>; now?: 
   return {
     get(input: Readonly<{ accountId: string }>): Promise<ClientResult<OnboardingSnapshot>> {
       return withAccount(input.accountId, async transaction => ok(await readSnapshot(transaction, input.accountId)));
+    },
+    async documentCopy(input: Readonly<{ accountId: string; kind: unknown }>): Promise<ClientResult<Readonly<{ fileName: string; text: string }>>> {
+      const kind = DOCUMENT_KINDS.find(value => value === input.kind);
+      if (!kind) return err({ code: "invalid_input", message: "Choose a valid document." });
+      return withAccount(input.accountId, async transaction => {
+        const current = await readSnapshot(transaction, input.accountId);
+        const row = await transaction.selectFrom("onboarding_records").select("data").where("account_id", "=", input.accountId as AccountsId).executeTakeFirst();
+        const records = row && isRecord(row.data) && Array.isArray(row.data.documentEvidence) ? row.data.documentEvidence : [];
+        const fingerprint = documentFingerprint({ answers: current.answers, content: current.content, kind });
+        const signed = records.find(item => isRecord(item) && item.kind === kind && item.fingerprint === fingerprint);
+        if (!isRecord(signed) || !isRecord(signed.document) || typeof signed.document.text !== "string" || !isRecord(signed.acknowledgement)) return err({ code: "not_found", message: "A signed copy is not available for this document." });
+        return ok({ fileName: `ebs-${kind}-signed.txt`, text: `${signed.document.text}\n\nDocument version: ${signed.document.version}\nElectronic signature: ${signed.acknowledgement.signedName}\nRecorded (UTC): ${signed.signedAt}\n\nSubmitted information\n${JSON.stringify(signed.details, null, 2)}\n` });
+      });
+    },
+    async saveAccountSetup(input: Readonly<{ accountId: string; revision: unknown; contentVersion: unknown; name: unknown; timezone: unknown }>): Promise<ClientResult<OnboardingSnapshot>> {
+      if (!isRevision(input.revision) || !isText(input.name, 100) || !isText(input.timezone, 100)) return err({ code: "invalid_input", message: "Enter your preferred name and time zone." });
+      const name = input.name.trim(), timezone = input.timezone.trim();
+      const problem = accountSetupProblem({ name, timezone });
+      if (problem) return err({ code: "invalid_input", message: problem });
+      return withAccount(input.accountId, async transaction => {
+        const current = await readSnapshot(transaction, input.accountId);
+        if (current.completedAt) return err({ code: "forbidden", message: "Manage your account details in Profile after onboarding." });
+        if (current.revision !== input.revision || current.content.version !== input.contentVersion) return conflict();
+        const store = createPostgresProfileStore(transaction);
+        const profile = await createProfiles({ store }).get({ accountId: input.accountId });
+        if (!profile.ok) return profile;
+        if (profile.value.profile.name !== name || profile.value.profile.timezone !== timezone) {
+          const saved = await store.write({ accountId: input.accountId, revision: profile.value.revision, profile: { ...profile.value.profile, name, timezone } });
+          if (!saved) throw new Error("Concurrent account details edit");
+        }
+        const prior = await transaction.selectFrom("onboarding_records").select("data").where("account_id", "=", input.accountId as AccountsId).executeTakeFirst();
+        const answers = { ...current.answers, routine: { ...current.answers.routine, name, timezone } };
+        const data = jsonData({ ...(prior && isRecord(prior.data) ? prior.data : {}), answers, contentVersion: current.content.version });
+        if (!prior) await transaction.insertInto("onboarding_records").values({ account_id: input.accountId as AccountsId, data, completed_at: null }).execute();
+        else await transaction.updateTable("onboarding_records").set({ data, revision: current.revision + 1, updated_at: now() }).where("account_id", "=", input.accountId as AccountsId).execute();
+        return ok(await readSnapshot(transaction, input.accountId));
+      });
     },
     async eligible(input: Readonly<{ accountId: string }>): Promise<ClientResult<Readonly<{ eligible: boolean }>>> {
       try {
@@ -43,11 +81,21 @@ export function createOnboarding(config: Readonly<{ db: Kysely<Database>; now?: 
         const prior = await transaction.selectFrom("onboarding_records").select("data").where("account_id", "=", input.accountId as AccountsId).executeTakeFirst();
         const previousEvidence = prior && isRecord(prior.data) && Array.isArray(prior.data.evidence) ? prior.data.evidence : [];
         const a = parsed.value;
-        const consentReady = current.content.approved && a.consent.version === current.content.consentVersion && a.consent.accepted && a.consent.healthData && a.consent.adult && a.consent.signedName && !healthScreeningProblem({ answers: a });
+        const consentReady = current.content.approved && ["parq", "informed", "participation"].every(kind => !documentProblem({ answers: a, content: current.content, kind: kind as "parq" | "informed" | "participation" }));
         const signature = consentSignature({ contentVersion: current.content.version, answers: a });
         const evidence = consentReady && !previousEvidence.some(item => isRecord(item) && item.signature === signature)
           ? [...previousEvidence, { signature, consentVersion: current.content.consentVersion, parqVersion: current.content.parqVersion, contentVersion: current.content.version, consent: a.consent, health: a.health, healthDetails: a.healthDetails, medicalClearance: a.medicalClearance, signedAt: now().toISOString() }] : previousEvidence;
-        const data = jsonData({ answers: a, contentVersion: current.content.version, evidence });
+        const documents: unknown[] = prior && isRecord(prior.data) && Array.isArray(prior.data.documentEvidence) ? [...prior.data.documentEvidence] : [];
+        for (const kind of DOCUMENT_KINDS) {
+          if (documentProblem({ answers: a, content: current.content, kind })) continue;
+          const fingerprint = documentFingerprint({ answers: a, content: current.content, kind });
+          if (documents.some(item => isRecord(item) && item.kind === kind && item.fingerprint === fingerprint)) continue;
+          const details = kind === "parq" ? { questions: current.content.healthQuestions, answers: a.health, explanation: a.healthDetails, medicalClearance: a.medicalClearance }
+            : kind === "informed" ? { emergencyContact: { name: a.routine.emergencyName, phone: a.routine.emergencyPhone }, healthData: a.consent.healthData }
+            : kind === "participation" ? { adult: a.consent.adult } : { coachName: "Harry Baldwin" };
+          documents.push({ kind, fingerprint, document: legalDocument(current.content, kind), acknowledgement: acknowledgement(a, kind), details, signedAt: now().toISOString() });
+        }
+        const data = jsonData({ ...(prior && isRecord(prior.data) ? prior.data : {}), answers: a, contentVersion: current.content.version, evidence, documentEvidence: documents });
         if (revision === 0) await transaction.insertInto("onboarding_records").values({ account_id: input.accountId as AccountsId, data, completed_at: null }).execute();
         else await transaction.updateTable("onboarding_records").set({ data, revision: revision + 1, updated_at: now() }).where("account_id", "=", input.accountId as AccountsId).execute();
         return ok(await readSnapshot(transaction, input.accountId));
@@ -59,7 +107,10 @@ export function createOnboarding(config: Readonly<{ db: Kysely<Database>; now?: 
         const current = await readSnapshot(transaction, input.accountId);
         if (current.completedAt) return ok(current);
         if (current.revision !== input.revision) return conflict();
+        const setupProblem = accountSetupProblem(current.answers.routine);
+        if (setupProblem) return err({ code: "invalid_input", message: setupProblem });
         if (!current.consentSignedAt) return err({ code: "invalid_input", message: "Save your current signed consent and health screening before finishing onboarding." });
+        if (DOCUMENT_KINDS.some(kind => !current.documentSignedAt?.[kind])) return err({ code: "invalid_input", message: "Sign and save each required form before finishing onboarding." });
         if (SECTIONS.some(section => current.missing[section].length)) return err({ code: "invalid_input", message: "Complete every onboarding section before opening your dashboard." });
         const store = createPostgresProfileStore(transaction);
         const existing = await createProfiles({ store }).get({ accountId: input.accountId }); if (!existing.ok) return existing;

@@ -9,12 +9,12 @@ import { parseSnapshot, GOALS } from "./data.ts";
 import type { Goal } from "./data.ts";
 import type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
 import { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
-import { onboardingView } from "./browser-view.ts";
+import { onboardingView, accountSetupView } from "./browser-view.ts";
 import { marketingPage } from "./marketing-view.ts";
 
 export { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
 export type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
-export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }>; marketingOnly?: boolean }>) {
+export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }>; marketingOnly?: boolean; accountSetupOnly?: boolean }>) {
   const scope = new AbortController();
   const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
@@ -29,12 +29,12 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
     if (from !== to && from >= 0 && to >= 0) { goals.splice(from, 1); goals.splice(to, 0, dragged); runtime.propose({ kind: "edit", answers: { ...model.draft, goals, goalsConfirmed: false } }); }
   }
   const runtime = createSamRuntime<OnboardingModel, OnboardingProposal, ReturnType<typeof representOnboarding>, OnboardingEffect>({
-    initial: { ...initialOnboardingModel(), accountBusy: config.account.busy, accountProblem: config.account.problem }, accept: acceptOnboarding, represent: representOnboarding, next: model => model.pending,
+    initial: { ...initialOnboardingModel(), mode: config.accountSetupOnly ? "account-setup" : config.marketingOnly ? "media" : "onboarding", accountBusy: config.account.busy, accountProblem: config.account.problem }, accept: acceptOnboarding, represent: representOnboarding, next: model => model.pending,
     present: state => {
       config.navigationChanged(onboardingNavigation(state));
       const previousFocus = document.activeElement;
       const focusedGoal = previousFocus instanceof HTMLElement ? previousFocus.closest<HTMLElement>("[data-goal]")?.dataset.goal : undefined;
-      render(config.marketingOnly ? marketingPage({ model: state, busy: state.busy, propose: proposal => runtime.propose(proposal) }) : onboardingView(state, {
+      render(config.accountSetupOnly ? accountSetupView(state, { propose: proposal => runtime.propose(proposal), signOut: () => runtime.propose({ kind: "signOut" }) }) : config.marketingOnly ? marketingPage({ model: state, busy: state.busy, propose: proposal => runtime.propose(proposal) }) : onboardingView(state, {
         propose: proposal => runtime.propose(proposal), signOut: () => runtime.propose({ kind: "signOut" }),
         upload: ({ slot, file }) => { if (!file || runtime.getModel().pending) return; const current = ++selection; files.set(current, file); runtime.propose({ kind: "upload", slot, selection: current }); },
         drag: goal => { dragged = goal; }, drop: goal => { moveTo(goal); dragged = null; },
@@ -64,6 +64,7 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
       }
       if (effect.kind === "navigate") { config.navigate(effect.href); return { kind: "navigationHandled", id: effect.id }; }
       if (effect.kind === "load") return completed(await load());
+      if (effect.kind === "saveAccountSetup") return completed(await call({ path: "/api/client/onboarding/account", body: effect, parse: parseSnapshot }));
       if (effect.kind === "refreshBooking") return completed(await call({ path: "/api/client/onboarding/booking/refresh", body: {}, parse: parseSnapshot, timeout: 30000 }));
       if (effect.kind === "cancelUpload") {
         for (const controller of controllers.values()) controller.abort();

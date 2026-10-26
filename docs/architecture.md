@@ -8,6 +8,23 @@ the shared SAM runtime with typed, correlated load/save/upload/booking effects.
 File handles, upload authorization and OAuth secrets remain in effect closures;
 the model contains answers, progress and owned media IDs, not signed URLs.
 
+`/account/setup` collects preferred name and time zone before onboarding. Its
+correlated SAM save calls `saveAccountSetup`, which validates the two fields and
+writes profile details and the onboarding draft together under the account lock.
+Onboarding loads with missing account details navigate to this separate screen;
+existing details are retained. Completed onboarding directs account edits to
+Profile. Welcome completion records its acknowledgement without an extra checkbox.
+
+The readiness, informed-consent, participation and coaching documents have separate
+versioned acknowledgements. Per-document approval is explicit in content configuration.
+The general revision-checked save records valid signatures with the exact document
+text, relevant submitted fields and a server timestamp; prior evidence is retained.
+Current completion ticks match the fingerprint of the displayed document and relevant
+answers to saved evidence, so changed health/contact information or document versions
+cannot retain an unrelated signature. Signed-copy exports derive ownership from the
+session and use stored evidence. Completion requires all four current signatures;
+the clinical signatures are also required before private assessment submissions.
+
 The server’s `eligible({ accountId })` checks the versioned completion record,
 not the legacy profile flag. When `ONBOARDING_ENABLED=true`, authenticated page
 routing redirects incomplete accounts to `/onboarding` and client HTTP dispatch

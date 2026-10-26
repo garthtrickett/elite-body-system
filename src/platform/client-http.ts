@@ -28,6 +28,13 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
       json(response, status, result);
     }
     if (url.pathname === "/api/client/onboarding" && request.method === "GET") { send(await onboarding.get({ accountId: account.id })); return; }
+    if (url.pathname === "/api/client/onboarding/document" && request.method === "GET") {
+      const result = await onboarding.documentCopy({ accountId: account.id, kind: url.searchParams.get("kind") });
+      if (!result.ok) { send(result); return; }
+      response.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Content-Disposition": `attachment; filename="${result.value.fileName}"`, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+      response.end(result.value.text); return;
+    }
+    if (url.pathname === "/api/client/onboarding/account" && request.method === "POST") { send(await onboarding.saveAccountSetup({ accountId: account.id, revision: body.revision, contentVersion: body.contentVersion, name: body.name, timezone: body.timezone })); return; }
     if (url.pathname === "/api/client/onboarding/marketing" && request.method === "POST") { send(await marketing.save({ accountId: account.id, revision: body.revision, permission: body.permission })); return; }
     if (url.pathname === "/api/client/onboarding/booking/refresh" && request.method === "POST") {
       if (!config.bookingProvider) { send({ ok: false, error: { code: "not_configured", message: "Booking confirmation is not connected yet. Contact Harry after booking." } }); return; }
