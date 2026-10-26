@@ -25,6 +25,8 @@ async function signIn(page: Page, seeded = false) {
   return provisioned.value.id;
 }
 async function section(page: Page, key: typeof SECTIONS[number]) {
+  // Loading the saved snapshot closes the phone menu; wait before opening it.
+  await expect(page.locator(".ob-main > fieldset.ob-fields")).toBeVisible();
   const mobile = page.locator(".ob-nav-mobile");
   if (await mobile.isVisible() && await mobile.getAttribute("open") === null) await mobile.locator("summary").click();
   const button = page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: new RegExp(SECTION_LABELS[key]) });
