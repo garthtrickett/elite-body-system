@@ -1,7 +1,7 @@
 import { html, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 
-export type WorkspacePage = "scorecard" | "training" | "meals" | "map" | "mindset" | "nutrition" | "activity" | "media";
+export type WorkspacePage = "scorecard" | "training" | "meals" | "map" | "mindset" | "nutrition" | "activity" | "media" | "account-setup";
 type NavigationItem = Readonly<{ page: WorkspacePage; label: string; href: string }>;
 const practice: readonly NavigationItem[] = [
   { page: "scorecard", label: "Scorecard", href: "/" },
@@ -39,6 +39,7 @@ export function workspaceShell(input: Readonly<{
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Daily practice</p>${items(practice)}</div>
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Your courses</p>${items(courses)}</div>
         <div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
+          <a class="sc-sidebar-link" href="/account/setup" aria-current=${input.page === "account-setup" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Account setup</a>
           <a class="sc-sidebar-link" href="/account/media" aria-current=${input.page === "media" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Media preferences</a>
           ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([key, label]) => html`<a class="sc-sidebar-link" href=${`/?panel=${key}`} aria-current=${panel === key ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>${label}</a>`)}
         </div>
@@ -53,7 +54,7 @@ export function workspaceShell(input: Readonly<{
       <a class="sc-nav-button ${input.page === "scorecard" && !panel ? "sc-nav-active" : ""}" href="/" aria-current=${input.page === "scorecard" && !panel ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>Scorecard</a>
       <a class="sc-nav-button ${panel === "profile" ? "sc-nav-active" : ""}" aria-current=${panel === "profile" ? "page" : nothing} href="/?panel=profile" aria-disabled=${input.navigationDisabled ?? false}>Profile</a>
       <div class="sc-mobile-more"><button class="sc-nav-button ${moreActive ? "sc-nav-active" : ""}" aria-current=${moreActive ? "true" : nothing} aria-label="More navigation" popovertarget="workspace-more-menu">More <span aria-hidden="true">⌃</span></button>
-        <div class="sc-mobile-menu" id="workspace-more-menu" popover="auto"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}<p class="sc-eyebrow">Your account</p><a class="sc-sidebar-link" href="/account/media" aria-disabled=${input.navigationDisabled}>Media preferences</a>
+        <div class="sc-mobile-menu" id="workspace-more-menu" popover="auto"><p class="sc-eyebrow">Daily practice</p>${items(practice.slice(2))}<p class="sc-eyebrow">Your courses</p>${items(courses)}<p class="sc-eyebrow">Your account</p><a class="sc-sidebar-link" href="/account/setup" aria-disabled=${input.navigationDisabled}>Account setup</a><a class="sc-sidebar-link" href="/account/media" aria-disabled=${input.navigationDisabled}>Media preferences</a>
 
         </div>
       </div>

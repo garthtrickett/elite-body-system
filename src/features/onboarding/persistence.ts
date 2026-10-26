@@ -8,6 +8,8 @@ import { emptyAnswers, emptyContent, parseAnswers, parseContent, missingRequirem
 import type { OnboardingSnapshot, OnboardingAnswers, OnboardingContent, Booking } from "./data.ts";
 import { createProfiles, createPostgresProfileStore } from "../profile/index.ts";
 import { readMarketingSnapshot } from "./marketing-store.ts";
+import { DOCUMENT_KINDS, documentFingerprint, emptyDocumentAcknowledgements } from "./documents.ts";
+import type { DocumentDates } from "./documents.ts";
 
 export const jsonData = (value: unknown) => sql`cast(${JSON.stringify(value)} as jsonb)`;
 export async function lockAccount(transaction: Transaction<Database>, accountId: string): Promise<void> {
@@ -44,6 +46,7 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
     if (!parsed.ok) throw new Error("Invalid onboarding answers");
     answers = record.data.contentVersion === content.version ? parsed.value : { ...parsed.value, acknowledged: { welcome: false, communication: false, rhythm: false }, consent: { ...parsed.value.consent, accepted: false } };
     if (record.data.contentVersion !== content.version) {
+      if (answers.documents) answers = { ...answers, documents: Object.fromEntries(Object.entries({ ...emptyDocumentAcknowledgements(), ...answers.documents }).map(([key, value]) => [key, { ...value, accepted: false }])) as NonNullable<OnboardingAnswers["documents"]> };
       const archived = typeof record.data.contentVersion === "string" ? await db.selectFrom("onboarding_settings").select("data").where("key", "=", `archive:${record.data.contentVersion}` as OnboardingSettingsKey).executeTakeFirst() : undefined;
       const previous = archived ? parseContent(archived.data) : undefined;
       if (!previous || previous.parqVersion !== content.parqVersion || JSON.stringify(previous.healthQuestions) !== JSON.stringify(content.healthQuestions)) answers = { ...answers, health: Array.from({ length: 7 }, () => null), medicalClearance: false };
@@ -62,5 +65,11 @@ export async function readSnapshot(db: Kysely<Database>, accountId: string): Pro
   const acknowledgement = acknowledgements.find(item => isRecord(item) && item.signature === signature);
   const consentSignedAt = isRecord(acknowledgement) && typeof acknowledgement.signedAt === "string" && Number.isFinite(Date.parse(acknowledgement.signedAt)) ? acknowledgement.signedAt : null;
   const previousMedia = media.filter(item => item.content_version !== content.version).map(item => ({ id: item.id, slot: item.slot, mediaType: item.media_type, size: item.size, status: item.status === "ready" ? "ready" as const : "pending" as const }));
-  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, previousMedia, marketing, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
+  const documentEvidence = record && isRecord(record.data) && Array.isArray(record.data.documentEvidence) ? record.data.documentEvidence : [];
+  const documentSignedAt = Object.fromEntries(DOCUMENT_KINDS.map(kind => {
+    const fingerprint = documentFingerprint({ answers, content, kind });
+    const signed = documentEvidence.find(item => isRecord(item) && item.kind === kind && item.fingerprint === fingerprint && typeof item.signedAt === "string" && Number.isFinite(Date.parse(item.signedAt)));
+    return [kind, isRecord(signed) ? signed.signedAt : null];
+  })) as DocumentDates;
+  return { version: "harry-v2", revision: record?.revision ?? 0, ...evidence, previousMedia, marketing, documentSignedAt, completedAt: record?.completed_at?.toISOString() ?? null, consentSignedAt, missing: missingRequirements(evidence) };
 }

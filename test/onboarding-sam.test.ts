@@ -132,7 +132,7 @@ test("Continue traverses all eight sections while final completion still enforce
   for (const section of ["questionnaire", "audit", "communication", "measurements", "lifestyle", "rhythm", "call"] as const) {
     model = finishSave(acceptOnboarding(model, { kind: "next" })); assert.equal(model.section, section);
   }
-  model = acceptOnboarding(model, { kind: "complete" }); assert.equal(model.pending, undefined); assert.equal(model.section, "audit"); assert.equal(model.showMissing, true); assert.match(model.error, /remaining requirements/);
+  model = acceptOnboarding(model, { kind: "complete" }); assert.equal(model.pending, undefined); assert.equal(model.section, "measurements"); assert.equal(model.showMissing, true); assert.match(model.error, /remaining requirements/);
 });
 
 test("recovery retains a reverted answer after an uncertain autosave while merging untouched server updates", () => {

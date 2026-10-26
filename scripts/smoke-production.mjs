@@ -42,9 +42,20 @@ try {
   const provisioned = await app.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); assert.equal(provisioned.ok, true);
   const preview = await app.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: "onboarding-production-smoke" }); assert.equal(preview.ok, true);
   const headers = { Cookie: `__Host-ebs-session=${preview.value.sessionToken}` };
-  const gated = await fetch(origin, { headers, redirect: "manual" }); assert.equal(gated.status, 303); assert.equal(gated.headers.get("location"), "/onboarding"); await gated.body.cancel();
-  const onboarding = await fetch(`${origin}/onboarding`, { headers }); assert.equal(onboarding.status, 200); assert.match(await onboarding.text(), /data-page="onboarding"/);
+  const gated = await fetch(origin, { headers, redirect: "manual" }); assert.equal(gated.status, 303); assert.equal(gated.headers.get("location"), "/account/setup"); await gated.body.cancel();
+  const setup = await fetch(`${origin}/account/setup`, { headers }); assert.equal(setup.status, 200);
+  const setupHtml = await setup.text(); assert.match(setupHtml, /data-page="account-setup"/);
+  const csrf = setupHtml.match(/data-csrf="([^"]+)"/)?.[1]; assert.ok(csrf);
+  const current = await fetch(`${origin}/api/client/onboarding`, { headers }); assert.equal(current.status, 200);
+  const snapshot = await current.json(); assert.equal(snapshot.ok, true);
+  const saved = await fetch(`${origin}/api/client/onboarding/account`, {
+    method: "POST",
+    headers: { Cookie: `${headers.Cookie}; __Host-ebs-csrf=${csrf}`, Origin: configuration.value.publicOrigin, "Content-Type": "application/json", "X-CSRF-Token": csrf },
+    body: JSON.stringify({ revision: snapshot.value.revision, contentVersion: snapshot.value.content.version, name: "Production smoke client", timezone: "Europe/London" }),
+  });
+  assert.equal(saved.status, 200); assert.equal((await saved.json()).ok, true);
+  const onboarding = await fetch(`${origin}/onboarding`, { headers, redirect: "manual" }); assert.equal(onboarding.status, 200); assert.match(await onboarding.text(), /data-page="onboarding"/);
   const denied = await fetch(`${origin}/api/client/state`, { headers }); assert.equal(denied.status, 403); assert.equal((await denied.json()).error.reason, "onboarding_required");
   console.log("Production image passed: unprivileged runtime, database health, HTTPS cookies, assets, and private paths");
-  console.log("Onboarding production image passed: new migrations, admin tooling, authenticated route and API gate");
+  console.log("Onboarding production image passed: new migrations, admin tooling, account setup, authenticated route and API gate");
 } finally { await app.close(); }

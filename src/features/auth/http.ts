@@ -70,7 +70,7 @@ export function createAuthenticatedHttp(config: Readonly<{
   };
 }
 
-export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean }>> }>):
+export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean; redirect?: "/onboarding" | "/account/setup" }>> }>):
   (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   const { auth, publicOrigin } = config;
   const secure = publicOrigin.startsWith("https:");
@@ -102,7 +102,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
         if (config.pageAccess) {
           const access = await config.pageAccess({ accountId: session.value.id, path });
           if (access.unavailable) { failure(response, 503, "unavailable"); return; }
-          if (!access.allowed) { response.writeHead(303, { Location: "/onboarding", "Cache-Control": "no-store" }); response.end(); return; }
+          if (!access.allowed) { response.writeHead(303, { Location: access.redirect ?? "/onboarding", "Cache-Control": "no-store" }); response.end(); return; }
         }
       }
       const existingCsrf = cookie(request, names.csrf);

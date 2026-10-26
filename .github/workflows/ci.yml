@@ -32,7 +32,14 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --no-fund --no-audit
-      - run: npx playwright install --with-deps chromium
+      - name: Install browser dependencies
+        run: |
+          # The runner's regional Azure mirror can stall on font downloads.
+          # Keep the same packages and checks, using Ubuntu's primary mirror.
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
       - run: npm run verify
       - name: Verify assessment S3 wire protocol
         run: bash scripts/with-assessment-s3.sh node --test test/onboarding-s3.test.ts

@@ -6,7 +6,41 @@ The new flow is `harry-v2`. The operator confirmed that all clients must complet
 
 `ONBOARDING_ENABLED=false` is the rollout default. The new `/onboarding` route and APIs can be verified before switching existing clients over. With `ONBOARDING_ENABLED=true`, every normal client page redirects incomplete accounts to onboarding and normal client APIs return `forbidden` with reason `onboarding_required`. Auth, sign-out, onboarding and health/assets remain available. Legacy `profile.completed` cannot satisfy this gate.
 
-Do not enable the production gate until Harry’s approved content, private media provider and actual booking confirmation have passed acceptance. Missing content/integrations are shown explicitly; they do not count as completed steps. No production settings have been changed by this implementation.
+Do not enable the production gate until approved content, private media provider and actual booking confirmation have passed acceptance. Missing content/integrations do not count as completed steps. The blanket preparation banner has been removed from onboarding. No production settings have been changed by this implementation.
+
+## Separate documents and coaching commitment
+
+`content.documents` contains `parq`, `informed`, `participation` and `coaching`,
+each with a version, title, text and its own explicit approval flag. The participation
+document must match `consentVersion`/`consentText`; the readiness version must match
+`parqVersion`. Use a new content version when updating documents. Defaults are original
+EBS drafts, not an official licensed PAR-Q+ instrument, and are not open for signature.
+Do not mark them approved merely to demonstrate a completed tick.
+
+The first three forms are on Fitness Participation Agreement. Emergency contacts and
+health-information consent are in Informed Consent. Adult/capacity confirmation is
+in Participation Agreement. Physical submissions now appear with measurements.
+Trainer–Client Agreement is below the separate coach-access section in Our Weekly
+Rhythm. Its coach commitment is displayed in Harry Baldwin's name at his request;
+the draft is not an executed coach signature. The four-week guarantee still needs
+measurement criteria, review process and a remedy from the operator, plus suitable
+claim support and legal review. Do not invent a refund, deadline or forfeiture condition.
+
+Signing uses the existing revision-checked save and retains per-document evidence in
+the onboarding record: exact text/version, acknowledgement, relevant fields and server
+time. `GET /api/client/onboarding/document?kind=parq|informed|participation|coaching`
+provides the authenticated client's current signed copy as a private text attachment.
+The existing combined evidence is retained for historical records. New form ticks
+require current saved evidence; drafts and changed answers do not receive a tick.
+Production approval still needs the US state, business/privacy disclosures and
+appropriate review for the client jurisdictions. Promotional media remains a separate
+authorisation, and clients remain free to post their own content.
+
+The commitment wording is original to EBS, informed by the structure of the
+[ACE coaching agreement](https://contentcdn.eacefitness.com/assets/certification/ace-answers/forms/hc/SampleCoachingAgreement.pdf).
+Relevant review references include [E-SIGN](https://www.law.cornell.edu/uscode/text/15/7001),
+[ICO consent guidance](https://ico.org.uk/consent) and
+[FTC advertising guidance](https://www.ftc.gov/business-guidance/resources/advertising-faqs-guide-small-business).
 
 
 ## Draft saving and section navigation
@@ -77,23 +111,9 @@ Content is archived by immutable version. Changing a version’s existing conten
 
 The section formerly called Physical audit · week one is now Fitness Participation Agreement. Its stored `audit` key and existing answers, signed evidence and assessment files retain their meaning. The physical assessments remain behind saved consent, screening and any required clearance.
 
-The authoritative original draft is `DRAFT_HEALTH_SAFETY` in `src/features/onboarding/health-safety.ts`, also exported from the feature's public server interface. It covers the online system, voluntary participation, inherent exercise risks and a limited release, self-directed training and equipment, remote supervision limits, emergencies, nutrition education, health disclosure, private assessment media, international clients, mandatory legal rights and electronic acknowledgement. Health-data consent is a separate checkbox. Publicity, marketing, sales of health information and recording entire calls are not authorised by that consent.
+The original combined `DRAFT_HEALTH_SAFETY` text is retained for historical compatibility. Current original drafts are `DRAFT_DOCUMENTS` in `src/features/onboarding/documents.ts`, exported from the public server interface. Informed Consent and Participation Agreement now have separate acceptance controls and full-name electronic signatures, while health-information consent remains its own checkbox. Each signed form retains its exact version, text, relevant answers and server timestamp. Historical combined agreements remain readable as originally signed.
 
-The current title is Fitness Participation Agreement. The checkbox explicitly
-acknowledges informed consent and exercise risks, with a required full-name
-electronic signature and saved document version/server timestamp. Risks form part
-of the informed-consent section; the limited liability release remains separately
-headed inside the agreement. This presentation is not a claim that one signature
-format or waiver is enforceable worldwide. US electronic-signature principles
-recognise an intentional electronic signing process while preserving other legal
-requirements: [15 USC 7001](https://www.law.cornell.edu/uscode/text/15/7001) and
-[15 USC 7006](https://www.law.cornell.edu/uscode/text/15/7006).
-
-The renamed default agreement and its marketing-release cross-reference have new
-draft versions. Configured/archived signed documents retain their exact text and
-versions; changing a heading never rewrites a client's earlier acknowledgement.
-
-The draft is shown when no configured agreement exists. Its signing and screening controls are disabled while content is unapproved; forged draft acknowledgements cannot produce a signed timestamp or authorise an assessment upload. Existing approved or archived documents continue to be displayed as configured. The `parqVersion` field remains a storage compatibility name: the seven original draft questions are not represented as an official PAR-Q or clinically validated screening tool.
+Draft answers can be saved, but unapproved documents cannot produce a signed timestamp or authorise assessments. The adult/capacity declaration remains a service policy, not a claim that 18 is the universal age of contractual capacity. The seven EBS screening questions are original drafting and are not presented as an official PAR-Q+ or a clinically validated screening tool. A specific intentional electronic-signing process does not by itself establish enforceability worldwide: [15 USC 7001](https://www.law.cornell.edu/uscode/text/15/7001).
 
 Confirmed facts: legal business name **Elite Body System**; United States business; fitness system delivered online; clients worldwide. Still needed: US state and legal contact address, privacy email/contact details, actual service-provider recipients and processing countries, retention rules and the service's separate payment/cancellation terms. Have qualified legal counsel review the final release for the relevant jurisdictions and a qualified exercise professional review the screening and assessment protocols before approving content. No choice of law, court, arbitration, ordinary-negligence waiver or fixed retention period has been invented.
 
