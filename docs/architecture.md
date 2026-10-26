@@ -30,8 +30,8 @@ change the server-owned clearance fields. Trusted review/resolution tools have
 no public client override endpoint.
 
 Concerning screening answers require both a short explanation and a separate
-self-reported physician-clearance declaration before advancing beyond Health &
-Safety Agreement. The same screening rule drives SAM navigation, completion
+self-reported physician-clearance declaration before advancing beyond Fitness Participation
+Agreement. The same screening rule drives SAM navigation, completion
 requirements, consent evidence and server media authorization. Drafts remain
 saveable while blocked. The declaration is distinct from a trusted reviewer
 resolution; it cannot manufacture that resolution or bypass physical-audit review.

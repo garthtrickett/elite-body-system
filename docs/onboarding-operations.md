@@ -33,7 +33,7 @@ ready counter continues to reflect actual requirements. Finish onboarding and th
 server gate still require every section, finalized evidence and a confirmed
 booking.
 
-Health screening appears first inside Health & Safety Agreement. Any Yes answer
+Health screening appears first inside Fitness Participation Agreement. Any Yes answer
 requires a short explanation and the separate declaration that a registered
 physician has cleared the client for physical activity. Until both are saved,
 Complete retains the draft in this section and navigation to later sections is
@@ -73,11 +73,25 @@ Mobility IDs become stable submission slots. Limb fields use centimetres and bod
 
 Content is archived by immutable version. Changing a version’s existing contents is rejected. Use a new version for changed instructions/documents; unfinished clients must acknowledge the new content and submit media against its protocol version. Completed clients retain their original version and completion record. This is intentionally separate from the existing exercise/course video registry: approval and assessment evidence must refer to one immutable onboarding content package, rather than independently mutable video keys.
 
-### Health & Safety Agreement: online-system draft
+### Fitness Participation Agreement: online-system draft
 
-The section formerly called Physical audit · week one is now Health & Safety Agreement. Its stored `audit` key and existing answers, signed evidence and assessment files retain their meaning. The physical assessments remain behind saved consent, screening and any required clearance.
+The section formerly called Physical audit · week one is now Fitness Participation Agreement. Its stored `audit` key and existing answers, signed evidence and assessment files retain their meaning. The physical assessments remain behind saved consent, screening and any required clearance.
 
 The authoritative original draft is `DRAFT_HEALTH_SAFETY` in `src/features/onboarding/health-safety.ts`, also exported from the feature's public server interface. It covers the online system, voluntary participation, inherent exercise risks and a limited release, self-directed training and equipment, remote supervision limits, emergencies, nutrition education, health disclosure, private assessment media, international clients, mandatory legal rights and electronic acknowledgement. Health-data consent is a separate checkbox. Publicity, marketing, sales of health information and recording entire calls are not authorised by that consent.
+
+The current title is Fitness Participation Agreement. The checkbox explicitly
+acknowledges informed consent and exercise risks, with a required full-name
+electronic signature and saved document version/server timestamp. Risks form part
+of the informed-consent section; the limited liability release remains separately
+headed inside the agreement. This presentation is not a claim that one signature
+format or waiver is enforceable worldwide. US electronic-signature principles
+recognise an intentional electronic signing process while preserving other legal
+requirements: [15 USC 7001](https://www.law.cornell.edu/uscode/text/15/7001) and
+[15 USC 7006](https://www.law.cornell.edu/uscode/text/15/7006).
+
+The renamed default agreement and its marketing-release cross-reference have new
+draft versions. Configured/archived signed documents retain their exact text and
+versions; changing a heading never rewrites a client's earlier acknowledgement.
 
 The draft is shown when no configured agreement exists. Its signing and screening controls are disabled while content is unapproved; forged draft acknowledgements cannot produce a signed timestamp or authorise an assessment upload. Existing approved or archived documents continue to be displayed as configured. The `parqVersion` field remains a storage compatibility name: the seven original draft questions are not represented as an official PAR-Q or clinically validated screening tool.
 
@@ -109,8 +123,8 @@ This is a completion template, not a privacy notice ready for client publication
 
 ## Optional Media & Testimonial Release
 
-Health-data and participation consent does not authorise marketing. The Health &
-Safety Agreement section includes a separate optional release. Every material,
+Health-data and participation consent does not authorise marketing. The Fitness Participation
+Agreement section includes a separate optional release. Every material,
 channel and identity choice starts unticked. Clients select photos/videos,
 results/measurements and/or testimonials; websites, social posts and paid ads;
 and name or recognisable-feature permission independently. Grants require at least

@@ -11,7 +11,7 @@ export type MarketingRecord = Readonly<{ revision: number; action: "granted" | "
 export type MarketingSnapshot = Readonly<{ release: MarketingRelease; revision: number; record: MarketingRecord | null }>;
 
 export const DRAFT_MARKETING_RELEASE: MarketingRelease = {
-  version: "ebs-media-testimonial-draft-2026-10-26", approved: false,
+  version: "ebs-media-testimonial-draft-2026-10-26-v2", approved: false,
   text: `Elite Body System — Optional Media & Testimonial Release
 
 Your choice
@@ -27,7 +27,7 @@ Honest results and compensation
 EBS must describe your experience accurately and comply with applicable advertising law, including substantiation and any disclosures about generally expected results. Your permission does not make an exceptional result typical. This release provides no payment or discount and requires no positive testimonial. Any separately agreed incentive or material relationship must be documented and disclosed where required. You keep ownership of material you own, and confirm that you are entitled to give permission for material you supply.
 
 Changing your mind
-You may change your choices or withdraw all marketing permission in Health & Safety Agreement, including after onboarding is complete. You may also use the EBS contact route supplied with your service. Withdrawal stops future marketing use of the affected material; EBS must stop affected paid campaigns and remove affected material from digital channels it controls. EBS cannot guarantee removal of copies independently shared by third parties or recall material already distributed. Withdrawal does not make earlier lawful use unlawful. EBS may keep a limited consent/withdrawal record to document and honour your choices, subject to applicable privacy law.
+You may change your choices or withdraw all marketing permission in Fitness Participation Agreement, including after onboarding is complete. You may also use the EBS contact route supplied with your service. Withdrawal stops future marketing use of the affected material; EBS must stop affected paid campaigns and remove affected material from digital channels it controls. EBS cannot guarantee removal of copies independently shared by third parties or recall material already distributed. Withdrawal does not make earlier lawful use unlawful. EBS may keep a limited consent/withdrawal record to document and honour your choices, subject to applicable privacy law.
 
 Your acknowledgement
 Before agreeing, read EBS's current privacy notice for its privacy contact, relevant recipients, retention and international-processing arrangements. This is not a blanket waiver of privacy or consumer rights, and does not authorise undisclosed uses or replace legally required transfer safeguards. By confirming the separate release checkbox and typing your full name, you expressly permit only your selected uses and intend an electronic acknowledgement of this document version. You confirm you are at least 18 and legally able to make this choice where you live. You can request a copy of your recorded permission.`,
