@@ -8,7 +8,7 @@ export const SECTION_LABELS: Readonly<Record<Section, string>> = { welcome: "Wel
 const LEGACY_GOALS = ["mobility", "strength", "size", "energy", "cardio", "get-lean", "reduce-pain"] as const;
 export const GOALS = [...LEGACY_GOALS, "consistency", "health-markers"] as const;
 export type Goal = typeof GOALS[number];
-export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers" };
+export const GOAL_LABELS: Readonly<Record<Goal, string>> = { mobility: "Mobility", strength: "Strength", size: "Gain muscle", energy: "Energy", cardio: "Get Cardio Fit", "get-lean": "Get lean", "reduce-pain": "Reduce pain", consistency: "Consistency", "health-markers": "Improve health markers" };
 export const QUESTIONS = {
   transformation: "What would be an incredible result for you over the next 180 days? What do you want to achieve?",
   now: "What are your main reasons for doing this now? Your “WHY”?",

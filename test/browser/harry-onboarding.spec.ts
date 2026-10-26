@@ -78,7 +78,7 @@ test("a fully submitted assessment with a confirmed booking finishes onboarding 
   await expect(finalThought).toHaveValue(""); await expect(finalThought).toBeDisabled();
   await expect(page.getByLabel(QUESTIONS.belief, { exact: true })).toHaveValue("");
   await expect(page.getByLabel(QUESTIONS.belief, { exact: true })).toBeDisabled();
-  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Get fit");
+  await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Get Cardio Fit");
   await expect(page.getByLabel("This is my preferred goal order.")).not.toBeChecked();
   await expect(page.getByLabel("This is my preferred goal order.")).toBeDisabled();
   await expect(page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ })).toContainText("✓");
@@ -111,7 +111,7 @@ test("Start Point Form places questions around full-width goal cards and saves t
     "What are your main reasons for doing this now? Your “WHY”?",
     "What motivates you to stay committed to your fitness to achieve that result?",
     "What in particular struggles need solving to achieve your desired result?",
-    "Rank your fitness goals",
+    "Rank your fitness goals in priority order",
     "Why did you choose EBS to solve this over other options?",
     "What was the final thought that made you decide to sign up?",
     "What previous experience do you have with personal training or fitness programs and why did you stop?",
@@ -119,7 +119,7 @@ test("Start Point Form places questions around full-width goal cards and saves t
     "Do you believe you're capable of achieving and maintaining Elite Body composition and Physical Performance for your age? If not, why not? If yes, why yes?",
   ]);
   await expect(page.locator(".ob-rank-name")).toHaveText([
-    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers",
+    "1. Mobility", "2. Strength", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Consistency", "9. Improve health markers",
   ]);
   await page.locator('[data-goal="strength"] .ob-rank-handle').dragTo(page.locator('[data-goal="mobility"]'));
   await expect(page.locator(".ob-rank-name").first()).toHaveText("1. Strength");
@@ -131,7 +131,7 @@ test("Start Point Form places questions around full-width goal cards and saves t
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
   await page.getByRole("button", { name: "Move Improve health markers up", exact: true }).click();
-  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Consistency"];
+  const rankedLabels = ["1. Strength", "2. Mobility", "3. Gain muscle", "4. Energy", "5. Get Cardio Fit", "6. Get lean", "7. Reduce pain", "8. Improve health markers", "9. Consistency"];
   await expect(page.locator(".ob-rank-name")).toHaveText(rankedLabels);
   await page.getByLabel("This is my preferred goal order.").check();
   await page.getByRole("button", { name: "Complete", exact: true }).click();
@@ -146,6 +146,7 @@ test("the final belief question resumes unanswered older forms and autosaves on 
     const accountId = await signIn(page, true);
     await sql`update onboarding_records set data = data #- '{answers,questionnaire,belief}' where account_id = ${accountId}`.execute(db);
     await page.reload(); await section(page, "questionnaire");
+    if (width === 390) await page.locator(".ob-nav-mobile > summary").click();
     const belief = page.getByLabel(QUESTIONS.belief, { exact: true });
     const nav = page.getByRole("navigation", { name: "Onboarding sections" }).getByRole("button", { name: /Start Point Form/ });
     await expect(belief).toHaveValue(""); await expect(nav).not.toContainText("✓");
@@ -155,6 +156,7 @@ test("the final belief question resumes unanswered older forms and autosaves on 
     await expect(nav).toContainText("✓");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.reload(); await section(page, "questionnaire");
+    if (width === 390) await page.locator(".ob-nav-mobile > summary").click();
     await expect(belief).toHaveValue(answer); await expect(nav).toContainText("✓");
     await expect(page.getByLabel(QUESTIONS.success, { exact: true })).toHaveValue(onboardingAnswers().questionnaire.success);
   }
