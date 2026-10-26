@@ -4,10 +4,12 @@ import { resolve } from "node:path";
 import type { DeliverLink } from "./contracts.ts";
 
 export type DeliveryConfig =
+  | Readonly<{ mode: "disabled" }>
   | Readonly<{ mode: "outbox"; directory: string }>
   | Readonly<{ mode: "resend"; from: string; apiKey: string }>;
 
 export function createLinkDelivery(config: DeliveryConfig, send: typeof fetch = fetch): DeliverLink {
+  if (config.mode === "disabled") return async () => { throw new Error("Email delivery unavailable"); };
   if (config.mode === "outbox") {
     const directory = resolve(config.directory);
     return async ({ email, link, signal }) => {

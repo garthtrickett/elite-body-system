@@ -191,6 +191,9 @@ account when the sending domain is ready.
 
 ## Railway deployment
 
+For Harry's local editing preview, automatic rebuilds and session-based checks,
+see [local preview operations](docs/local-preview.md).
+
 The Docker image builds browser assets, removes development dependencies, and
 runs Node 22 as an unprivileged user. Its explicit build context excludes local
 environment files, outbox messages, test output, and Git history.

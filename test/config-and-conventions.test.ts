@@ -78,3 +78,16 @@ test("Harry preview access is explicit and defaults off", () => {
   const enabled = readConfig({ ...env, AUTH_HARRY_PREVIEW: "true" }); assert.ok(enabled.ok); assert.equal(enabled.value.harryPreview, true);
   assert.equal(readConfig({ ...env, AUTH_HARRY_PREVIEW: "yes" }).ok, false);
 });
+
+test("tunnel preview can disable email only with local binding, preview access and a non-production environment", async () => {
+  const preview = { ...env, PUBLIC_ORIGIN: "https://preview.example.test", AUTH_HARRY_PREVIEW: "true", EMAIL_MODE: "disabled" };
+  const result = readConfig(preview); assert.ok(result.ok); assert.deepEqual(result.value.delivery, { mode: "disabled" });
+  for (const override of [{ NODE_ENV: "production" }, { AUTH_HARRY_PREVIEW: "false" }, { HOST: "0.0.0.0" }]) {
+    assert.equal(readConfig({ ...preview, ...override }).ok, false);
+  }
+  let sent = false;
+  await assert.rejects(createLinkDelivery({ mode: "disabled" }, async () => { sent = true; return new Response(); })({
+    email: "member@example.test", link: "https://preview.example.test/#test", signal: new AbortController().signal,
+  }), { message: "Email delivery unavailable" });
+  assert.equal(sent, false);
+});
