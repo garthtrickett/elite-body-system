@@ -70,6 +70,7 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
         return completed(await load());
       }
       if (effect.kind === "save") return completed(await call({ path: "/api/client/onboarding/save", body: effect, parse: parseSnapshot }));
+      if (effect.kind === "saveMarketing") return completed(await call({ path: "/api/client/onboarding/marketing", body: { revision: effect.revision, permission: effect.permission }, parse: parseSnapshot }));
       if (effect.kind === "complete") return completed(await call({ path: "/api/client/onboarding/complete", body: { revision: effect.revision }, parse: parseSnapshot }));
       if (effect.kind === "remove") return completed(await call({ path: "/api/client/onboarding/media/remove", body: { id: effect.mediaId }, parse: parseSnapshot }));
       if (effect.kind === "read") {

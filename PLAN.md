@@ -6,6 +6,15 @@ The operator authorized implementing the [eight-section onboarding plan](docs/ha
 
 ## Active client-platform goal
 
+The requested optional Media & Testimonial Release lives in Health & Safety
+Agreement with separate choices for material, channels, identity and restrictions.
+Its own versioned approval and append-only permission history are independent of
+participation consent and completion. Clients can withdraw after onboarding;
+external campaign/post removal remains an operator action. The original release
+stays an unapproved draft until the missing business/privacy disclosures and
+relevant legal review are complete. See the onboarding operations guide for the
+configuration and private history export commands.
+
 The operator has now authorized completing onboarding/profile with per-client
 PostgreSQL storage and configurable targets, training with logs/history/timers,
 mindset and courses, and meal analysis as a separate integration. Harry’s archive

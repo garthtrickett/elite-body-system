@@ -86,6 +86,59 @@ This is a completion template, not a privacy notice ready for client publication
 - Liability releases vary by location and service. New York's provision for certain paid recreational facilities is an example of a statutory restriction, not a conclusion that an online system is such a facility. [New York General Obligations Law § 5-326](https://www.nysenate.gov/legislation/laws/GOB/5-326). The draft therefore preserves negligence and mandatory consumer rights pending relevant jurisdiction review.
 - Symptoms and medical conditions can require professional review before exercise. Severe symptoms require local urgent care rather than waiting for remote coaching. [ACSM exercise screening](https://www.exerciseismedicine.org/assets/page_documents/EIM%20exercise%20preparticipation%20screening.pdf), [NHLBI exercise risks](https://www.nhlbi.nih.gov/health/heart/physical-activity/risks), [MedlinePlus emergency symptoms](https://www.medlineplus.gov/ency/article/003079.htm).
 
+## Optional Media & Testimonial Release
+
+Health-data and participation consent does not authorise marketing. The Health &
+Safety Agreement section includes a separate optional release. Every material,
+channel and identity choice starts unticked. Clients select photos/videos,
+results/measurements and/or testimonials; websites, social posts and paid ads;
+and name or recognisable-feature permission independently. Grants require at least
+one material and channel, an express acknowledgement, an adult/capacity declaration
+and a typed name. Optional restrictions must be honoured. Refusing consent never
+changes service access or onboarding eligibility.
+
+The original draft is `DRAFT_MARKETING_RELEASE`, exported through onboarding's
+public server interface. Its default is unapproved, so new grants are disabled.
+Complete the privacy contact, actual platform recipients, retention and
+international-processing disclosures, then obtain the relevant legal review
+before approving a version. This is independent of health/safety document approval.
+Use a private JSON object containing `version`, `approved` and `text`:
+
+```sh
+npm run onboarding:admin -- configure-marketing /private/path/marketing-release.json
+npm run onboarding:admin -- review-marketing ACCOUNT_ID /private/path/marketing-history.json
+```
+
+Versions are immutable. Changed terms or approval status require a new version.
+Each append-only account record retains the exact release, selected permissions,
+restrictions, signed name, server timestamp and independent revision. History
+exports use new mode-0600 files. Ordinary onboarding saves, completion and changes
+to health documents neither grant permission nor overwrite marketing history.
+
+Clients may review, change or withdraw permission in this section after onboarding
+is complete. Withdrawal requires no new signature or approved replacement release.
+Earlier grants retain their original terms when the configured release changes;
+new grants require the current approved version. Unsaved choices have explicit
+save/discard controls and recover after uncertain saves without losing assessment
+drafts. There is no automatic permission inferred from private assessment uploads.
+
+Before each publication or campaign, the operator must check the latest record,
+its selected categories/channels/identity and restrictions. Obscure names and all
+recognisable features unless permitted; do not publish if adequate de-identification
+is impossible. On withdrawal, stop affected paid campaigns and remove affected
+material from EBS-controlled digital channels. This application records permission
+and withdrawal; it does not publish marketing or automatically remove external
+posts/ads. Independently shared copies cannot be guaranteed removable. Set and
+honour an appropriate consent-evidence retention policy.
+
+The draft follows granular, optional consent and easy withdrawal principles in
+the [ICO consent guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/lawful-basis/consent/what-is-valid-consent/).
+Permission is not advertising substantiation: truthful testimonials, material
+relationship disclosures and generally expected results remain required under
+the [FTC endorsement guidance](https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking).
+The release does not claim universal enforceability or replace applicable privacy
+notices, transfer safeguards or consumer rights.
+
 ## Private S3-compatible storage
 
 The operator selected Railway-hosted S3-compatible storage on 22 October 2026. Use a private Railway Bucket in the existing project; see [Railway's bucket guide](https://docs.railway.com/guides/storage-buckets-guide). Provisioning is pending: the machine's Railway CLI login currently reports an expired grant. No bucket or production variables were changed.

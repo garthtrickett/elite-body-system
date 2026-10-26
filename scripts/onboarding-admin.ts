@@ -1,26 +1,33 @@
 import { readFile, writeFile, open, rm } from "node:fs/promises";
 import { createDatabase } from "../src/platform/database/connection.ts";
 import { readConfig } from "../src/platform/config.ts";
-import { createOnboarding, createAssessmentMedia, createS3AssessmentStorage, createGoogleBookingProvider } from "../src/features/onboarding/index.ts";
+import { createOnboarding, createAssessmentMedia, createS3AssessmentStorage, createGoogleBookingProvider, createMarketingPermissions } from "../src/features/onboarding/index.ts";
 import { isRecord } from "../src/shared/validation.ts";
 
 const [command, accountOrFile, detailsFile] = process.argv.slice(2);
 const configuration = readConfig(process.env);
 if (!configuration.ok || !command) {
-  console.error("Configure this app’s environment, then use onboarding:admin configure CONTENT.json | review ACCOUNT_ID OUTPUT.json | download ACCOUNT_ID DETAILS.json | resolve ACCOUNT_ID DETAILS.json | sync-booking ACCOUNT_ID | cleanup");
+  console.error("Configure this app’s environment, then use onboarding:admin configure CONTENT.json | configure-marketing RELEASE.json | review ACCOUNT_ID OUTPUT.json | review-marketing ACCOUNT_ID OUTPUT.json | download ACCOUNT_ID DETAILS.json | resolve ACCOUNT_ID DETAILS.json | sync-booking ACCOUNT_ID | cleanup");
   process.exitCode = 1;
 } else {
-  const config = configuration.value, db = createDatabase(config.databaseUrl), onboarding = createOnboarding({ db });
+  const config = configuration.value, db = createDatabase(config.databaseUrl), onboarding = createOnboarding({ db }), marketing = createMarketingPermissions({ db });
   const accountId = accountOrFile ?? "";
   try {
     if (command === "configure" && accountOrFile) {
       const content: unknown = JSON.parse(await readFile(accountOrFile, "utf8"));
       const result = await onboarding.configure({ content }); console.log(JSON.stringify(result)); if (!result.ok) process.exitCode = 1;
+    } else if (command === "configure-marketing" && accountOrFile) {
+      const release: unknown = JSON.parse(await readFile(accountOrFile, "utf8"));
+      const result = await marketing.configure({ release }); console.log(JSON.stringify(result)); if (!result.ok) process.exitCode = 1;
     } else if (command === "cleanup" && config.assessmentStorage) {
       const result = await createAssessmentMedia({ db, storage: createS3AssessmentStorage(config.assessmentStorage) }).cleanup();
       console.log(JSON.stringify(result)); if (!result.ok) process.exitCode = 1;
     } else if (!/^[a-f0-9-]{36}$/.test(accountId)) { console.error("Supply a valid account ID."); process.exitCode = 1; }
-    else if (command === "review" && detailsFile) {
+    else if (command === "review-marketing" && detailsFile) {
+      const result = await marketing.history({ accountId });
+      if (!result.ok) { console.error(result.error.message); process.exitCode = 1; }
+      else { await writeFile(detailsFile, JSON.stringify(result.value, null, 2), { mode: 0o600, flag: "wx" }); console.log("Private marketing permission history written to the requested new file."); }
+    } else if (command === "review" && detailsFile) {
       const result = await onboarding.get({ accountId });
       if (!result.ok) { console.error(result.error.message); process.exitCode = 1; }
       else { await writeFile(detailsFile, JSON.stringify(result.value, null, 2), { mode: 0o600, flag: "wx" }); console.log("Private onboarding review written to the requested new file."); }

@@ -29,6 +29,15 @@ clearance. A client profile save cannot forge the new completion version or
 change the server-owned clearance fields. Trusted review/resolution tools have
 no public client override endpoint.
 
+Optional marketing permission has a separate document configuration, revision and
+append-only account event history. Its typed operations are exported from the same
+feature interface. Each grant/withdrawal retains its exact versioned release and
+server timestamp. Authenticated HTTP derives ownership from the session. Marketing
+does not enter completion requirements or alter health-consent evidence. Its SAM
+draft/effect stays editable after completion, independently of the locked assessment;
+withdrawal remains possible under an unapproved replacement release. External
+publication and removal remain operator responsibilities.
+
 S3-compatible storage holds binary media outside PostgreSQL. Finalization checks
 metadata and media signatures against a separate immutable ready key; database
 metadata owns completion eligibility. Google Calendar confirmation requires a
