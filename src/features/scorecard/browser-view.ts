@@ -89,6 +89,7 @@ export function scorecardView(state: ScorecardState, actions: ScorecardActions) 
     ${state.syncError && !state.panel ? html`<div class="sc-sync-desktop">${syncFeedback(state, actions)}</div>` : nothing}
     <div class="sc-content">
       ${carousel(state, actions)}
+      ${state.storyInvitation && state.profile.profile.completed ? html`<section class="px-5" aria-label="Progress story invitation"><p class="sc-copy">A milestone worth celebrating: Harry has a progress story for you to review.</p><a class="sc-secondary ob-link mt-2" href="/account/media">Review my story · optional</a></section>` : nothing}
       <div class="sc-pillar-grid"><section class="px-5" aria-label="Nutrition">${sectionHeader("Nutrition", state, actions)}<div class="sc-tile-grid">
         ${metricTile("energy", "Energy", "kcal", state, actions)}${metricTile("protein", "Protein", "g", state, actions)}${metricTile("water", "Water", "L", state, actions)}
       </div></section>

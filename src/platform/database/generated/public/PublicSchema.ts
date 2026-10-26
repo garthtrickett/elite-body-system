@@ -14,6 +14,7 @@ import type { default as WorkoutSessionsTable } from './WorkoutSessions.js';
 import type { default as OnboardingResolutionsTable } from './OnboardingResolutions.js';
 import type { default as AuthRateLimitsTable } from './AuthRateLimits.js';
 import type { default as DailyScorecardsTable } from './DailyScorecards.js';
+import type { default as MarketingStoriesTable } from './MarketingStories.js';
 import type { default as AuthSessionsTable } from './AuthSessions.js';
 import type { default as MealEntriesTable } from './MealEntries.js';
 import type { default as AssessmentMediaTable } from './AssessmentMedia.js';
@@ -49,6 +50,8 @@ export default interface PublicSchema {
   auth_rate_limits: AuthRateLimitsTable;
 
   daily_scorecards: DailyScorecardsTable;
+
+  marketing_stories: MarketingStoriesTable;
 
   auth_sessions: AuthSessionsTable;
 

@@ -235,3 +235,14 @@ test("recovery cannot attach an old physician declaration to changed screening o
   const revised = { ...remote, content: { ...remote.content, parqVersion: "new-screening" }, answers: { ...remote.answers, health: Array(7).fill(null) } };
   const updated = acceptOnboarding(loading, { kind: "completed", id: loading.pending!.id, effectKind: "load", result: { ok: true, value: revised } }); assert.equal(updated.draft.medicalClearance, false);
 });
+
+test("a new story invitation cannot inherit approval or selected channels from an earlier unsaved story", () => {
+  const first = { id: "00000000-0000-0000-0000-000000000001", title: "First milestone", results: "A first result", testimonial: "", mediaIds: [], clientName: "Alex Example", createdAt: "2026-10-26T10:00:00Z" };
+  let model = loaded(); model = { ...model, snapshot: { ...model.snapshot!, marketing: { ...model.snapshot!.marketing, story: first } } };
+  model = acceptOnboarding(model, { kind: "editMarketing", permission: { ...marketingPermission(), storyId: first.id } });
+  model = acceptOnboarding(model, { kind: "reload" });
+  const second = { ...first, id: "00000000-0000-0000-0000-000000000002", results: "A different result" };
+  const remote = { ...snapshot(), marketing: { ...emptyMarketingSnapshot(), story: second } };
+  model = acceptOnboarding(model, { kind: "completed", id: model.pending!.id, effectKind: "load", result: { ok: true, value: remote } });
+  assert.equal(model.marketingDraft.storyId, second.id); assert.equal(model.marketingDraft.accepted, false); assert.equal(model.marketingDraft.choices.website, false); assert.equal(model.marketingDirty, false);
+});

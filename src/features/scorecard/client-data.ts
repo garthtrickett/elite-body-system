@@ -5,7 +5,7 @@ import { parseScorecard } from "./operations.ts";
 import type { Scorecard } from "./operations.ts";
 
 export type StoredDay = Readonly<{ date: string; scorecard: Scorecard; revision: number }>;
-export type ClientState = Readonly<{ profile: ProfileSnapshot; day: StoredDay; history: readonly StoredDay[] }>;
+export type ClientState = Readonly<{ profile: ProfileSnapshot; day: StoredDay; history: readonly StoredDay[]; storyInvitation?: boolean }>;
 
 export function parseStoredDay(value: unknown): StoredDay | undefined {
   if (!isRecord(value) || !isDay(value.date) || !isRevision(value.revision)) return undefined;
@@ -18,7 +18,7 @@ export function parseProfileSnapshot(value: unknown): ProfileSnapshot | undefine
   return parsed.ok ? { profile: parsed.value, revision: value.revision } : undefined;
 }
 export function parseClientState(value: unknown): ClientState | undefined {
-  if (!isRecord(value) || !Array.isArray(value.history) || value.history.length > 100) return undefined;
+  if (!isRecord(value) || !Array.isArray(value.history) || value.history.length > 100 || value.storyInvitation !== undefined && typeof value.storyInvitation !== "boolean") return undefined;
   const profile = parseProfileSnapshot(value.profile), day = parseStoredDay(value.day), history = value.history.map(parseStoredDay);
-  return profile && day && history.every((item): item is StoredDay => item !== undefined) ? { profile, day, history } : undefined;
+  return profile && day && history.every((item): item is StoredDay => item !== undefined) ? { profile, day, history, storyInvitation: value.storyInvitation === true } : undefined;
 }

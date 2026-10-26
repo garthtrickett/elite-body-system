@@ -2,8 +2,10 @@ import type { Kysely } from "kysely";
 import type Database from "../../platform/database/generated/Database.ts";
 import type { AccountsId } from "../../platform/database/generated/public/Accounts.ts";
 import type { OnboardingSettingsKey } from "../../platform/database/generated/public/OnboardingSettings.ts";
-import { DRAFT_MARKETING_RELEASE, parseMarketingRelease, parseMarketingRecord } from "./marketing-data.ts";
+import { DRAFT_MARKETING_RELEASE, parseMarketingRelease, parseMarketingRecord, activeMarketing } from "./marketing-data.ts";
 import type { MarketingRelease, MarketingRecord, MarketingSnapshot } from "./marketing-data.ts";
+import { parseMarketingStory } from "./story-data.ts";
+import type { MarketingStoriesId } from "../../platform/database/generated/public/MarketingStories.ts";
 
 export async function readMarketingRelease(db: Kysely<Database>): Promise<MarketingRelease> {
   const row = await db.selectFrom("onboarding_settings").select("data").where("key", "=", "marketing-release" as OnboardingSettingsKey).forShare().executeTakeFirst();
@@ -22,7 +24,16 @@ export async function readMarketingRecords(input: Readonly<{ db: Kysely<Database
   });
 }
 export async function readMarketingSnapshot(input: Readonly<{ db: Kysely<Database>; accountId: string }>): Promise<MarketingSnapshot> {
-  const [release, records] = await Promise.all([readMarketingRelease(input.db), readMarketingRecords({ ...input, latestOnly: true })]);
+  const [release, records, story] = await Promise.all([readMarketingRelease(input.db), readMarketingRecords(input), readMarketingStory(input)]);
   const record = records[0] ?? null;
-  return { release, revision: record?.revision ?? 0, record };
+  return { release, revision: record?.revision ?? 0, record, story, active: activeMarketing(records) };
+}
+export async function readMarketingStory(input: Readonly<{ db: Kysely<Database>; accountId: string; id?: string }>) {
+  let query = input.db.selectFrom("marketing_stories").selectAll().where("account_id", "=", input.accountId as AccountsId);
+  if (input.id) query = query.where("id", "=", input.id as MarketingStoriesId);
+  const row = await query.orderBy("created_at", "desc").orderBy("id", "desc").limit(1).executeTakeFirst();
+  if (!row) return null;
+  const story = parseMarketingStory(typeof row.data === "object" && row.data !== null ? { ...row.data, id: row.id, createdAt: row.created_at.toISOString() } : null);
+  if (!story) throw new Error("Invalid story request");
+  return story;
 }

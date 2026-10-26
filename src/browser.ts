@@ -37,7 +37,7 @@ if (root) {
         current = route;
         const host = { csrf, navigate: (href: string) => navigation?.navigate(href), replaceQuery: (key: "date", value: string) => navigation?.replaceQuery(key, value), navigationChanged: (value: NavigationGuard) => { guard = value; showShell(); } };
         showShell();
-        feature = route.page === "onboarding" ? mountOnboarding(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
+        feature = route.page === "onboarding" || route.page === "media" ? mountOnboarding(outlet, { ...host, signOut: actions.signOut, account: latestAccount, marketingOnly: route.page === "media" })
           : route.page === "training" ? mountTraining(outlet, host)
           : route.page === "meals" ? mountMeals(outlet, host)
           : route.page === "map" || route.page === "nutrition" || route.page === "activity" || route.page === "mindset" ? mountLearning(outlet, { ...host, page: route.page })

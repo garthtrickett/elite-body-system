@@ -10,10 +10,11 @@ import type { Goal } from "./data.ts";
 import type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
 import { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
 import { onboardingView } from "./browser-view.ts";
+import { marketingPage } from "./marketing-view.ts";
 
 export { acceptOnboarding, initialOnboardingModel, representOnboarding } from "./browser-model.ts";
 export type { OnboardingModel, OnboardingProposal, OnboardingEffect } from "./browser-model.ts";
-export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }> }>) {
+export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<{ csrf: string; signOut: () => void; account: Readonly<{ busy: boolean; problem: string }>; marketingOnly?: boolean }>) {
   const scope = new AbortController();
   const call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
   const files = new Map<number, File>(), controllers = new Map<number, AbortController>();
@@ -33,7 +34,7 @@ export function mountOnboarding(root: HTMLElement, config: RouteHost & Readonly<
       config.navigationChanged(onboardingNavigation(state));
       const previousFocus = document.activeElement;
       const focusedGoal = previousFocus instanceof HTMLElement ? previousFocus.closest<HTMLElement>("[data-goal]")?.dataset.goal : undefined;
-      render(onboardingView(state, {
+      render(config.marketingOnly ? marketingPage({ model: state, busy: state.busy, propose: proposal => runtime.propose(proposal) }) : onboardingView(state, {
         propose: proposal => runtime.propose(proposal), signOut: () => runtime.propose({ kind: "signOut" }),
         upload: ({ slot, file }) => { if (!file || runtime.getModel().pending) return; const current = ++selection; files.set(current, file); runtime.propose({ kind: "upload", slot, selection: current }); },
         drag: goal => { dragged = goal; }, drop: goal => { moveTo(goal); dragged = null; },

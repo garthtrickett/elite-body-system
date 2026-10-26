@@ -60,13 +60,13 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
       const profile = await profiles.get({ accountId: account.id });
       if (!profile.ok) { send(profile); return; }
       const date = url.searchParams.get("day") ?? clientDay({ timezone: profile.value.profile.timezone, now: new Date() });
-      const [day, history, session, mapRead] = await Promise.all([scorecards.get({ accountId: account.id, date }), scorecards.history({ accountId: account.id }), training.get({ accountId: account.id, date }), learning.hasRead({ accountId: account.id, date })]);
+      const [day, history, session, mapRead, storyNotice] = await Promise.all([scorecards.get({ accountId: account.id, date }), scorecards.history({ accountId: account.id }), training.get({ accountId: account.id, date }), learning.hasRead({ accountId: account.id, date }), marketing.notice({ accountId: account.id })]);
       if (!day.ok) { send(day); return; }
       if (!history.ok) { send(history); return; }
       if (!session.ok) { send(session); return; }
       if (!mapRead.ok) { send(mapRead); return; }
       const complete = trainingComplete(session.value);
-      send({ ok: true, value: { profile: profile.value, day: { ...day.value, scorecard: { ...day.value.scorecard, checks: { ...day.value.scorecard.checks, training: complete, map: mapRead.value } } }, history: history.value } }); return;
+      send({ ok: true, value: { profile: profile.value, day: { ...day.value, scorecard: { ...day.value.scorecard, checks: { ...day.value.scorecard.checks, training: complete, map: mapRead.value } } }, history: history.value, storyInvitation: storyNotice.ok && storyNotice.value.pending } }); return;
     }
     if (request.method === "POST" && url.pathname === "/api/client/profile") {
       send(await profiles.save({ accountId: account.id, revision: body.revision, profile: body.profile })); return;

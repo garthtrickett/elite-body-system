@@ -41,9 +41,17 @@ Optional marketing permission has a separate document configuration, revision an
 append-only account event history. Its typed operations are exported from the same
 feature interface. Each grant/withdrawal retains its exact versioned release and
 server timestamp. Authenticated HTTP derives ownership from the session. Marketing
-does not enter completion requirements or alter health-consent evidence. Its SAM
-draft/effect stays editable after completion, independently of the locked assessment;
-withdrawal remains possible under an unapproved replacement release. External
+does not enter completion requirements or alter health-consent evidence.
+Onboarding renders no media request. Harry creates an immutable account-owned
+story invitation after a milestone through the trusted CLI. A small scorecard
+link appears only for an invitation that has not already been approved. The
+separate `/account/media` route uses the same correlated SAM and stays accessible
+for withdrawal even before new onboarding completes. New grants require completed
+setup, an owned story ID, exact matching material categories and ready owned files.
+The server embeds that immutable story in each grant; clients cannot supply its
+text or attachments. Active grants are resolved per story since the most recent
+global withdrawal; earlier grants and original terms remain in the event history.
+Withdrawal remains possible under an unapproved replacement release. External
 publication and removal remain operator responsibilities.
 
 S3-compatible storage holds binary media outside PostgreSQL. Finalization checks

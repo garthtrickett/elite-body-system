@@ -123,55 +123,71 @@ This is a completion template, not a privacy notice ready for client publication
 
 ## Optional Media & Testimonial Release
 
-Health-data and participation consent does not authorise marketing. The Fitness Participation
-Agreement section includes a separate optional release. Every material,
-channel and identity choice starts unticked. Clients select photos/videos,
-results/measurements and/or testimonials; websites, social posts and paid ads;
-and name or recognisable-feature permission independently. Grants require at least
-one material and channel, an express acknowledgement, an adult/capacity declaration
-and a typed name. Optional restrictions must be honoured. Refusing consent never
-changes service access or onboarding eligibility.
+Health-data and participation consent does not authorise marketing. Onboarding
+contains no media request. After a client achieves a meaningful milestone, Harry
+can propose a specific success story using the trusted CLI. A quiet optional link
+then appears near the client's progress cards. There is no automatic weight-loss
+threshold, signup popup or permission inferred from assessment uploads.
 
-The original draft is `DRAFT_MARKETING_RELEASE`, exported through onboarding's
-public server interface. Its default is unapproved, so new grants are disabled.
-Complete the privacy contact, actual platform recipients, retention and
-international-processing disclosures, then obtain the relevant legal review
-before approving a version. This is independent of health/safety document approval.
-Use a private JSON object containing `version`, `approved` and `text`:
+Create a private JSON object with `title`, `results`, `testimonial` and `mediaIds`
+(an array of at most six ready assessment UUIDs owned by the client). Text fields
+may be empty if another type of content is supplied. The title identifies the
+milestone; the operator must select a genuine result rather than treating completed
+setup as proof of progress. The client must have completed setup before an invitation
+can be created. Each request receives an immutable server ID and timestamp.
 
 ```sh
+npm run onboarding:admin -- request-story ACCOUNT_ID /private/path/story.json
 npm run onboarding:admin -- configure-marketing /private/path/marketing-release.json
 npm run onboarding:admin -- review-marketing ACCOUNT_ID /private/path/marketing-history.json
 ```
 
-Versions are immutable. Changed terms or approval status require a new version.
-Each append-only account record retains the exact release, selected permissions,
-restrictions, signed name, server timestamp and independent revision. History
-exports use new mode-0600 files. Ordinary onboarding saves, completion and changes
-to health documents neither grant permission nor overwrite marketing history.
+`configure-marketing` accepts `version`, `approved` and `text`. The original draft
+is `DRAFT_MARKETING_RELEASE`, exported from the public feature interface. It stays
+unapproved until the missing privacy contact, provider recipients, retention and
+international-processing disclosures and relevant legal review are complete.
+Changed release text or approval status requires a new version. This approval is
+independent of participation-document approval.
 
-Clients may review, change or withdraw permission in this section after onboarding
-is complete. Withdrawal requires no new signature or approved replacement release.
-Earlier grants retain their original terms when the configured release changes;
-new grants require the current approved version. Unsaved choices have explicit
-save/discard controls and recover after uncertain saves without losing assessment
-drafts. There is no automatic permission inferred from private assessment uploads.
+At `/account/media`, clients review the exact results/testimonial and can open each
+proposed file. Only those materials are covered. Website, organic social and paid
+advertising are separately selectable and unticked. Identity choices and restrictions
+sit under an optional disclosure; without permission, names and recognisable features
+must be omitted/obscured, or the material must not be published. The explicit approval
+checkbox identifies the signer using their earlier entered full name (editable under
+preferences) and confirms adult capacity, avoiding another compulsory name entry.
+The complete release is available under a disclosure before approval.
 
-Before each publication or campaign, the operator must check the latest record,
-its selected categories/channels/identity and restrictions. Obscure names and all
-recognisable features unless permitted; do not publish if adequate de-identification
-is impossible. On withdrawal, stop affected paid campaigns and remove affected
-material from EBS-controlled digital channels. This application records permission
-and withdrawal; it does not publish marketing or automatically remove external
-posts/ads. Independently shared copies cannot be guaranteed removable. Set and
-honour an appropriate consent-evidence retention policy.
+New grants require the authenticated account's specific story, the current approved
+release and matching material categories. Files are checked for ownership/readiness
+both when a story is offered and when approved. A changed story is a new immutable
+request and requires fresh approval. Recovery clears an earlier unsaved approval
+when another story is loaded. No story publishing or sending of external messages is
+automated. The scorecard invitation stops after that story has been approved and
+stays stopped after withdrawal; Harry must create another request to invite again.
 
-The draft follows granular, optional consent and easy withdrawal principles in
-the [ICO consent guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/lawful-basis/consent/what-is-valid-consent/).
-Permission is not advertising substantiation: truthful testimonials, material
-relationship disclosures and generally expected results remain required under
-the [FTC endorsement guidance](https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking).
-The release does not claim universal enforceability or replace applicable privacy
+Media preferences stays available from desktop account navigation and the phone's
+More menu, including before onboarding completion so earlier grants can be withdrawn.
+A global withdrawal needs no new signature or approved replacement release and
+clears all active story permissions. Multiple approved stories remain independently
+scoped until withdrawal; changing channels for one story supersedes only that story's
+previous choices. Legacy grants retain their original exact release and can be
+withdrawn here. Every event retains the release, specific story, selected channels,
+identity choices, restrictions, signer and server timestamp. Private history exports
+use new mode-0600 files. Ordinary assessment saves do not alter this history.
+
+Before publication, the operator must check the latest active permission for the
+specific story and obey restrictions. On withdrawal, stop affected campaigns and
+remove affected material from EBS-controlled digital channels. The application records
+withdrawal; it does not remove external ads/posts. Independent copies cannot be
+guaranteed removable. Set an appropriate consent-evidence retention policy.
+
+This timing and layered presentation follows the
+[ICO consent guidance](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/lawful-basis/consent/what-is-valid-consent/).
+Permission does not substantiate an advertising claim: truthful testimonials,
+material-relationship disclosures and generally expected results remain relevant
+under [FTC endorsement guidance](https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking).
+The draft does not claim universal enforceability or replace applicable privacy
 notices, transfer safeguards or consumer rights.
 
 ## Private S3-compatible storage

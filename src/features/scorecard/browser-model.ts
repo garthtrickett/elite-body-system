@@ -33,6 +33,7 @@ export type ScorecardModel = Readonly<{
   dayRevision: number;
   history: readonly StoredDay[];
   loaded: boolean;
+  storyInvitation: boolean;
   syncError: string;
   generation: number;
   savedGeneration: number;
@@ -58,7 +59,7 @@ export function initialScorecardModel(account: AccountState, launchPanel?: "prof
   return { day: emptyScorecard(), drafts: { weight: "", energy: "", protein: "", water: "", sleep: "", steps: "" },
     errors: {}, card: 0, touchX: undefined, panel: undefined, setupStarted: false, launchPanel, goalDraft: "", message: "", account, exiting: false,
     profile: { profile, revision: 0 }, profileUi: initialProfileUi(profile), date: "", observedDate: "", dayRevision: 0, history: [],
-    loaded: false, syncError: "", generation: 0, savedGeneration: 0, sequence: 0, pending: undefined };
+    loaded: false, storyInvitation: false, syncError: "", generation: 0, savedGeneration: 0, sequence: 0, pending: undefined };
 }
 
 /** One pure acceptor owns all scorecard interaction state. Network effects are selected after acceptance. */
@@ -144,7 +145,7 @@ export function acceptScorecardProposal(model: ScorecardModel, proposal: Scoreca
       const value = proposal.result.value;
       const loadedUi = initialProfileUi(value.profile.profile);
       const profileUi = model.launchPanel === "setup" && value.profile.profile.completed && value.profile.profile.onboardingVersion !== "harry-v2" ? acceptProfileProposal(loadedUi, { kind: "editSetup" }) : loadedUi;
-      const loaded = { ...model, setupStarted: model.launchPanel === "setup" || model.panel === "setup" || !value.profile.profile.completed, loaded: true, pending: undefined, profile: value.profile, profileUi,
+      const loaded = { ...model, storyInvitation: value.storyInvitation === true, setupStarted: model.launchPanel === "setup" || model.panel === "setup" || !value.profile.profile.completed, loaded: true, pending: undefined, profile: value.profile, profileUi,
         date: value.day.date, observedDate: value.day.date, day: value.day.scorecard, dayRevision: value.day.revision, drafts: draftsFor(value.day.scorecard), history: value.history,
         launchPanel: undefined, panel: model.launchPanel ?? (model.loaded && model.panel === "setup" && model.profile.profile.completed ? "setup" : value.profile.profile.completed ? undefined : "setup"), generation: 0, savedGeneration: 0, syncError: "" };
       return value.profile.profile.onboardingVersion === "harry-v2" && model.launchPanel === "setup" ? schedule({ ...loaded, panel: undefined }, { kind: "navigate", href: "/onboarding" }) : loaded;

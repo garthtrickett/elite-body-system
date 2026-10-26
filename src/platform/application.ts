@@ -14,7 +14,7 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
     publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
   const onboarding = createOnboarding({ db });
   const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), ...(config.onboardingEnabled ? { pageAccess: async ({ accountId, path }: Readonly<{ accountId: string; path: string }>) => {
-    if (path === "/onboarding") return { allowed: true };
+    if (path === "/onboarding" || path === "/account/media") return { allowed: true };
     const access = await onboarding.eligible({ accountId });
     return access.ok ? { allowed: access.value.eligible } : { allowed: false, unavailable: true };
   } } : {}) });
