@@ -39,7 +39,12 @@ export async function startTestApp(options: Readonly<{ harryPreview?: boolean; o
       throw new Error("Test outbox has no matching link");
     },
     async close(): Promise<void> {
-      await app.close();
+      // A browser can leave speculative/incomplete HTTP connections behind even
+      // after its page closes. Stop accepting first, then release this test's
+      // sockets so teardown does not wait for browser-context fixture disposal.
+      const closing = app.close();
+      app.server.closeAllConnections();
+      await closing;
       await rm(outbox, { recursive: true, force: true });
     },
   };
