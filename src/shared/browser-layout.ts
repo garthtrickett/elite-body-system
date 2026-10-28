@@ -40,9 +40,10 @@ export function workspaceShell(input: Readonly<{
     <aside class="sc-sidebar" aria-label="Elite Body System workspace">
       <a class="sc-sidebar-brand" href="/" aria-label="Elite Body System home" aria-disabled=${input.navigationDisabled ?? false}>Elite Body<br>System<span class="sc-eyebrow">Build your standard.</span></a>
       <nav class="sc-sidebar-nav" aria-label="Workspace navigation">
+        <div class="sc-sidebar-scroll">
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Daily practice</p>${items(practice)}</div>
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Your courses</p>${items(courses)}</div>
-        <div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
+        </div><div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
           <a class="sc-sidebar-link" href="/account/setup" aria-current=${input.page === "account-setup" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Account setup</a>
           <a class="sc-sidebar-link" href="/account/media" aria-current=${input.page === "media" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Media preferences</a>
           ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([key, label]) => html`<a class="sc-sidebar-link" href=${`/?panel=${key}`} aria-current=${panel === key ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>${label}</a>`)}

@@ -1,3 +1,5 @@
+import {readdir,readFile} from "node:fs/promises";
+import {join} from "node:path";
 import { test, expect } from "@playwright/test";
 import type { Page, BrowserContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
@@ -15,7 +17,15 @@ let app: Awaited<ReturnType<typeof startTestApp>>, manager: AccountsId;
 test.beforeAll(async () => { app = await startTestApp({ masterEmail }); manager = await account(masterEmail); await db.insertInto("business_managers").values({ account_id: manager }).execute(); await db.insertInto("performance_mentors").values({ account_id: manager, all_clients: true }).execute(); });
 test.afterAll(async () => { if (publicEmails.length) { const leads = await db.selectFrom("sales_leads").select("visitor_id").where("email", "in", publicEmails).execute(); if (leads.length) await db.deleteFrom("sales_visitors").where("id", "in", leads.map(l => l.visitor_id)).execute(); } if (slots.length) await db.deleteFrom("sales_call_slots").where("id", "in", slots).execute(); await db.deleteFrom("marketing_articles").where("created_by","in",ids).execute(); await db.deleteFrom("coaching_community_posts").where("author_id","in",ids).execute(); await db.deleteFrom("accounts").where("id", "in", ids).execute(); await app.close(); await db.destroy(); });
 async function account(email = `portal-browser-member-${randomUUID()}@example.test`) { const a = await app.auth.provisionAccount({ email }); if (!a.ok) throw new Error("Test account unavailable"); const id = a.value.id as AccountsId; ids.push(id); return id; }
-async function signIn(context: BrowserContext, id: AccountsId) { const a = await db.selectFrom("accounts").select("email").where("id", "=", id).executeTakeFirstOrThrow(); await app.auth.requestLink({ email: a.email, clientKey: randomUUID() }); const s = await app.auth.redeemLink({ token: new URL(await app.readLink(a.email)).hash.slice(1) }); if (!s.ok) throw new Error("Test session unavailable"); await context.addCookies([{ name: "ebs-session", value: s.value.sessionToken, url: app.origin, httpOnly: true, sameSite: "Lax" }]); }
+async function signIn(context: BrowserContext, id: AccountsId) {
+  const a=await db.selectFrom("accounts").select("email").where("id","=",id).executeTakeFirstOrThrow(),before=new Set(await readdir(app.outbox));
+  expect((await app.auth.requestLink({email:a.email,clientKey:randomUUID()})).ok).toBe(true);
+  let link:string|undefined;
+  for(const file of await readdir(app.outbox))if(!before.has(file)) {const value:unknown=JSON.parse(await readFile(join(app.outbox,file),"utf8"));if(value&&typeof value==="object"&&"to" in value&&value.to===a.email&&"link" in value&&typeof value.link==="string")link=value.link;}
+  if(!link)throw new Error("A fresh test sign-in link was not issued");
+  const session=await app.auth.redeemLink({token:new URL(link).hash.slice(1)});if(!session.ok)throw new Error("Fresh test session unavailable");
+  await context.addCookies([{name:"ebs-session",value:session.value.sessionToken,url:app.origin,httpOnly:true,sameSite:"Lax"}]);
+}
 async function apply(page: Page, email: string) {
   await page.goto(app.origin + "/apply#apply"); await page.getByLabel("Full name", { exact: true }).fill("Portal browser applicant"); await page.getByLabel("Email", { exact: true }).fill(email); await page.getByLabel("Age", { exact: true }).selectOption("35–44"); await page.getByLabel("Your role and business", { exact: true }).fill("Founder"); await page.getByLabel("Main goal", { exact: true }).selectOption("Build strength and muscle"); await page.getByLabel("Training now", { exact: true }).selectOption("2–3 times a week"); await page.getByLabel("What's stopped you getting the result so far?", { exact: true }).fill("A routine that works around travel."); await page.getByRole("radio", { name: "Yes, I'm ready to start", exact: true }).check(); await page.getByRole("button", { name: "Submit application", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/book-call");
 }
@@ -39,7 +49,7 @@ test("master email confirmation opens all three portal areas and sign-out revoke
   await page.goto(await app.readLink(masterEmail)); await page.getByRole("button", { name: "Continue to Elite Body System", exact: true }).click(); await expect(page).toHaveURL(app.origin + "/manage");
   for (const label of ["Elite Marketing System", "Elite Sales System", "Elite Delivery"]) { await page.getByRole("link", { name: label, exact: true }).click(); await expect(page.getByRole("heading", { name: label, exact: true })).toBeVisible(); }
   await expect(page.getByRole("link", { name: "EBS Mentor Portal", exact: true })).toBeVisible(); await expect(page.getByRole("link", { name: "EBS Member Portal", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Sign out", exact: true }).click(); await page.goto(app.origin + "/manage"); await expect(page).toHaveURL(app.origin + "/master/sign-in");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click(); await expect(page).toHaveURL(app.origin+"/sign-in"); await page.goto(app.origin + "/manage"); await expect(page).toHaveURL(app.origin + "/master/sign-in");
 });
 
 test("Marketing walks through proof, drafts and downloads while protecting unsaved work", async ({ page }, info) => {
