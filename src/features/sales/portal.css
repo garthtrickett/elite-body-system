@@ -61,7 +61,8 @@
 .mp-column { background: #171614; border: 1px solid #f3f0ea16; border-radius: 12px; min-height: 320px; }
 .mp-column h3 { font-family: var(--font-sans); font-size: 13px; padding: 20px 16px; display: flex; justify-content: space-between; border-bottom: 1px solid #f3f0ea14; }
 .mp-column h3 span { color: #aaa69e; }
-.mp-column > div { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.mp-column > div { padding: 10px; display: flex; flex-direction: column; gap: 10px; max-height: min(55dvh, 600px); overflow-y: auto; overscroll-behavior: contain; }
+.mp-column .mp-lead { flex-shrink: 0; }
 .mp-lead { display: flex; flex-direction: column; gap: 6px; text-align: left; border: 1px solid #f3f0ea20; border-radius: 8px; padding: 14px; background: #11100e; min-width: 0; }
 .mp-lead strong { font-weight: 500; font-size: 14px; }
 .mp-lead > span:not(.mp-tag), .mp-lead small { color: #aaa69e; font-size: 11px; overflow-wrap: anywhere; }

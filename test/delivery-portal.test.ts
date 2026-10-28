@@ -24,7 +24,8 @@ async function membership(clientId: string, level: "group" | "individual", activ
 test("Mentor roster respects selected or all-client scope and includes incomplete new accounts", async () => {
   const scoped = await delivery.clients({ actorId: mentor }); assert.ok(scoped.ok); assert.deepEqual(scoped.value.clients.map(c => c.id), [client]); assert.equal(scoped.value.canManageMembership, false);
   assert.ok(!(await delivery.client({ actorId: mentor, clientId: other })).ok);
-  const all = await delivery.clients({ actorId: manager }); assert.ok(all.ok); assert.ok(all.value.clients.some(c => c.id === other)); assert.ok(all.value.canManageMembership);
+  const otherAccount=await db.selectFrom("accounts").select("email").where("id","=",other).executeTakeFirstOrThrow();
+  const all = await delivery.clients({ actorId: manager,search:otherAccount.email }); assert.ok(all.ok); assert.ok(all.value.clients.some(c => c.id === other)); assert.ok(all.value.canManageMembership);
   const incomplete = await delivery.client({ actorId: manager, clientId: other }); assert.ok(incomplete.ok); assert.equal(incomplete.value.timezone, "UTC"); assert.equal(incomplete.value.client.profileCompleted, false);
   assert.ok(!(await delivery.clients({ actorId: client })).ok);
 });
