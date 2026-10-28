@@ -88,11 +88,11 @@ test("lead pagination uses exact PostgreSQL microseconds without losing a record
   const token = await apply();
   const latest = await db.selectFrom("sales_leads").select("id").where("visitor_id", "=", visitors.at(-1)!).executeTakeFirstOrThrow();
   const another = await apply(); void token; void another;
-  const older = await db.selectFrom("sales_leads").select("id").where("visitor_id", "=", visitors.at(-1)!).executeTakeFirstOrThrow();
+  const older = await db.selectFrom("sales_leads").select(["id","revision"]).where("visitor_id", "=", visitors.at(-1)!).executeTakeFirstOrThrow();
   await sql`update sales_leads set created_at='2020-01-01T00:00:00.123456Z'::timestamptz where id=${latest.id}::uuid`.execute(db);
   await sql`update sales_leads set created_at='2020-01-01T00:00:00.123455Z'::timestamptz where id=${older.id}::uuid`.execute(db);
   const page = await management.snapshot({ actorId: manager, before: latest.id }); assert.ok(page.ok); assert.ok(page.value.leads.some(l => l.id === older.id)); assert.ok(!page.value.leads.some(l => l.id === latest.id));
-  const stage = await management.lead({ actorId: manager, leadId: older.id, stage: "call_booked", notes: "", revision: 1 }); assert.ok(!stage.ok && stage.error.code === "invalid_input");
-  const write = await management.lead({ actorId: manager, leadId: older.id as SalesLeadsId, stage: "follow_up", notes: "Agreed next step", revision: 1 }); assert.ok(write.ok);
-  const stale = await management.lead({ actorId: manager, leadId: older.id, stage: "lost", notes: "", revision: 1 }); assert.ok(!stale.ok && stale.error.code === "conflict");
+  const stage = await management.lead({ actorId: manager, leadId: older.id, stage: "call_booked", notes: "", revision: older.revision }); assert.ok(!stage.ok && stage.error.code === "invalid_input");
+  const write = await management.lead({ actorId: manager, leadId: older.id as SalesLeadsId, stage: "follow_up", notes: "Agreed next step", revision: older.revision }); assert.ok(write.ok);
+  const stale = await management.lead({ actorId: manager, leadId: older.id, stage: "lost", notes: "", revision: older.revision }); assert.ok(!stale.ok && stale.error.code === "conflict");
 });
