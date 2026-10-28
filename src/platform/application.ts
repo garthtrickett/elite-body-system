@@ -84,7 +84,7 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
       const asset = assets.get(path);
       if (request.method === "GET" && asset) {
         const contents = await readFile(asset.file);
-        response.writeHead(200, { "Content-Type": asset.type, "X-Content-Type-Options": "nosniff" });
+        response.writeHead(200, { "Content-Type": asset.type, "X-Content-Type-Options": "nosniff", ...(asset.type === "font/woff2" ? { "Access-Control-Allow-Origin": "*" } : {}) });
         response.end(contents); return;
       }
       if (["/free-value", "/apply", "/book-call", "/client-stories"].includes(path) || path.startsWith("/api/sales/") || path.startsWith("/api/management/")) await handleSales(request, response);

@@ -46,6 +46,7 @@ try {
   for (const path of ["/api/management/snapshot", "/api/marketing/snapshot", "/api/mentor/delivery/clients"]) { const denied = await fetch(origin + path); assert.equal(denied.status, 401); await denied.body.cancel(); }
   const publicPage = await fetch(`${origin}/free-value`); assert.equal(publicPage.status, 200); const visitorCookies = publicPage.headers.getSetCookie().map(c => c.split(";")[0]).join("; "); assert.match(await publicPage.text(), /data-mode="sales"/);
   const publicState = await fetch(`${origin}/api/sales/snapshot?page=free-value`, {headers:{Cookie:visitorCookies}}); assert.equal(publicState.status,200); const publicData=await publicState.json(); assert.equal(publicData.value.settings.insights.length,30); assert.equal(publicData.value.callScript,undefined);
+  const exportFont=await fetch(`${origin}/assets/fonts/instrument-serif-regular.woff2`,{headers:{Origin:"null"}});assert.equal(exportFont.headers.get("access-control-allow-origin"),"*");await exportFont.body.cancel();
   const browserAsset = await fetch(`${origin}/assets/app.js`); assert.ok(!(await browserAsset.text()).includes("There are two ways to access the same Elite Body System transformation."));
   const provisioned = await app.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); assert.equal(provisioned.ok, true);
   const preview = await app.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: "onboarding-production-smoke" }); assert.equal(preview.ok, true);
