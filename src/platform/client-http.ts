@@ -11,8 +11,9 @@ import { createContentMedia } from "../features/content/index.ts";
 import { createMeals, createOpenAiMealAnalyzer } from "../features/meals/index.ts";
 import { createOnboarding, createAssessmentMedia, createMarketingPermissions } from "../features/onboarding/index.ts";
 import type { AssessmentStorage, BookingProvider } from "../features/onboarding/index.ts";
+import type { WeeklyCheckins } from "../features/checkins/index.ts";
 
-export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
+export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; checkins: WeeklyCheckins; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
   const onboarding = createOnboarding({ db: config.db });
   const marketing = createMarketingPermissions({ db: config.db });
   const assessmentMedia = createAssessmentMedia({ db: config.db, ...(config.assessmentStorage ? { storage: config.assessmentStorage } : {}) });
@@ -27,6 +28,10 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
       const status = result.ok ? 200 : result.error.code === "conflict" ? 409 : result.error.code === "unavailable" || result.error.code === "not_configured" ? 503 : result.error.code === "rate_limited" ? 429 : result.error.code === "not_found" ? 404 : result.error.code === "forbidden" ? 403 : 400;
       json(response, status, result);
     }
+    if (url.pathname === "/api/client/checkins" && request.method === "GET") { send(await config.checkins.get({ accountId: account.id })); return; }
+    if (url.pathname === "/api/client/checkins/access" && request.method === "GET") { send(await config.checkins.access({ accountId: account.id })); return; }
+    if (url.pathname === "/api/client/checkins/history" && request.method === "GET") { send(await config.checkins.history({ accountId: account.id, ...(url.searchParams.has("before") ? { before: url.searchParams.get("before") } : {}) })); return; }
+    if (url.pathname === "/api/client/checkins/save" && request.method === "POST") { send(await config.checkins.save({ accountId: account.id, week: body.week, revision: body.revision, answers: body.answers, rawMeasurements: body.rawMeasurements, submit: body.submit })); return; }
     if (url.pathname === "/api/client/onboarding" && request.method === "GET") { send(await onboarding.get({ accountId: account.id })); return; }
     if (url.pathname === "/api/client/onboarding/document" && request.method === "GET") {
       const result = await onboarding.documentCopy({ accountId: account.id, kind: url.searchParams.get("kind") });
@@ -63,6 +68,9 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
       if (!access.ok) { send(access); return; }
       if (!access.value.eligible) { json(response, 403, { ok: false, error: { code: "forbidden", reason: "onboarding_required", message: "Complete onboarding before opening your dashboard.", redirect: "/onboarding" } }); return; }
     }
+    const weekly = await config.checkins.access({ accountId: account.id });
+    if (!weekly.ok) { send(weekly); return; }
+    if (weekly.value.required) { json(response, 403, { ok: false, error: { code: "forbidden", reason: "checkin_required", message: "Complete your weekly check-in to continue to your dashboard.", redirect: "/check-in" } }); return; }
     if (request.method === "GET" && url.pathname === "/api/client/state") {
       const profile = await profiles.get({ accountId: account.id });
       if (!profile.ok) { send(profile); return; }

@@ -1,0 +1,5 @@
+import { blankAnswers, QUESTIONS } from "../../src/features/checkins/data.ts";
+import type { Answers, Entry, Snapshot } from "../../src/features/checkins/data.ts";
+export const completeAnswers = (week = "2026-10-24"): Answers => ({ ...blankAnswers(week), wins: "Trained consistently and moved more load.", scores: { training: 8, nutrition: 7, recovery: 6, mindset: 8, energy: 7, judgement: 8, focus: 9, drive: 8 }, data: { weight: 80, waist: 82, muscle: 38, priorityMovement: "improved", progressiveOverload: ["load"] }, answer: "Prepare my training clothes the night before." });
+export const checkinEntry = (overrides: Partial<Entry> = {}): Entry => ({ week: "2026-10-24", revision: 1, answers: completeAnswers(), rawMeasurements: { weight: "80", waist: "82", muscle: "38" }, question: QUESTIONS[completeAnswers().qIndex]!, savedAt: "2026-10-24T10:00:00Z", submittedAt: null, ...overrides });
+export const checkinSnapshot = (overrides: Partial<Snapshot> = {}): Snapshot => ({ enabled: true, enrolled: true, timezone: "UTC", hour: 9, week: "2026-10-24", due: true, required: true, current: null, history: [], nextCursor: null, ...overrides });

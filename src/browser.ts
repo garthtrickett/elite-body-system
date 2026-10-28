@@ -5,6 +5,7 @@ import { mountTraining } from "./features/training/browser.ts";
 import { mountMeals } from "./features/meals/browser.ts";
 import { mountLearning } from "./features/learning/browser.ts";
 import { mountOnboarding } from "./features/onboarding/browser.ts";
+import { mountCheckins, mountMentorCheckins } from "./features/checkins/browser.ts";
 import { workspaceShell } from "./shared/browser-layout.ts";
 import { appRoute } from "./shared/app-routes.ts";
 import { createBrowserNavigation } from "./shared/browser-navigation.ts";
@@ -38,6 +39,8 @@ if (root) {
         const host = { csrf, navigate: (href: string) => navigation?.navigate(href), replaceQuery: (key: "date", value: string) => navigation?.replaceQuery(key, value), navigationChanged: (value: NavigationGuard) => { guard = value; showShell(); } };
         showShell();
         feature = route.page === "onboarding" || route.page === "media" || route.page === "account-setup" ? mountOnboarding(outlet, { ...host, signOut: actions.signOut, account: latestAccount, marketingOnly: route.page === "media", accountSetupOnly: route.page === "account-setup" })
+          : route.page === "checkin" ? mountCheckins(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
+          : route.page === "mentor-checkins" ? mountMentorCheckins(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
           : route.page === "training" ? mountTraining(outlet, host)
           : route.page === "meals" ? mountMeals(outlet, host)
           : route.page === "map" || route.page === "nutrition" || route.page === "activity" || route.page === "mindset" ? mountLearning(outlet, { ...host, page: route.page })
@@ -59,7 +62,7 @@ if (root) {
             // A different authentication context requires a fresh auth runtime.
             disposeFeature(); navigation?.dispose(); location.replace(route.href); return;
           }
-          if (route.href === previous.href) return;
+          if (route.href === previous.href) { feature?.revisit?.(); return; }
           if (previous.page === route.page && feature?.retain) {
             current = route; showShell(); feature.retain(route.href);
             const panel = new URL(route.href, location.origin).searchParams.get("panel");
@@ -67,7 +70,7 @@ if (root) {
             return;
           }
           disposeFeature(); render(nothing, outlet); guard = { kind: "ready" }; mount(route, csrf);
-          const content = outlet.querySelector<HTMLElement>("#workspace-content, .ob-shell");
+          const content = outlet.querySelector<HTMLElement>("#workspace-content, .ob-shell, .ci-page");
           if (content) { content.scrollTop = 0; content.tabIndex = -1; if (!new URL(route.href, location.origin).searchParams.has("panel") && !outlet.querySelector("dialog[open]")) content.focus({ preventScroll: true }); }
           window.scrollTo({ top: 0, behavior: "instant" });
         },
