@@ -13,6 +13,6 @@ COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/src ./src
 COPY --from=build /app/dist ./dist
-COPY scripts/migrate.ts scripts/provision-account.ts scripts/set-video.ts scripts/onboarding-admin.ts ./scripts/
+COPY scripts/migrate.ts scripts/provision-account.ts scripts/set-video.ts scripts/onboarding-admin.ts scripts/mentor-admin.ts ./scripts/
 USER node
 CMD ["node", "src/server.ts"]

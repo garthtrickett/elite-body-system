@@ -1,5 +1,93 @@
 # Elite Body System — extraction and implementation plan
 
+## Saturday Body check-in
+
+The uploaded EBS check-in supplies the client Body form: eight 1–10 ratings,
+weight/waist/muscle measurements, Priority Movement (Unchanged/Improved),
+wins and a rotating prompt. All visible answers and ratings are required on
+completion; partial answers save automatically while clients fill in the form. The movement selection is saved per week
+and shown first in Data and in history; older records without it display as not
+recorded. Its own graph steps up for each Improved week and stays level for
+Unchanged. The graph counts reported improvements in the displayed date range;
+missing results stay absent rather than being counted as unchanged.
+Selecting Improved reveals progressive-overload choices: more load moved
+(strength), more reps (endurance), more control (technique) and more range
+(mobility). Clients select one primary form before submitting an Improved result;
+drafts may leave it unanswered. The selection is saved with the week and shown in
+history. Selecting Unchanged hides and clears it. Older records with multiple
+selections remain readable without inventing a primary choice.
+Business is reserved for a future coach admin area. This increment is web only;
+external WhatsApp delivery is deferred at the operator's request.
+
+The opening box is titled “What went well this week? (Wins)”. Its placeholder asks
+what went well, what improved and how the client feels/performs now. The separate
+insight question is reserved for the Quarterly Check-In and is omitted from the
+weekly form. Previously saved lesson answers remain readable in weekly history;
+historical reflection answers remain under the Wins heading.
+
+Measurement guidance asks for weight, waist and the priority muscle group after
+Friday's workout, using the same scales and measuring sites each week. Weight is
+a Friday measurement rather than a weekly average.
+
+The check-in uses the platform's dark background, dark cards and light text,
+matching the supplied colour reference. The form has no next-Saturday notice or
+dashboard shortcut while filling in the form. Complete opens a Progress summary
+with measurement and Priority Movement graphs, score averages, attention points
+and optional score comparisons with a selected past check-in. Continue then opens
+the dashboard. Past check-ins are accessed through the score-comparison selector;
+there is no separate history section at the bottom. Earlier comparison choices
+can be loaded from the same scores card. Progress is hidden while the current
+form is unfinished. Progress graph and section titles
+reuse the check-in title style, including its responsive font size.
+Muscle Gain has a full-width graph of the priority muscle group measurement in
+centimetres. Weight and Waist share a separate two-column row, stacking on phones.
+The scores chart uses horizontal bars filled out of 10, with a second bar for a
+selected past check-in and the numeric difference. Missing ratings remain absent.
+The Score averages trend graph sits directly below the scores chart.
+Separate cards use the page background as spacing; the Wins box is compact, rating
+scales cover about half the desktop card, and the athlete heading is “Think like an
+Athlete”. There is no question swap, visible “Your answer” label, autosave caption
+or ratings-remaining caption. Automatic saving still operates. Data groups
+Priority Movement and its conditional follow-up before a Friday measurements
+subsection with aligned fields and compact guidance.
+
+After setup, a full-screen check-in opens every Saturday at 09:00 in the client's
+enrolled time zone. The current week must be submitted before dashboard or normal
+workflow access is allowed. Automatic draft saving does not unlock the app.
+The only submission button is “Complete”. An incomplete attempt shows “Fill out
+this section then click complete to send it” in red beside each unfinished section
+title, and keeps the client on the form. The reminders clear as sections are filled. PostgreSQL
+stores separate dated records, server submission times and revisions; submitted
+weeks remain readable, with progress charts, comparisons and paginated history.
+The first requirement is the first Saturday on/after enrolment, without creating
+historical requirements for weeks before this feature was enabled. New weeks are
+determined by server time, including after restarts. Account/privacy access and
+sign-out remain available. Verification and CI stay batched at session end.
+
+## Performance Mentor check-in review
+
+The coach-only area at `/mentor/check-ins` lists submitted, unreviewed check-ins
+for explicitly assigned clients. The oldest is expanded initially. Buttons beside
+the client name expand the full answers and open a private AI summary with “What
+went well” and “Needs attention”. Mark reviewed saves the reviewer, submission
+revision and server timestamp, removes the item from the queue and opens the next.
+The original check-in stays in the client account and history without alteration.
+The queue refreshes every 30 seconds and shows the next batch as reviews finish.
+
+Coach access and client assignments are provisioned through `mentor:admin`, never
+from public client input. OpenAI summaries use the existing server-only API key and
+project model, are generated on request and cached per submitted record. Missing
+provider configuration shows an explicit unavailable state; full answers and manual
+review remain usable. This adds the check-in review area; in-app coach messaging is
+not implemented by this increment.
+
+## Quarterly Check-In requirements
+
+The operator reserved “What Insight did you gain? (From error or success)” for a
+Quarterly Check-In alongside progress photos, full-body measurements and body-fat
+percentage. This records the requested quarterly scope; a separate quarterly
+workflow has not been implemented in the weekly-check-in increment.
+
 ## Harry’s revised onboarding
 
 Preferred name and time zone are collected in Account setup before the eight

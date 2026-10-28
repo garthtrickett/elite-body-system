@@ -1,32 +1,51 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { sql } from "kysely";
-import { createAuth, createAuthHttp, createLinkDelivery, createPostgresAuthStore } from "../features/auth/index.ts";
+import { createAuth, createAuthHttp, createLinkDelivery, createPostgresAuthStore, HARRY_PREVIEW_EMAIL } from "../features/auth/index.ts";
 import { createDatabase } from "./database/connection.ts";
 import type { Config } from "./config.ts";
 import { createClientHttp } from "./client-http.ts";
 import { createOnboarding, createS3AssessmentStorage, createGoogleBookingProvider, assessmentUploadOrigin, accountSetupProblem } from "../features/onboarding/index.ts";
 import type { AssessmentStorage } from "../features/onboarding/index.ts";
+import { createWeeklyCheckins, startCheckinWorker, createMentorCheckins, createMentorSummarizer } from "../features/checkins/index.ts";
+import { createMentorHttp } from "./mentor-http.ts";
 
 export function createApplication(config: Config, dependencies: Readonly<{ assessmentStorage?: AssessmentStorage }> = {}) {
   const db = createDatabase(config.databaseUrl);
   const auth = createAuth({ store: createPostgresAuthStore(db), deliverLink: createLinkDelivery(config.delivery),
     publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
   const onboarding = createOnboarding({ db });
+  const mentorCheckins = createMentorCheckins({ db, summarizer: createMentorSummarizer({ ...(config.openAiApiKey ? { apiKey: config.openAiApiKey } : {}) }) });
+  const handleMentor = createMentorHttp({ auth, publicOrigin: config.publicOrigin, checkins: mentorCheckins });
+  const checkins = createWeeklyCheckins({ db, enabled: config.checkinsEnabled !== false, hour: config.checkinHour ?? 9,
+    ...(config.harryPreview && config.delivery.mode === "disabled" ? { previewEmail: HARRY_PREVIEW_EMAIL } : {}), ready: async ({ accountId }) => {
+    if (!config.onboardingEnabled) return true;
+    const result = await onboarding.eligible({ accountId });
+    if (!result.ok) throw new Error("Onboarding eligibility unavailable");
+    return result.value.eligible;
+  } });
+  let checkinWorker: ReturnType<typeof startCheckinWorker> | undefined;
   const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), pageAccess: async ({ accountId, path }) => {
-    if (path === "/account/media" || path === "/account/setup") return { allowed: true };
+    if (path === "/mentor/check-ins") {
+      const access = await mentorCheckins.access({ actorId: accountId });
+      return access.ok ? { allowed: access.value.allowed, forbidden: !access.value.allowed } : { allowed: false, unavailable: true };
+    }
+    if (path === "/account/media" || path === "/account/setup" || path === "/check-in") return { allowed: true };
     if (path !== "/onboarding") {
-      if (!config.onboardingEnabled) return { allowed: true };
-      const access = await onboarding.eligible({ accountId });
+      const access = config.onboardingEnabled ? await onboarding.eligible({ accountId }) : { ok: true as const, value: { eligible: true } };
       if (!access.ok) return { allowed: false, unavailable: true };
-      if (access.value.eligible) return { allowed: true };
+      if (access.value.eligible) {
+        const weekly = await checkins.access({ accountId });
+        if (!weekly.ok) return { allowed: false, unavailable: true };
+        return weekly.value.required ? { allowed: false, redirect: "/check-in" } : { allowed: true };
+      }
     }
     const current = await onboarding.get({ accountId });
     if (!current.ok) return { allowed: false, unavailable: true };
     const setupRequired = !current.value.completedAt && !!accountSetupProblem(current.value.answers.routine);
     return { allowed: path === "/onboarding" && !setupRequired, redirect: setupRequired ? "/account/setup" : "/onboarding" };
   } });
-  const handleClient = createClientHttp({ auth, db, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
+  const handleClient = createClientHttp({ auth, db, checkins, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
     ...(config.googleBooking ? { bookingProvider: createGoogleBookingProvider(config.googleBooking) } : {}),
     ...(dependencies.assessmentStorage ? { assessmentStorage: dependencies.assessmentStorage } : config.assessmentStorage ? { assessmentStorage: createS3AssessmentStorage(config.assessmentStorage) } : {}), ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });
   const assets = new Map([
@@ -50,7 +69,8 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
         response.writeHead(200, { "Content-Type": asset.type, "X-Content-Type-Options": "nosniff" });
         response.end(contents); return;
       }
-      if (path.startsWith("/api/client/")) await handleClient(request, response);
+      if (path.startsWith("/api/mentor/")) await handleMentor(request, response);
+      else if (path.startsWith("/api/client/")) await handleClient(request, response);
       else await handle(request, response);
     }
     void route().catch(() => {
@@ -63,7 +83,9 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
   server.headersTimeout = 10_000;
   return {
     auth, server,
+    startBackgroundWork(): void { if (config.checkinsEnabled !== false && !checkinWorker) checkinWorker = startCheckinWorker({ db, checkins }); },
     async close(): Promise<void> {
+      await checkinWorker?.stop();
       await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
       await db.destroy();
     },

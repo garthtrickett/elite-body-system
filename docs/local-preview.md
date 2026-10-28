@@ -18,6 +18,56 @@ and legal acceptance remain incomplete; no approval or medical clearance was
 invented. The private `seed.mjs` creates that profile only if none exists and
 does not reset later edits.
 
+The Body check-in is at `/check-in`, also available through Weekly check-in in
+navigation. It uses the persistent preview database. On weekdays before the first
+Saturday, partial answers save automatically without a Save draft button;
+Complete submits only when all visible answers and ratings are filled. Incomplete
+sections show red reminders after a Complete attempt. Submission opens Saturday at
+09:00 in the enrolled time zone. When due, the form fills the screen and normal
+app access is blocked until submission. Complete opens the Progress summary;
+Continue then opens the dashboard. Each week's submitted record, progress
+charts and history are saved per account. Business and external WhatsApp delivery
+are deferred. Refresh the preview after an edit to see it.
+
+## Temporary Complete walkthrough
+
+For Harry’s synthetic account only, Complete currently opens Progress without
+requiring all answers or waiting for Saturday. Partial edits finish autosaving
+first. The summary uses the entered values; missing values stay absent. It does
+not invent scores or record an incomplete form as a submitted check-in. Back to
+check-in allows repeated walkthroughs, and Continue opens the dashboard.
+
+This exception requires both `AUTH_HARRY_PREVIEW=true` and `EMAIL_MODE=disabled`,
+which is rejected in production, and the fixed preview account email. Ordinary
+client validation and submission timing remain enforced by the server. The
+preview account is exempt from the weekly dashboard gate during this walkthrough.
+Remove the `previewEmail` composition in `application.ts` to end the exception.
+
+## Performance Mentor preview
+
+The check-in review area is `/mentor/check-ins`. The shared synthetic preview
+account has a mentor grant assigned only to itself, so it can demonstrate both
+sides without access to other accounts. It does not auto-grant production roles or
+assign real clients. Submitted check-ins appear in the review queue, the first
+opens by default, and marking reviewed removes it while preserving its history.
+
+AI summary code uses `OPENAI_API_KEY`, which is not configured in this local
+preview. The summary panel states this explicitly; full answers and review remain
+available. Do not claim live AI summaries have been verified. No external provider
+call was made during these edits.
+
+For provisioned coach accounts, trusted administration uses:
+
+```sh
+npm run mentor:admin -- grant COACH_EMAIL
+npm run mentor:admin -- assign COACH_EMAIL CLIENT_EMAIL
+npm run mentor:admin -- unassign COACH_EMAIL CLIENT_EMAIL
+npm run mentor:admin -- revoke COACH_EMAIL
+```
+
+Run these only with the intended app environment. There is no browser self-grant
+or public assignment endpoint. Production client assignments remain explicit.
+
 ## Services and private state
 
 Use `work ls` to find the three persistent jobs:

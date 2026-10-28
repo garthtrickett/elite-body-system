@@ -39,10 +39,14 @@ try {
     await response.body.cancel();
   }
   assert.equal(existsSync("scripts/onboarding-admin.ts"), true);
+  assert.equal(existsSync("scripts/mentor-admin.ts"), true);
   const provisioned = await app.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); assert.equal(provisioned.ok, true);
   const preview = await app.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: "onboarding-production-smoke" }); assert.equal(preview.ok, true);
   const headers = { Cookie: `__Host-ebs-session=${preview.value.sessionToken}` };
   const gated = await fetch(origin, { headers, redirect: "manual" }); assert.equal(gated.status, 303); assert.equal(gated.headers.get("location"), "/account/setup"); await gated.body.cancel();
+  const coachPage = await fetch(`${origin}/mentor/check-ins`, { headers, redirect: "manual" }); assert.equal(coachPage.status, 403); await coachPage.body.cancel();
+  const coachApi = await fetch(`${origin}/api/mentor/checkins`, { headers }); assert.equal(coachApi.status, 403); await coachApi.body.cancel();
+  const weekly = await fetch(`${origin}/api/client/checkins`, { headers }); assert.equal(weekly.status, 200); assert.notEqual((await weekly.json()).value.flowPreview, true);
   const setup = await fetch(`${origin}/account/setup`, { headers }); assert.equal(setup.status, 200);
   const setupHtml = await setup.text(); assert.match(setupHtml, /data-page="account-setup"/);
   const csrf = setupHtml.match(/data-csrf="([^"]+)"/)?.[1]; assert.ok(csrf);

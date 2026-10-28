@@ -1,5 +1,105 @@
 # Architecture and operation contracts
 
+## Weekly check-ins
+
+`features/checkins/index.ts` exposes typed account-scoped `get`, `access`, `save`
+and paginated `history` operations. The Body form comes from the uploaded EBS
+prototype; Business and external WhatsApp messaging are outside this increment.
+The browser entry point composes the same SAM runtime and validated HTTP transport.
+Pending effects are correlated; uncertain saves retry their original payload,
+stale tabs receive conflicts, and navigation/unload protects unsaved drafts.
+A route-scoped debounce saves partial edits automatically and flushes on field
+blur or hiding the tab. Each write captures an edit generation and raw measurement
+strings; acknowledgements advance the revision without replacing newer input.
+Complete waits for an in-flight draft acknowledgement before submitting the latest
+answers. Only explicit completion submits; autosave always leaves the gate locked.
+Successful completion stays on a Progress summary and queues one focus effect.
+Graphs, attention points and optional past-score comparisons are shown only after
+the current week is submitted. Continue explicitly navigates to the dashboard.
+
+`weekly_checkin_schedules` records each enrolled client's first Saturday and time
+zone. The web server's bounded enrolment loop also registers inactive clients.
+The account's completed setup enrols them; an existing schedule is retained across
+profile changes and server restarts. If mandatory onboarding is enabled, its
+eligibility remains a prerequisite. The current requirement is calculated from
+server time, each Saturday at the configured hour (09:00 by default), without a
+client-controlled due date or completion flag. Missed weeks do not require invented
+backfilled answers: the current Saturday is required, and earlier records remain.
+
+Page routing, client route resolution and normal-workflow HTTP dispatch all check
+the authoritative weekly requirement. `/check-in` renders a full-screen form with
+no workspace navigation. Shared validation requires Wins, all eight ratings,
+Priority Movement (and its primary overload choice when Improved), all three valid
+measurements and the athlete question answer before completion. An incomplete
+Complete attempt shows the requested red reminder beside each unfinished title.
+Only the committed server submission timestamp unlocks the app. The check-in,
+onboarding, account setup, media preferences and authentication endpoints remain
+accessible. No automatic external messages are sent.
+
+`weekly_checkins` has one record per account/Saturday, with versioned answers, the
+exact prompt, revision, save time and optional submission time. Drafts cannot
+unlock the gate. Account locks serialize submissions, identical retries succeed,
+and completed records cannot be silently overwritten. History and charts use only
+submitted records, retrieve 26 weeks per page and allow loading older pages. Blank
+measurements remain absent and break chart lines instead of becoming zeroes. There
+is no automatic deletion or device-only storage.
+
+Priority Movement is a nullable Unchanged/Improved result stored with each week's
+data. It appears first in Data and has a dedicated step graph counting Improved
+weeks in the loaded history range. Unchanged holds the level; missing results
+break the line. The graph does not claim a measured amount of strength or movement
+gain. Older records without the field load as not recorded.
+
+`CHECKINS_ENABLED=false` pauses requirements and enrolment while preserving access
+to saved history. `CHECKIN_HOUR` accepts a local hour from 0 to 23. The time zone is
+frozen at enrolment so a client profile edit cannot evade the current requirement;
+changing it later is a trusted administration task. The worker starts explicitly
+with the listening web server and drains before the database closes.
+
+### Temporary preview walkthrough
+
+The composition enables `previewEmail` only for disabled email delivery with the
+Harry preview flag. Config rejects that delivery mode in production. Check-in
+snapshots mark `flowPreview` only when the authenticated account matches that
+fixed email, and only that account is exempt from the weekly access gate. Its
+Complete action flushes pending draft saves, then represents a local Progress
+summary without submitting an incomplete record. Empty measurements and scores
+remain absent. Server submission validation is unchanged. Back to check-in permits
+repeated walkthroughs, and Continue uses normal navigation. No demo results enter
+client history or the coach review queue.
+
+## Performance Mentor reviews
+
+`createMentorCheckins` is the check-in slice’s account-scoped coach interface for
+access, queue, summary, review and client history. The trusted `mentor:admin` CLI
+grants a provisioned account the mentor role and assigns individual clients.
+`performance_mentors` and `mentor_clients` constrain access; neither can be written
+from HTTP. `/mentor/check-ins` checks the role before serving its document or route
+JSON, and `/api/mentor/checkins*` checks the session and assigned client on every
+operation. Mentor routes are independent of the client onboarding/check-in gate.
+
+The pending queue joins submitted records with coach assignments and excludes
+`weekly_checkin_reviews`. It returns the oldest 50 and a total count, refreshing
+as reviews remove entries. Review writes lock the assignment and submitted record,
+check the expected revision, and insert one idempotent receipt with reviewer and
+server time. They never delete or change the client submission. Account cascades
+remove owned data; deleting a reviewer retains the receipt with a null reviewer.
+
+The coach SAM loop correlates effects, ignores stale completions and removes an
+item only after the server acknowledges review. Uncertain review writes block
+navigation until their identical retry resolves. The next oldest item then opens.
+Full answers and paginated history remain available independently of AI.
+
+The summary adapter follows OpenAI Responses structured outputs, uses the existing
+`gpt-6-luna` model, `store: false`, a server-only key and a fixed output schema. Only
+the selected submission and up to three earlier check-ins enter the request; no
+account IDs, contact details or other clients are included. Client text is treated
+as data. Output is validated before caching in `weekly_checkin_summaries`, with its
+source revision, model and timestamp. Per-process generation is coalesced and
+bounded to four active summaries; failures are explicit and do not prevent review.
+The provider is not called by client submission, and summaries are not returned by
+client endpoints. The UI labels them as AI preparation for the coach’s review.
+
 ## Versioned onboarding
 
 `features/onboarding/index.ts` owns the `harry-v2` operations, private media

@@ -70,7 +70,7 @@ export function createAuthenticatedHttp(config: Readonly<{
   };
 }
 
-export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean; redirect?: "/onboarding" | "/account/setup" }>> }>):
+export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean; forbidden?: boolean; redirect?: "/onboarding" | "/account/setup" | "/check-in" }>> }>):
   (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   const { auth, publicOrigin } = config;
   const secure = publicOrigin.startsWith("https:");
@@ -102,6 +102,7 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
         if (config.pageAccess) {
           const access = await config.pageAccess({ accountId: session.value.id, path });
           if (access.unavailable) { failure(response, 503, "unavailable"); return; }
+          if (access.forbidden) { json(response, 403, { ok: false, error: { code: "forbidden", message: "This page requires a Performance Mentor account." } }); return; }
           if (!access.allowed) { response.writeHead(303, { Location: access.redirect ?? "/onboarding", "Cache-Control": "no-store" }); response.end(); return; }
         }
       }

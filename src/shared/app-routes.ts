@@ -1,6 +1,8 @@
 export const APP_ROUTES = {
   "/": { page: "scorecard", title: "Scorecard" },
   "/training": { page: "training", title: "Training" },
+  "/check-in": { page: "checkin", title: "Weekly check-in" },
+  "/mentor/check-ins": { page: "mentor-checkins", title: "Check-ins · Performance Mentor" },
   "/meals": { page: "meals", title: "Meals" },
   "/mindset/map": { page: "map", title: "Neural Map" },
   "/courses/mindset": { page: "mindset", title: "Mindset" },
