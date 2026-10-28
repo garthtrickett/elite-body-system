@@ -13,11 +13,13 @@ website or YouTube.
    misconception, method, proof and next action. Speak naturally into a voice note,
    upload an audio file or type. Each recording is limited to two minutes and
    audio files to 8 MB. Check the transcript. Raw audio is sent for transcription
-   but is not retained in the application database.
-3. **Build:** all six answers and a source/client angle are required. The system
-   arranges your own answers into a concise blog and a corresponding video script.
-   It does not invent personal experiences, client outcomes or scientific claims.
-   Edit the drafts before using them. Rebuilding replaces both output drafts.
+   but is not retained in the application database. A temporary failure keeps the
+   audio in browser memory for manual retry or discard; closing the page removes it.
+3. **Build:** all six answers and a source/client angle are required. The connected writing service edits your supplied answers into clear, short
+   sections; the application inserts your proof verbatim into the blog and script.
+   With no provider key, the preview arranges the original answers as an editable
+   draft. Check every claim before using either output; do not publish unsupported
+   experiences or outcomes. Rebuilding replaces both output drafts.
 4. **Pictures:** add HTTPS URLs for owned/approved images, diagrams or results.
    Captions explain the point. Client material must already have the relevant
    permission; this workspace does not grant it.
@@ -45,7 +47,8 @@ on-screen draft; save it as well to retain those edits in the library.
   minute: two HTTP calls for research and one for voice, with at least ten seconds
   between operations.
   Other applications sharing the account also consume its quota; set this to the
-  allowance reserved for this workspace. Daily YouTube quota and token/audio
+  allowance reserved for this workspace. Writing requests also count as one call.
+  Daily YouTube quota and token/audio
   limits are separate provider constraints.
 - One marketing provider operation runs at a time per app process. A provider 429
   pauses subsequent manual requests for Retry-After (bounded 10 seconds–15 minutes,

@@ -26,6 +26,9 @@ export type MarketingEffect = Readonly<{
     kind: "recordStop";
     key: AnswerKey;
 }> | Readonly<{
+    kind: "discardVoice";
+    uploadId: string;
+}> | Readonly<{
     kind: "download";
     article: Article;
     format: "markdown" | "html";
@@ -39,12 +42,23 @@ export type MarketingModel = Readonly<{
     query: string;
     topics: readonly Topic[];
     recording: AnswerKey | null;
+    voiceRetry: Readonly<{
+        key: AnswerKey;
+        uploadId: string;
+    }> | null;
     serial: number;
     pending: MarketingEffect | undefined;
     error: string;
     notice: string;
 }>;
 export type MarketingProposal = Readonly<{
+    kind: "retryVoice";
+}> | Readonly<{
+    kind: "discardVoice";
+}> | Readonly<{
+    kind: "voiceDiscarded";
+    id: number;
+}> | Readonly<{
     kind: "start";
 }> | Readonly<{
     kind: "older";
@@ -107,6 +121,7 @@ export type MarketingProposal = Readonly<{
 }> | Readonly<{
     kind: "voiced";
     id: number;
+    retryUploadId?: string;
     result: ClientResult<Readonly<{
         text: string;
     }>>;
@@ -117,16 +132,18 @@ export type MarketingProposal = Readonly<{
         downloaded: true;
     }>>;
 }>;
-export const initialMarketing = (): MarketingModel => ({ snapshot: null, article: null, dirty: false, step: "subject", question: 0, query: "", topics: [], recording: null, serial: 0, pending: undefined, error: "", notice: "" });
+export const initialMarketing = (): MarketingModel => ({ snapshot: null, article: null, dirty: false, step: "subject", question: 0, query: "", topics: [], recording: null, voiceRetry: null, serial: 0, pending: undefined, error: "", notice: "" });
 type NewEffect = MarketingEffect extends infer E ? E extends MarketingEffect ? Omit<E, "id"> : never : never;
 function effect(m: MarketingModel, e: NewEffect): MarketingModel { return { ...m, serial: m.serial + 1, pending: { ...e, id: m.serial + 1 }, error: "", notice: "" }; }
 export function acceptMarketing(m: MarketingModel, p: MarketingProposal): MarketingModel {
     if ("id" in p && typeof p.id === "number") {
         if (!m.pending || m.pending.id !== p.id)
             return m;
-        const replies: Readonly<Record<MarketingEffect["kind"], MarketingProposal["kind"]>> = { load: "loaded", save: "saved", research: "researched", voice: "voiced", recordStart: "recordStarted", recordStop: "voiced", download: "downloaded" };
+        const replies: Readonly<Record<MarketingEffect["kind"], MarketingProposal["kind"]>> = { load: "loaded", save: "saved", research: "researched", voice: "voiced", recordStart: "recordStarted", recordStop: "voiced", download: "downloaded", discardVoice: "voiceDiscarded" };
         if (replies[m.pending.kind] !== p.kind)
             return m;
+        if (p.kind === "voiceDiscarded")
+            return { ...m, voiceRetry: null, pending: undefined, notice: "Voice note discarded." };
         if (p.kind === "loaded")
             return p.result.ok ? { ...m, snapshot: m.pending.kind === "load" && m.pending.before && m.snapshot ? { ...p.result.value, articles: [...m.snapshot.articles, ...p.result.value.articles.filter(a => !m.snapshot!.articles.some(prior => prior.id === a.id))] } : p.result.value, pending: undefined, error: "" } : { ...m, pending: undefined, error: p.result.error.message };
         if (p.kind === "saved") {
@@ -142,7 +159,7 @@ export function acceptMarketing(m: MarketingModel, p: MarketingProposal): Market
             return p.result.ok && m.pending.kind === "recordStart" ? { ...m, recording: m.pending.key, pending: undefined, notice: "Recording. Keep each answer to two minutes." } : { ...m, pending: undefined, error: p.result.ok ? "Recording did not start." : p.result.error.message };
         if (p.kind === "voiced") {
             const key = m.pending.kind === "voice" || m.pending.kind === "recordStop" ? m.pending.key : undefined;
-            return p.result.ok && m.article && key ? { ...m, article: { ...m.article, answers: { ...m.article.answers, [key]: [m.article.answers[key], p.result.value.text].filter(Boolean).join("\n\n") } }, dirty: true, recording: null, pending: undefined, notice: "Transcript added. Read it through and correct anything before building." } : { ...m, recording: null, pending: undefined, error: p.result.ok ? "Choose an interview question first." : p.result.error.message };
+            return p.result.ok && m.article && key ? { ...m, article: { ...m.article, answers: { ...m.article.answers, [key]: [m.article.answers[key], p.result.value.text].filter(Boolean).join("\n\n") } }, dirty: true, recording: null, voiceRetry: null, pending: undefined, notice: "Transcript added. Read it through and correct anything before building." } : { ...m, recording: null, voiceRetry: key && p.retryUploadId ? { key, uploadId: p.retryUploadId } : null, pending: undefined, error: p.result.ok ? "Choose an interview question first." : p.result.error.message };
         }
         if (p.kind === "downloaded")
             return { ...m, pending: undefined, ...(p.result.ok ? { notice: "Export prepared. Your saved draft stays in Marketing." } : { error: p.result.error.message }) };
@@ -154,6 +171,12 @@ export function acceptMarketing(m: MarketingModel, p: MarketingProposal): Market
         return m.recording ? effect(m, { kind: "recordStop", key: m.recording }) : m;
     if (m.recording)
         return m;
+    if (p.kind === "retryVoice")
+        return m.voiceRetry ? effect(m, { kind: "voice", ...m.voiceRetry }) : m;
+    if (p.kind === "discardVoice")
+        return m.voiceRetry ? effect(m, { kind: "discardVoice", uploadId: m.voiceRetry.uploadId }) : m;
+    if (m.voiceRetry && ["new", "select", "voice", "recordStart", "start"].includes(p.kind))
+        return { ...m, error: "Retry or discard the pending voice note first." };
     if (p.kind === "start")
         return m.dirty ? { ...m, error: "Save your draft before refreshing." } : effect(m, { kind: "load", before: "" });
     if (p.kind === "older")
@@ -187,5 +210,5 @@ export function acceptMarketing(m: MarketingModel, p: MarketingProposal): Market
     return m;
 }
 export function marketingNavigation(m: MarketingModel): NavigationGuard {
-    return m.recording || m.pending ? { kind: "blocked", message: m.recording ? "Stop your voice recording before leaving." : "Finishing this marketing action…" } : m.dirty ? { kind: "confirm", message: "Leave this article? Your unsaved changes will be lost." } : { kind: "ready" };
+    return m.recording || m.pending ? { kind: "blocked", message: m.recording ? "Stop your voice recording before leaving." : "Finishing this marketing action…" } : m.dirty || m.voiceRetry ? { kind: "confirm", message: "Leave this article? Your unsaved changes will be lost." } : { kind: "ready" };
 }

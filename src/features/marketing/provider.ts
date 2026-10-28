@@ -1,6 +1,8 @@
 import { isRecord, isText } from "../../shared/validation.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import type { Topic } from "./data.ts";
+import { editInterview } from "./editorial.ts";
+import type { Article } from "./data.ts";
 import { retryDelay } from "./pacing.ts";
 export function createMarketingProviders(config: Readonly<{
     openAiApiKey?: string;
@@ -20,6 +22,16 @@ export function createMarketingProviders(config: Readonly<{
     };
     return {
         youtubeAvailable: !!config.youtubeApiKey, voiceAvailable: !!config.openAiApiKey,
+        writingAvailable: !!config.openAiApiKey,
+        async draft(input: Readonly<{
+            article: Article;
+        }>) {
+            if (now() < pausedUntil)
+                return throttled();
+            if (!config.openAiApiKey)
+                return { ok: false as const, error: { code: "not_configured" as const, message: "Writing is not connected. Your interview can still be arranged as a draft." } };
+            return editInterview({ apiKey: config.openAiApiKey, send, pause }, input);
+        },
         async research(input: Readonly<{
             query: string;
         }>): Promise<ClientResult<readonly Topic[]>> {
@@ -30,8 +42,10 @@ export function createMarketingProviders(config: Readonly<{
             try {
                 const query = new URLSearchParams({ part: "snippet", type: "video", maxResults: "12", order: "viewCount", publishedAfter: new Date(now() - 90 * 86400000).toISOString(), q: input.query, key: config.youtubeApiKey });
                 const search = await send(`https://www.googleapis.com/youtube/v3/search?${query}`, { signal: AbortSignal.timeout(15000), redirect: "error" });
-                if (pause(search))
+                if (pause(search)) {
+                    await search.body?.cancel();
                     return throttled();
+                }
                 const found: unknown = await search.json();
                 if (!search.ok || !isRecord(found) || !Array.isArray(found.items))
                     throw new Error("Research unavailable");
@@ -39,8 +53,10 @@ export function createMarketingProviders(config: Readonly<{
                 if (!ids.length)
                     return { ok: true, value: [] };
                 const details = await send(`https://www.googleapis.com/youtube/v3/videos?${new URLSearchParams({ part: "snippet,statistics", id: ids.join(","), key: config.youtubeApiKey })}`, { signal: AbortSignal.timeout(15000), redirect: "error" });
-                if (pause(details))
+                if (pause(details)) {
+                    await details.body?.cancel();
                     return throttled();
+                }
                 const value: unknown = await details.json();
                 if (!details.ok || !isRecord(value) || !Array.isArray(value.items))
                     throw new Error("Research unavailable");
@@ -80,8 +96,10 @@ export function createMarketingProviders(config: Readonly<{
                 form.append("model", "gpt-transcribe");
                 form.append("prompt", "Elite Body System by Harry Baldwin. Training, nutrition, mindset, recovery. Transcribe the speaker's experience faithfully.");
                 const response = await send("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${config.openAiApiKey}` }, body: form, redirect: "error", signal: AbortSignal.timeout(60000) });
-                if (pause(response))
+                if (pause(response)) {
+                    await response.body?.cancel();
                     return throttled();
+                }
                 const value: unknown = await response.json();
                 if (!response.ok || !isRecord(value) || !isText(value.text, 24000) || !value.text.trim())
                     throw new Error("No transcript");

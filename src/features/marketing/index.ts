@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { isRecord } from "../../shared/validation.ts";
 import { sql } from "kysely";
 import type { Kysely } from "kysely";
 import type Database from "../../platform/database/generated/Database.ts";
@@ -64,7 +66,28 @@ export function createMarketing(config: Readonly<{
                 return failure("invalid_input", "Add a subject and valid YouTube source, if used.");
             if (input.build && (!a.sourceUrl || !a.angle.trim() || QUESTIONS.some(q => !a.answers[q.key].trim())))
                 return failure("invalid_input", "Add the YouTube source, explain the client relevance and answer all six questions, including a real result or story.");
-            const draft = input.build ? buildDraft(a) : a, data = JSON.stringify(draft);
+            const inputHash = createHash("sha256").update(JSON.stringify(a)).digest("hex");
+            if (input.build) {
+                const prior = await db.selectFrom("marketing_articles").selectAll().where("id", "=", a.id as MarketingArticlesId).executeTakeFirst();
+                if (prior && prior.revision === a.revision + 1 && isRecord(prior.data) && isRecord(prior.data.buildReceipt) && prior.data.buildReceipt.inputHash === inputHash) {
+                    const saved = parseArticle(prior.data);
+                    if (!saved)
+                        throw new Error("Invalid saved draft");
+                    return { ok: true, value: { ...saved, revision: prior.revision, updatedAt: prior.updated_at.toISOString() } };
+                }
+                if (prior && prior.revision !== a.revision || !prior && a.revision !== 0)
+                    return failure("conflict", "This article changed in another tab. Copy your edits before reloading.");
+            }
+            let draft = input.build ? buildDraft(a) : a;
+            if (input.build && provider.writingAvailable) {
+                const edited = await runProvider(() => provider.draft({ article: a }));
+                if (!edited.ok)
+                    return edited;
+                if (!await managerAccess({ db, actorId: input.actorId }))
+                    return failure("forbidden", "Business manager access is required.");
+                draft = { ...a, ...edited.value };
+            }
+            const data = JSON.stringify({ ...draft, ...(input.build ? { buildReceipt: { inputHash } } : {}) });
             if (Buffer.byteLength(data) > 220000)
                 return failure("invalid_input", "This article is too long. Shorten the interview or draft.");
             const row = a.revision === 0 ? await db.insertInto("marketing_articles").values({ id: a.id as MarketingArticlesId, created_by: input.actorId as AccountsId, data }).onConflict(c => c.column("id").doNothing()).returningAll().executeTakeFirst() : await db.updateTable("marketing_articles").set({ data, revision: a.revision + 1, updated_at: new Date() }).where("id", "=", a.id as MarketingArticlesId).where("revision", "=", a.revision).returningAll().executeTakeFirst();

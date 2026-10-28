@@ -74,3 +74,19 @@ test("voice transcription is bounded, faithful and explicit about missing config
   assert.ok(!(await provider.transcribe({ base64: "a".repeat(12 * 1024 * 1024 + 1), mediaType: "audio/webm" })).ok); assert.equal(calls, 0);
   const result = await provider.transcribe({ base64: "YXVkaW8=", mediaType: "audio/webm;codecs=opus" }); assert.ok(result.ok); assert.equal(result.value.text, "The supplied voice note."); assert.equal(calls, 1);
 });
+test("connected writing edits owner answers, keeps the exact proof and never sends identity or secrets in the prompt", async () => {
+  const article = completeArticle(); let calls = 0;
+  const provider = createMarketingProviders({ openAiApiKey: "private-writing-key", send: async (url, init) => {
+    calls++; assert.equal(url, "https://api.openai.com/v1/responses"); const body = JSON.parse(String(init?.body)) as { model: string; store: boolean; input: string; text: { format: { strict: boolean } } }; assert.equal(body.model, "gpt-6-luna"); assert.equal(body.store, false); assert.equal(body.text.format.strict, true); assert.doesNotMatch(body.input, new RegExp(article.id + "|private-writing-key|@example"));
+    return new Response(JSON.stringify({ status: "completed", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ hook: "Make the useful action repeatable.", problem: "Edited problem.", experience: "Edited supplied experience.", mistake: "Edited misconception.", solution: "Edited practical steps.", action: "One next action." }) }] }] }));
+  } });
+  const result = await provider.draft({ article }); assert.ok(result.ok); assert.match(result.value.blog, /Make the useful action repeatable/); assert.ok(result.value.blog.includes(article.answers.proof)); assert.ok(result.value.script.includes(article.answers.proof)); assert.equal(calls, 1);
+});
+test("a throttled voice note stays correlated to its original question until retry or discard", () => {
+  let m = acceptMarketing(initialMarketing(), { kind: "new", id: randomUUID() }); m = acceptMarketing(m, { kind: "voice", key: "proof", uploadId: "browser-audio" }); assert.ok(m.pending);
+  m = acceptMarketing(m, { kind: "voiced", id: m.pending.id, retryUploadId: "browser-audio", result: { ok: false, error: { code: "rate_limited", message: "Wait" } } });
+  assert.equal(m.voiceRetry?.key, "proof"); assert.equal(marketingNavigation(m).kind, "confirm");
+  const blocked = acceptMarketing(m, { kind: "new", id: randomUUID() }); assert.equal(blocked.article?.id, m.article?.id);
+  m = acceptMarketing(m, { kind: "retryVoice" }); assert.ok(m.pending?.kind === "voice"); assert.equal(m.pending.uploadId, "browser-audio"); assert.equal(m.pending.key, "proof");
+  m = acceptMarketing(m, { kind: "voiced", id: m.pending.id, result: { ok: true, value: { text: "The actual supplied result." } } }); assert.equal(m.voiceRetry, null); assert.equal(m.article?.answers.proof, "The actual supplied result.");
+});

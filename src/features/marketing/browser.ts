@@ -14,7 +14,7 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
     csrf: string;
 }>) {
     const scope = new AbortController(), call = createClientTransport({ csrf: config.csrf, send: fetch, signal: scope.signal });
-    const uploads = new Map<string, File>();
+    const uploads = new Map<string, Blob>();
     let recorder: MediaRecorder | undefined, stream: MediaStream | undefined, timer: number | undefined;
     let chunks: Blob[] = [], audioSize = 0, disposed = false;
     const release = () => { window.clearTimeout(timer); stream?.getTracks().forEach(t => t.stop()); stream = undefined; recorder = undefined; chunks = []; audioSize = 0; };
@@ -26,6 +26,14 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
         const base64 = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onerror = () => reject(new Error("Audio unavailable")); reader.onload = () => typeof reader.result === "string" ? resolve(reader.result.slice(reader.result.indexOf(",") + 1)) : reject(new Error("Invalid audio")); reader.readAsDataURL(blob); });
         return call({ path: "/api/marketing/voice", body: { base64, mediaType: blob.type || "audio/mp4" }, timeout: 75000, parse: v => isRecord(v) && isText(v.text, 24000) ? { text: v.text } : undefined });
     }
+    async function processVoice(id: number, uploadId: string, blob: Blob): Promise<MarketingProposal> {
+        uploads.set(uploadId, blob);
+        const result = await transcribe(blob).catch(() => unavailable("This voice note could not be read. Try again."));
+        const retain = !result.ok && result.error.code !== "invalid_input";
+        if (!retain)
+            uploads.delete(uploadId);
+        return { kind: "voiced", id, result, ...(retain ? { retryUploadId: uploadId } : {}) };
+    }
     const runtime = createSamRuntime<MarketingModel, MarketingProposal, MarketingModel, MarketingEffect>({
         initial: initialMarketing(), accept: acceptMarketing, represent: m => m, next: m => m.pending,
         present: state => {
@@ -33,7 +41,8 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
                     const id = crypto.randomUUID();
                     uploads.set(id, file);
                     runtime.propose({ kind: "voice", key, uploadId: id });
-                    if (runtime.getModel().pending?.kind !== "voice")
+                    const accepted = runtime.getModel().pending;
+                    if (accepted?.kind !== "voice" || accepted.uploadId !== id)
                         uploads.delete(id);
                 } }), root);
             config.navigationChanged(marketingNavigation(state));
@@ -42,13 +51,12 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
             if (e.kind === "load")
                 return { kind: "loaded", id: e.id, result: await call({ path: `/api/marketing/snapshot?before=${encodeURIComponent(e.before)}`, parse: parseMarketing }) };
             if (e.kind === "save")
-                return { kind: "saved", id: e.id, result: await call({ path: "/api/marketing/save", body: { article: e.article, build: e.build }, parse: parseArticle }) };
+                return { kind: "saved", id: e.id, result: await call({ path: "/api/marketing/save", body: { article: e.article, build: e.build }, timeout: 75000, parse: parseArticle }) };
             if (e.kind === "research")
                 return { kind: "researched", id: e.id, result: await call({ path: "/api/marketing/research", body: { query: e.query }, timeout: 40000, parse: parseTopics }) };
             if (e.kind === "voice") {
                 const file = uploads.get(e.uploadId);
-                uploads.delete(e.uploadId);
-                return { kind: "voiced", id: e.id, result: file ? await transcribe(file) : unavailable("Choose your voice note again.") };
+                return file ? processVoice(e.id, e.uploadId, file) : { kind: "voiced", id: e.id, result: unavailable("Choose your voice note again.") };
             }
             if (e.kind === "recordStart") {
                 try {
@@ -87,7 +95,11 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
                     return { kind: "voiced", id: e.id, result: unavailable("No recording was available. Please try again or upload a voice note.") };
                 }
                 const blob = await new Promise<Blob>((resolve, reject) => { active.onerror = () => reject(new Error("Recording interrupted")); active.onstop = () => { const result = new Blob(chunks, { type: active.mimeType }); release(); resolve(result); }; active.stop(); });
-                return { kind: "voiced", id: e.id, result: await transcribe(blob) };
+                return processVoice(e.id, `recorded-${e.id}`, blob);
+            }
+            if (e.kind === "discardVoice") {
+                uploads.delete(e.uploadId);
+                return { kind: "voiceDiscarded", id: e.id };
             }
             const content = e.format === "markdown" ? notionMarkdown(e.article, location.origin) : brandedDocument({ article: e.article, origin: location.origin });
             const blob = new Blob([content], { type: e.format === "markdown" ? "text/markdown;charset=utf-8" : "text/html;charset=utf-8" });
@@ -102,7 +114,7 @@ export function mountMarketing(root: HTMLElement, config: RouteHost & Readonly<{
             if (e.kind === "recordStart" || e.kind === "recordStop")
                 release();
             const result = unavailable("This marketing action could not finish. Your current answers are still on this page.");
-            return e.kind === "load" ? { kind: "loaded", id: e.id, result } : e.kind === "save" ? { kind: "saved", id: e.id, result } : e.kind === "research" ? { kind: "researched", id: e.id, result } : e.kind === "recordStart" ? { kind: "recordStarted", id: e.id, result } : e.kind === "recordStop" || e.kind === "voice" ? { kind: "voiced", id: e.id, result } : { kind: "downloaded", id: e.id, result };
+            return e.kind === "discardVoice" ? { kind: "voiceDiscarded", id: e.id } : e.kind === "load" ? { kind: "loaded", id: e.id, result } : e.kind === "save" ? { kind: "saved", id: e.id, result } : e.kind === "research" ? { kind: "researched", id: e.id, result } : e.kind === "recordStart" ? { kind: "recordStarted", id: e.id, result } : e.kind === "recordStop" || e.kind === "voice" ? { kind: "voiced", id: e.id, result } : { kind: "downloaded", id: e.id, result };
         },
     });
     const protect = (e: BeforeUnloadEvent) => {
