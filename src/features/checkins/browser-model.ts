@@ -54,7 +54,10 @@ export function acceptCheckinProposal(model: CheckinModel, proposal: CheckinProp
   if (proposal.kind === "completed") {
     if (model.pending?.id !== proposal.id || model.pending.kind !== proposal.effectKind) return model;
     if (!proposal.result.ok) return { ...model, pending: undefined, submitRequested: false, error: proposal.result.error.message, retry: model.pending, uncertain: proposal.effectKind === "save" && proposal.result.error.code === "unavailable", reloadRequired: proposal.result.error.code === "conflict" };
-    const snapshot = proposal.result.value, saving = model.pending.kind === "save", draft = snapshot.current?.answers ?? blankAnswers(snapshot.week);
+    const incoming = proposal.result.value;
+    const retained = model.snapshot?.week === incoming.week && model.snapshot.history.length > incoming.history.length ? model.snapshot : undefined;
+    const snapshot = retained ? { ...incoming, history: [...incoming.history, ...retained.history.filter(entry => !incoming.history.some(current => current.week === entry.week))], nextCursor: retained.nextCursor } : incoming;
+    const saving = model.pending.kind === "save", draft = snapshot.current?.answers ?? blankAnswers(snapshot.week);
     const dirty = saving && model.pending.kind === "save" && model.generation !== model.pending.generation;
     const updated: CheckinModel = { ...model, snapshot, draft: saving ? model.draft : draft, raw: saving ? model.raw : snapshot.current?.rawMeasurements ?? { weight: "", waist: "", muscle: "" }, pending: undefined, retry: undefined, dirty, uncertain: false, reloadRequired: false, error: "", status: saving && !dirty ? snapshot.current?.submittedAt ? "Check-in complete." : "Saved automatically." : "" };
     if (model.pending.kind === "save" && model.pending.submit && snapshot.current?.submittedAt && !snapshot.required) return queue({ ...updated, submitRequested: false }, { kind: "focusProgress" });

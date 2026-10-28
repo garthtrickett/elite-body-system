@@ -78,3 +78,11 @@ test("Unchanged clears primary overload and Improved requires exactly one primar
   model = accept(model, { kind: "priorityMovement", value: "improved" }); model = accept(model, { kind: "submit" }); assert.deepEqual(representCheckin(model).incomplete, ["data"]);
   model = accept(model, { kind: "progressiveOverload", value: "control" }); model = accept(model, { kind: "progressiveOverload", value: "range" }); assert.deepEqual(model.draft.data.progressiveOverload, ["range"]);
 });
+
+test("refresh retains loaded older comparisons for the same week", () => {
+  const latest = checkinEntry({ submittedAt: "2026-10-24T10:00:00Z" }), older = checkinEntry({ week: "2026-10-17", submittedAt: "2026-10-17T10:00:00Z" });
+  let model = loaded(checkinSnapshot({ current: latest, history: [latest, older], required: false }));
+  model = accept(model, { kind: "compare", week: older.week }); model = accept(model, { kind: "refresh" });
+  model = accept(model, { kind: "completed", id: model.pending!.id, effectKind: "load", result: { ok: true, value: checkinSnapshot({ current: latest, history: [latest], nextCursor: latest.week, required: false }) } });
+  assert.equal(model.compareWeek, older.week); assert.equal(model.snapshot?.history.length, 2); assert.equal(model.snapshot?.nextCursor, null);
+});

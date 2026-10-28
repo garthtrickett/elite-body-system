@@ -77,14 +77,22 @@ test("phone check-in is compact, has consistent Data labels and no overflowing c
 });
 test("temporary Harry walkthrough opens Progress from an empty form without creating a fake submission", async ({ page }) => {
   const preview = await startTestApp({ harryPreview: true, previewFlow: true, checkinsEnabled: true });
+  let restore = async () => {};
   try {
     const account = await preview.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); if (!account.ok) throw new Error("Account unavailable");
-    const existing = await db.selectFrom("client_profiles").select("revision").where("account_id", "=", account.value.id as AccountsId).executeTakeFirst();
+    const owner = account.value.id as AccountsId;
+    const existing = await db.selectFrom("client_profiles").selectAll().where("account_id", "=", owner).executeTakeFirst();
+    const schedule = await db.selectFrom("weekly_checkin_schedules").select("account_id").where("account_id", "=", owner).executeTakeFirst();
+    restore = async () => {
+      if (existing) await db.updateTable("client_profiles").set({ data: storedJson(existing.data), revision: existing.revision, updated_at: existing.updated_at }).where("account_id", "=", owner).execute();
+      else await db.deleteFrom("client_profiles").where("account_id", "=", owner).execute();
+      if (!schedule) await db.deleteFrom("weekly_checkin_schedules").where("account_id", "=", owner).execute();
+    };
     expect(await createPostgresProfileStore(db).write({ accountId: account.value.id, revision: existing?.revision ?? 0, profile: completedProfile() })).toBeTruthy();
     const session = await preview.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: randomUUID() }); if (!session.ok) throw new Error("Session unavailable");
     await page.context().addCookies([{ name: "ebs-session", value: session.value.sessionToken, httpOnly: true, sameSite: "Lax", url: preview.origin }]); await page.goto(preview.origin + "/check-in");
     await page.getByRole("button", { name: "Complete", exact: true }).click(); await expect(page.getByRole("heading", { name: "Progress", exact: true })).toBeVisible();
     await expect(page.getByRole("meter")).toHaveCount(0); await page.getByRole("button", { name: "Back to check-in", exact: true }).click(); await expect(page.getByRole("button", { name: "Complete", exact: true })).toBeVisible();
     const rows = await db.selectFrom("weekly_checkins").select("submitted_at").where("account_id", "=", account.value.id as AccountsId).execute(); expect(rows.every(row => row.submitted_at === null)).toBe(true);
-  } finally { await preview.close(); }
+  } finally { await preview.close(); await restore(); }
 });
