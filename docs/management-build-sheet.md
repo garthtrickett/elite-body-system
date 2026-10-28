@@ -18,7 +18,24 @@ invent a provider quota. Honour Retry-After and stop automatic retry loops.
 | 9 | Member portal preserved; Mentor clients/messages/progress/programming/check-ins | Complete; synthetic exchanges, community, future programming and member provisioning inspected |
 | 10 | YouTube topic → experience interview/voice notes → proof → blog/script | Complete; interview, saved drafts and both exports inspected; provider keys absent locally |
 | 11 | Simple illustrated Notion formatting and Free Value CTA | Markdown and branded HTML export implemented; direct Notion connection outstanding |
-| 12 | Isolated full verification, exact-head CI, merge and Railway release | Build complete; isolated regression verification next |
+| 12 | Isolated full verification, exact-head CI, merge and Railway release | Local full verification passed; exact-head CI and release follow |
+
+## Local release qualification
+
+The isolated release checkout passed `npm run verify` at `ba15d8b`: lint,
+TypeScript, conventions, schema generation, 207 passing core tests and all 122
+browser tests. One S3 wire test is intentionally skipped without its fixture;
+the separate S3 fixture run passed all three tests with no skips.
+
+The production Docker image built and passed its PostgreSQL migration and runtime
+checks: non-root execution, cookies, public assets, private paths, master/mentor
+access controls, onboarding and the existing client gate. Generated schema types
+had no diff, tracked source hashes remained unchanged throughout the run, and the
+checkout stayed clean. The final follow-up changes only preview/release documents.
+GitHub CI must pass for that exact final head before merging and deploying.
+
+Provider tests use deterministic responses. Live OpenAI requests, YouTube research
+and direct Notion publication have not been verified with owner connections.
 
 ## Decisions
 
