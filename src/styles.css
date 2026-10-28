@@ -690,3 +690,8 @@ body:has(.sc-dialog[open]) { overflow: hidden; }
   .ci-form-actions { align-items: stretch; }.ci-form-actions .ci-primary { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .ci-page button:active:not(:disabled) { transform: none; } }
+/* Short desktop windows need the whole sidebar to scroll; taller windows keep account links pinned. */
+@media (min-width: 1024px) and (max-height: 700px) {
+  .sc-sidebar { overflow-y: auto; }
+  .sc-sidebar-nav, .sc-sidebar-scroll { flex: none; min-height: auto; overflow: visible; }
+}
