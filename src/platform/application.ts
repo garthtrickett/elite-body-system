@@ -10,12 +10,25 @@ import type { AssessmentStorage } from "../features/onboarding/index.ts";
 import { createWeeklyCheckins, startCheckinWorker, createMentorCheckins, createMentorSummarizer } from "../features/checkins/index.ts";
 import { createMentorHttp } from "./mentor-http.ts";
 
+import { createPublicSales, createSalesManagement } from "../features/sales/index.ts";
+import { createDelivery } from "../features/delivery/index.ts";
+import { createDeliveryHttp } from "./delivery-http.ts";
+import { createMarketing } from "../features/marketing/index.ts";
+import { createMarketingHttp } from "./marketing-http.ts";
+import { createSalesHttp } from "./sales-http.ts";
+
 export function createApplication(config: Config, dependencies: Readonly<{ assessmentStorage?: AssessmentStorage }> = {}) {
   const db = createDatabase(config.databaseUrl);
   const auth = createAuth({ store: createPostgresAuthStore(db), deliverLink: createLinkDelivery(config.delivery),
     publicOrigin: config.publicOrigin, rateKey: config.rateKey, harryPreview: config.harryPreview === true });
+  const management = createSalesManagement({ db });
+  const marketing = createMarketing({ db, ...(config.marketingProviderRpm ? { requestsPerMinute: config.marketingProviderRpm } : {}), ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}), ...(config.youtubeApiKey ? { youtubeApiKey: config.youtubeApiKey } : {}) });
+  const handleMarketing = createMarketingHttp({ auth, publicOrigin: config.publicOrigin, marketing });
+  const handleSales = createSalesHttp({ auth, publicOrigin: config.publicOrigin, publicSales: createPublicSales({ db }), management });
   const onboarding = createOnboarding({ db });
   const mentorCheckins = createMentorCheckins({ db, summarizer: createMentorSummarizer({ ...(config.openAiApiKey ? { apiKey: config.openAiApiKey } : {}) }) });
+  const delivery = createDelivery({ db, checkins: mentorCheckins, auth });
+  const handleDelivery = createDeliveryHttp({ auth, publicOrigin: config.publicOrigin, delivery });
   const handleMentor = createMentorHttp({ auth, publicOrigin: config.publicOrigin, checkins: mentorCheckins });
   const checkins = createWeeklyCheckins({ db, enabled: config.checkinsEnabled !== false, hour: config.checkinHour ?? 9,
     ...(config.harryPreview && config.delivery.mode === "disabled" ? { previewEmail: HARRY_PREVIEW_EMAIL } : {}), ready: async ({ accountId }) => {
@@ -25,8 +38,12 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
     return result.value.eligible;
   } });
   let checkinWorker: ReturnType<typeof startCheckinWorker> | undefined;
-  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), pageAccess: async ({ accountId, path }) => {
-    if (path === "/mentor/check-ins") {
+  const handle = createAuthHttp({ auth, publicOrigin: config.publicOrigin, ...(config.masterEmail ? { masterEmail: config.masterEmail } : {}), masterPreview: config.harryPreview === true && config.delivery.mode === "disabled", ...(config.assessmentStorage ? { uploadOrigin: assessmentUploadOrigin(config.assessmentStorage) } : {}), pageAccess: async ({ accountId, path }) => {
+    if (path.startsWith("/manage") || path === "/master") {
+      const access = await management.access({ actorId: accountId });
+      return access.ok ? { allowed: access.value.allowed, forbidden: !access.value.allowed } : { allowed: false, unavailable: true };
+    }
+    if (path === "/mentor/check-ins" || path === "/mentor") {
       const access = await mentorCheckins.access({ actorId: accountId });
       return access.ok ? { allowed: access.value.allowed, forbidden: !access.value.allowed } : { allowed: false, unavailable: true };
     }
@@ -45,7 +62,7 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
     const setupRequired = !current.value.completedAt && !!accountSetupProblem(current.value.answers.routine);
     return { allowed: path === "/onboarding" && !setupRequired, redirect: setupRequired ? "/account/setup" : "/onboarding" };
   } });
-  const handleClient = createClientHttp({ auth, db, checkins, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
+  const handleClient = createClientHttp({ auth, db, checkins, delivery, publicOrigin: config.publicOrigin, onboardingEnabled: config.onboardingEnabled === true,
     ...(config.googleBooking ? { bookingProvider: createGoogleBookingProvider(config.googleBooking) } : {}),
     ...(dependencies.assessmentStorage ? { assessmentStorage: dependencies.assessmentStorage } : config.assessmentStorage ? { assessmentStorage: createS3AssessmentStorage(config.assessmentStorage) } : {}), ...(config.openAiApiKey ? { openAiApiKey: config.openAiApiKey } : {}) });
   const assets = new Map([
@@ -55,6 +72,7 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
     ["/assets/fonts/instrument-serif-italic.woff2", { file: new URL("../../dist/fonts/instrument-serif-italic.woff2", import.meta.url), type: "font/woff2" }],
     ["/assets/fonts/geist.woff2", { file: new URL("../../dist/fonts/geist.woff2", import.meta.url), type: "font/woff2" }],
   ]);
+  for (const name of ["band.jpg", "hero.jpg", "portrait.jpg", "logo.png"]) assets.set(`/assets/sales/${name}`, { file: new URL(`../assets/sales/${name}`, import.meta.url), type: name.endsWith("png") ? "image/png" : "image/jpeg" });
   const server = createServer((request, response) => {
     async function route(): Promise<void> {
       const path = new URL(request.url ?? "/", config.publicOrigin).pathname;
@@ -66,10 +84,13 @@ export function createApplication(config: Config, dependencies: Readonly<{ asses
       const asset = assets.get(path);
       if (request.method === "GET" && asset) {
         const contents = await readFile(asset.file);
-        response.writeHead(200, { "Content-Type": asset.type, "X-Content-Type-Options": "nosniff" });
+        response.writeHead(200, { "Content-Type": asset.type, "X-Content-Type-Options": "nosniff", ...(asset.type === "font/woff2" ? { "Access-Control-Allow-Origin": "*" } : {}) });
         response.end(contents); return;
       }
-      if (path.startsWith("/api/mentor/")) await handleMentor(request, response);
+      if (["/free-value", "/apply", "/book-call", "/client-stories"].includes(path) || path.startsWith("/api/sales/") || path.startsWith("/api/management/")) await handleSales(request, response);
+      else if (path.startsWith("/api/marketing/")) await handleMarketing(request, response);
+      else if (path.startsWith("/api/mentor/delivery/")) await handleDelivery(request, response);
+      else if (path.startsWith("/api/mentor/")) await handleMentor(request, response);
       else if (path.startsWith("/api/client/")) await handleClient(request, response);
       else await handle(request, response);
     }

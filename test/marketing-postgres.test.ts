@@ -1,0 +1,38 @@
+import { before, after, test } from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { createDatabase } from "../src/platform/database/connection.ts";
+import type { AccountsId } from "../src/platform/database/generated/public/Accounts.ts";
+import { createMarketing } from "../src/features/marketing/index.ts";
+import { emptyArticle } from "../src/features/marketing/data.ts";
+import { startTestApp, testDatabaseUrl } from "./support/app.ts";
+const db = createDatabase(testDatabaseUrl()), ids: AccountsId[] = [];
+const marketing = createMarketing({ db });
+let app: Awaited<ReturnType<typeof startTestApp>>, manager: AccountsId, other: AccountsId;
+before(async () => { app = await startTestApp(); for (const name of ["manager", "member"]) { const a = await app.auth.provisionAccount({ email: `marketing-${name}-${randomUUID()}@example.test` }); assert.ok(a.ok); ids.push(a.value.id as AccountsId); } manager = ids[0]!; other = ids[1]!; await db.insertInto("business_managers").values({ account_id: manager }).execute(); });
+after(async () => { await db.deleteFrom("marketing_articles").where("created_by","in",ids).execute(); await db.deleteFrom("accounts").where("id", "in", ids).execute(); await app.close(); await db.destroy(); });
+test("marketing library is manager-only and saves partial interviews without publishing", async () => {
+  assert.ok(!(await marketing.get({ actorId: other })).ok);
+  const article = { ...emptyArticle(randomUUID()), title: "A real subject" };
+  assert.ok(!(await marketing.save({ actorId: other, article })).ok);
+  const saved = await marketing.save({ actorId: manager, article }); assert.ok(saved.ok); assert.equal(saved.value.revision, 1);
+  const repeated = await marketing.save({ actorId: manager, article }); assert.ok(repeated.ok); assert.equal(repeated.value.revision, 1);
+  const library = await marketing.get({ actorId: manager }); assert.ok(library.ok); assert.ok(library.value.articles.some(a => a.id === article.id)); assert.equal(library.value.voiceAvailable, false);
+  assert.ok(!(await marketing.save({ actorId: manager, article: saved.value, build: true })).ok);
+});
+test("building requires all six real-answer fields and concurrent edits cannot silently overwrite", async () => {
+  const article = { ...emptyArticle(randomUUID()), title: "A clear point", sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk", angle: "An efficient repeatable week", answers: { problem: "Diary pressure", experience: "Supplied personal experience", mistake: "Too much complexity", solution: "Choose repeatable actions", proof: "", action: "Protect the next session" } };
+  const missing = await marketing.save({ actorId: manager, article, build: true }); assert.ok(!missing.ok && missing.error.code === "invalid_input");
+  const complete = { ...article, answers: { ...article.answers, proof: "Supplied real story with its actual result" } };
+  const saved = await marketing.save({ actorId: manager, article: complete, build: true }); assert.ok(saved.ok); assert.match(saved.value.blog, /Supplied real story/);
+  const writes = await Promise.all([marketing.save({ actorId: manager, article: { ...saved.value, title: "Tab one" } }), marketing.save({ actorId: manager, article: { ...saved.value, title: "Tab two" } })]); assert.equal(writes.filter(r => r.ok).length, 1); assert.ok(writes.some(r => !r.ok && r.error.code === "conflict"));
+  const winning = writes.find(r => r.ok); assert.ok(winning?.ok);
+  const retry = await marketing.save({ actorId: manager, article: { ...saved.value, title: winning.value.title } }); assert.ok(retry.ok); assert.equal(retry.value.revision, winning.value.revision);
+});
+test("the content library can load older articles without duplicates or hidden truncation", async () => {
+  const entries = Array.from({ length: 51 }, (_, n) => ({ ...emptyArticle(randomUUID()), title: `Library page fixture ${n}` }));
+  await db.insertInto("marketing_articles").values(entries.map(article => ({ id: article.id as import("../src/platform/database/generated/public/MarketingArticles.ts").MarketingArticlesId, created_by: manager, data: JSON.stringify(article) }))).execute();
+  const first = await marketing.get({ actorId: manager }); assert.ok(first.ok); assert.equal(first.value.articles.length, 50); assert.ok(first.value.nextCursor);
+  const second = await marketing.get({ actorId: manager, before: first.value.nextCursor }); assert.ok(second.ok); assert.equal(second.value.nextCursor, null);
+  const all = [...first.value.articles, ...second.value.articles]; assert.equal(new Set(all.map(a => a.id)).size, all.length); assert.ok(entries.every(e => all.some(a => a.id === e.id)));
+});

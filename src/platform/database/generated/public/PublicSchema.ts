@@ -14,13 +14,25 @@ import type { default as WeeklyCheckinSummariesTable } from './WeeklyCheckinSumm
 import type { default as AccountsTable } from './Accounts.js';
 import type { default as OnboardingSettingsTable } from './OnboardingSettings.js';
 import type { default as WorkoutSessionsTable } from './WorkoutSessions.js';
+import type { default as CoachingMembershipsTable } from './CoachingMemberships.js';
 import type { default as OnboardingResolutionsTable } from './OnboardingResolutions.js';
+import type { default as SalesSettingsTable } from './SalesSettings.js';
 import type { default as AuthRateLimitsTable } from './AuthRateLimits.js';
 import type { default as DailyScorecardsTable } from './DailyScorecards.js';
 import type { default as MarketingStoriesTable } from './MarketingStories.js';
 import type { default as AuthSessionsTable } from './AuthSessions.js';
 import type { default as MealEntriesTable } from './MealEntries.js';
+import type { default as SalesEventsTable } from './SalesEvents.js';
 import type { default as AssessmentMediaTable } from './AssessmentMedia.js';
+import type { default as CoachingThreadReadsTable } from './CoachingThreadReads.js';
+import type { default as BusinessManagersTable } from './BusinessManagers.js';
+import type { default as SalesCallSlotsTable } from './SalesCallSlots.js';
+import type { default as CoachingProgramAdjustmentsTable } from './CoachingProgramAdjustments.js';
+import type { default as CoachingMessagesTable } from './CoachingMessages.js';
+import type { default as CoachingCommunityPostsTable } from './CoachingCommunityPosts.js';
+import type { default as SalesVisitorsTable } from './SalesVisitors.js';
+import type { default as MarketingArticlesTable } from './MarketingArticles.js';
+import type { default as SalesLeadsTable } from './SalesLeads.js';
 import type { default as OnboardingBookingsTable } from './OnboardingBookings.js';
 import type { default as WeeklyCheckinReviewsTable } from './WeeklyCheckinReviews.js';
 import type { default as WeeklyCheckinsTable } from './WeeklyCheckins.js';
@@ -57,7 +69,11 @@ export default interface PublicSchema {
 
   workout_sessions: WorkoutSessionsTable;
 
+  coaching_memberships: CoachingMembershipsTable;
+
   onboarding_resolutions: OnboardingResolutionsTable;
+
+  sales_settings: SalesSettingsTable;
 
   auth_rate_limits: AuthRateLimitsTable;
 
@@ -69,7 +85,27 @@ export default interface PublicSchema {
 
   meal_entries: MealEntriesTable;
 
+  sales_events: SalesEventsTable;
+
   assessment_media: AssessmentMediaTable;
+
+  coaching_thread_reads: CoachingThreadReadsTable;
+
+  business_managers: BusinessManagersTable;
+
+  sales_call_slots: SalesCallSlotsTable;
+
+  coaching_program_adjustments: CoachingProgramAdjustmentsTable;
+
+  coaching_messages: CoachingMessagesTable;
+
+  coaching_community_posts: CoachingCommunityPostsTable;
+
+  sales_visitors: SalesVisitorsTable;
+
+  marketing_articles: MarketingArticlesTable;
+
+  sales_leads: SalesLeadsTable;
 
   onboarding_bookings: OnboardingBookingsTable;
 

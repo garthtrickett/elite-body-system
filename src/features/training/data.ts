@@ -1,3 +1,6 @@
+import { baseExercises, parseProgramRules, parseProgramAdjustment } from "./program-rules.ts";
+import type { ProgramRules } from "./program-rules.ts";
+import type { ProgramAdjustment } from "./programming.ts";
 import { PROGRAM, WEEK } from "./catalog.ts";
 import type { Exercise } from "./catalog.ts";
 import type { ClientProfile, ClientResult } from "../profile/browser.ts";
@@ -6,12 +9,12 @@ import { err, ok } from "../../shared/result.ts";
 
 export type LiftSet = Readonly<{ kg: number; reps: number; done: boolean }>;
 export type Workout = Readonly<{
-  date: string; planKey: number; startedAt: number | null; finishedAt: number | null;
+  date: string; planKey: number; programRules?: ProgramRules; startedAt: number | null; finishedAt: number | null;
   sets: Readonly<Record<string, readonly LiftSet[]>>; cardio: Readonly<Record<string, number>>;
   mobility: Readonly<Record<string, readonly boolean[]>>; notes: Readonly<Record<string, string>>;
   swaps: Readonly<Record<string, boolean>>; restUntil: number | null;
 }>;
-export type TrainingSnapshot = Readonly<{ workout: Workout; revision: number; history: readonly Workout[]; blocked: "setup_required" | "clearance_required" | null; readOnly: boolean; videoUrls: Readonly<Record<string, string>> }>;
+export type TrainingSnapshot = Readonly<{ workout: Workout; revision: number; history: readonly Workout[]; blocked: "setup_required" | "clearance_required" | null; readOnly: boolean; videoUrls: Readonly<Record<string, string>>; adjustments?: readonly ProgramAdjustment[] }>;
 
 export function planFor(input: Readonly<{ profile: ClientProfile; date: string }>): number {
   const order = [1, 2, 3, 4, 5, 6, 0];
@@ -26,7 +29,7 @@ export function emptyWorkout(input: Readonly<{ date: string; planKey: number }>)
   return { ...input, startedAt: null, finishedAt: null, sets: {}, cardio: {}, mobility: {}, notes: {}, swaps: {}, restUntil: null };
 }
 export function exercisesFor(workout: Workout): readonly Exercise[] {
-  return (PROGRAM[workout.planKey] ?? []).map(exercise => workout.swaps[exercise.id] && exercise.alt
+  return baseExercises(workout).map(exercise => workout.swaps[exercise.id] && exercise.alt
     ? { ...exercise, id: exercise.alt.id, name: exercise.alt.name } : exercise);
 }
 export function setNumberProblem(input: Readonly<{ field: "kg" | "reps"; value: number; done: boolean }>): string {
@@ -38,7 +41,9 @@ export function parseWorkout(value: unknown): ClientResult<Workout> {
   const fail = () => err({ code: "invalid_input", message: "Check the workout’s exercises, sets, weights and repetitions." } as const);
   if (!isRecord(value) || !isDay(value.date) || typeof value.planKey !== "number" || !WEEK[value.planKey] || !isRecord(value.sets) || !isRecord(value.cardio) || !isRecord(value.mobility) || !isRecord(value.notes) || !isRecord(value.swaps)) return fail();
   for (const key of ["startedAt", "finishedAt", "restUntil"]) if (value[key] !== null && (typeof value[key] !== "number" || !Number.isSafeInteger(value[key]) || value[key] < 0)) return fail();
-  const base = PROGRAM[value.planKey] ?? [], allowed = new Map(base.flatMap(exercise => [[exercise.id, exercise] as const, ...(exercise.alt ? [[exercise.alt.id, exercise] as const] : [])]));
+  const rules = value.programRules === undefined ? undefined : parseProgramRules({planKey:value.planKey,value:value.programRules});
+  if(value.programRules !== undefined && !rules)return fail();
+  const base = baseExercises({planKey:value.planKey,...(rules?{programRules:rules}:{})}), allowed = new Map(base.flatMap(exercise => [[exercise.id, exercise] as const, ...(exercise.alt ? [[exercise.alt.id, exercise] as const] : [])]));
   const swaps: Record<string, boolean> = {}, sets: Record<string, readonly LiftSet[]> = {}, cardio: Record<string, number> = {}, mobility: Record<string, readonly boolean[]> = {}, notes: Record<string, string> = {};
   for (const [id, swapped] of Object.entries(value.swaps)) {
     if (typeof swapped !== "boolean" || !base.some(exercise => exercise.id === id && exercise.alt)) return fail();
@@ -64,7 +69,7 @@ export function parseWorkout(value: unknown): ClientResult<Workout> {
     mobility[id] = checks as boolean[];
   }
   for (const [id, note] of Object.entries(value.notes)) { if (!allowed.has(id) || !isText(note)) return fail(); notes[id] = note; }
-  return ok({ date: value.date, planKey: value.planKey, sets, cardio, mobility, notes, swaps,
+  return ok({ date: value.date, planKey: value.planKey, ...(rules?{programRules:rules}:{}), sets, cardio, mobility, notes, swaps,
     startedAt: value.startedAt as number | null, finishedAt: value.finishedAt as number | null, restUntil: value.restUntil as number | null });
 }
 
@@ -93,7 +98,16 @@ export function parseTrainingSnapshot(value: unknown): TrainingSnapshot | undefi
     try { const parsed = new URL(url); if (parsed.protocol !== "https:" || parsed.username || parsed.password) return undefined; } catch { return undefined; }
     videoUrls[key] = url;
   }
-  return { videoUrls, workout: workout.value, revision: value.revision, history, blocked: value.blocked as TrainingSnapshot["blocked"], readOnly: value.readOnly };
+  let adjustments: readonly ProgramAdjustment[] | undefined;
+  if(value.adjustments!==undefined) {
+    if(!Array.isArray(value.adjustments) || value.adjustments.length>50)return;
+    const rows:ProgramAdjustment[]=[];
+    for(const a of value.adjustments) {
+      const parsed=parseProgramAdjustment(a);if(!parsed)return;rows.push(parsed);
+    }
+    adjustments=rows;
+  }
+  return { ...(adjustments?{adjustments}:{}), videoUrls, workout: workout.value, revision: value.revision, history, blocked: value.blocked as TrainingSnapshot["blocked"], readOnly: value.readOnly };
 }
 
 export function trainingComplete(snapshot: TrainingSnapshot): boolean { return snapshot.blocked === null && (snapshot.workout.planKey === 0 || snapshot.workout.finishedAt !== null); }

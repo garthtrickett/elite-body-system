@@ -1,13 +1,15 @@
 import { html, nothing } from "lit-html";
 import type { TemplateResult } from "lit-html";
 
-export type WorkspacePage = "scorecard" | "training" | "meals" | "map" | "mindset" | "nutrition" | "activity" | "media" | "account-setup" | "checkin" | "mentor-checkins";
+export type WorkspacePage = "scorecard" | "training" | "meals" | "map" | "mindset" | "nutrition" | "activity" | "media" | "account-setup" | "checkin" | "mentor-checkins" | "mentor-delivery" | "management" | "messages" | "community";
 type NavigationItem = Readonly<{ page: WorkspacePage; label: string; href: string }>;
 const practice: readonly NavigationItem[] = [
   { page: "scorecard", label: "Scorecard", href: "/" },
   { page: "training", label: "Training", href: "/training" },
   { page: "meals", label: "Meals", href: "/meals" },
   { page: "map", label: "Neural Map", href: "/mindset/map" },
+  { page: "messages", label: "Coaching messages", href: "/messages" },
+  { page: "community", label: "Community", href: "/community" },
   { page: "checkin", label: "Weekly check-in", href: "/check-in" },
 ];
 const courses: readonly NavigationItem[] = [
@@ -29,7 +31,7 @@ export function workspaceShell(input: Readonly<{
   page: WorkspacePage | "onboarding"; panel?: string | undefined; outlet: HTMLElement;
   navigationDisabled: boolean; status: string; retry?: (() => void) | undefined;
 }>) {
-  if (input.page === "checkin" || input.page === "mentor-checkins") return html`<div class="ci-workspace">${input.outlet}<div class="sc-route-status" role="status" ?hidden=${!input.status}>${input.status}${input.retry ? html` <button class="sc-secondary" @click=${input.retry}>Retry navigation</button>` : nothing}</div></div>`;
+  if (input.page === "mentor-delivery" || input.page === "management" || input.page === "checkin" || input.page === "mentor-checkins") return html`<div class="ci-workspace">${input.outlet}<div class="sc-route-status" role="status" ?hidden=${!input.status}>${input.status}${input.retry ? html` <button class="sc-secondary" @click=${input.retry}>Retry navigation</button>` : nothing}</div></div>`;
   const panel = input.page === "onboarding" ? "setup" : input.page === "scorecard" && (input.panel === "profile" || input.panel === "setup") ? input.panel : undefined;
   const moreActive = !panel && input.page !== "scorecard" && input.page !== "training";
   const items = (entries: readonly NavigationItem[]) => entries.map(item => html`<a class="sc-sidebar-link" href=${item.href}
@@ -38,9 +40,10 @@ export function workspaceShell(input: Readonly<{
     <aside class="sc-sidebar" aria-label="Elite Body System workspace">
       <a class="sc-sidebar-brand" href="/" aria-label="Elite Body System home" aria-disabled=${input.navigationDisabled ?? false}>Elite Body<br>System<span class="sc-eyebrow">Build your standard.</span></a>
       <nav class="sc-sidebar-nav" aria-label="Workspace navigation">
+        <div class="sc-sidebar-scroll">
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Daily practice</p>${items(practice)}</div>
         <div class="sc-sidebar-group"><p class="sc-eyebrow">Your courses</p>${items(courses)}</div>
-        <div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
+        </div><div class="sc-sidebar-group sc-sidebar-account"><p class="sc-eyebrow">Your account</p>
           <a class="sc-sidebar-link" href="/account/setup" aria-current=${input.page === "account-setup" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Account setup</a>
           <a class="sc-sidebar-link" href="/account/media" aria-current=${input.page === "media" ? "page" : nothing} aria-disabled=${input.navigationDisabled}>Media preferences</a>
           ${([ ["setup", "Day 1 setup"], ["profile", "Profile"] ] as const).map(([key, label]) => html`<a class="sc-sidebar-link" href=${`/?panel=${key}`} aria-current=${panel === key ? "page" : nothing} aria-disabled=${input.navigationDisabled ?? false}>${label}</a>`)}

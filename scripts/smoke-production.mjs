@@ -40,10 +40,19 @@ try {
   }
   assert.equal(existsSync("scripts/onboarding-admin.ts"), true);
   assert.equal(existsSync("scripts/mentor-admin.ts"), true);
+  assert.equal(existsSync("scripts/management-admin.ts"), true);
+  const masterPage = await fetch(`${origin}/master/sign-in`); assert.equal(masterPage.status, 200); assert.match(await masterPage.text(), /data-master-preview="false"/);
+  for (const name of ["band.jpg", "hero.jpg", "portrait.jpg", "logo.png"]) { const asset = await fetch(`${origin}/assets/sales/${name}`); assert.equal(asset.status, 200); assert.ok((await asset.arrayBuffer()).byteLength > 100); }
+  for (const path of ["/api/management/snapshot", "/api/marketing/snapshot", "/api/mentor/delivery/clients"]) { const denied = await fetch(origin + path); assert.equal(denied.status, 401); await denied.body.cancel(); }
+  const publicPage = await fetch(`${origin}/free-value`); assert.equal(publicPage.status, 200); const visitorCookies = publicPage.headers.getSetCookie().map(c => c.split(";")[0]).join("; "); assert.match(await publicPage.text(), /data-mode="sales"/);
+  const publicState = await fetch(`${origin}/api/sales/snapshot?page=free-value`, {headers:{Cookie:visitorCookies}}); assert.equal(publicState.status,200); const publicData=await publicState.json(); assert.equal(publicData.value.settings.insights.length,30); assert.equal(publicData.value.callScript,undefined);
+  const exportFont=await fetch(`${origin}/assets/fonts/instrument-serif-regular.woff2`,{headers:{Origin:"null"}});assert.equal(exportFont.headers.get("access-control-allow-origin"),"*");await exportFont.body.cancel();
+  const browserAsset = await fetch(`${origin}/assets/app.js`); assert.ok(!(await browserAsset.text()).includes("There are two ways to access the same Elite Body System transformation."));
   const provisioned = await app.auth.provisionAccount({ email: "harrybaldwin@preview.invalid" }); assert.equal(provisioned.ok, true);
   const preview = await app.auth.signInHarryPreview({ alias: "harrybaldwin", clientKey: "onboarding-production-smoke" }); assert.equal(preview.ok, true);
   const headers = { Cookie: `__Host-ebs-session=${preview.value.sessionToken}` };
   const gated = await fetch(origin, { headers, redirect: "manual" }); assert.equal(gated.status, 303); assert.equal(gated.headers.get("location"), "/account/setup"); await gated.body.cancel();
+  for (const path of ["/manage", "/mentor"]) {const denied=await fetch(origin+path,{headers,redirect:"manual"});assert.equal(denied.status,403);await denied.body.cancel();}
   const coachPage = await fetch(`${origin}/mentor/check-ins`, { headers, redirect: "manual" }); assert.equal(coachPage.status, 403); await coachPage.body.cancel();
   const coachApi = await fetch(`${origin}/api/mentor/checkins`, { headers }); assert.equal(coachApi.status, 403); await coachApi.body.cancel();
   const weekly = await fetch(`${origin}/api/client/checkins`, { headers }); assert.equal(weekly.status, 200); assert.notEqual((await weekly.json()).value.flowPreview, true);
@@ -61,5 +70,6 @@ try {
   const onboarding = await fetch(`${origin}/onboarding`, { headers, redirect: "manual" }); assert.equal(onboarding.status, 200); assert.match(await onboarding.text(), /data-page="onboarding"/);
   const denied = await fetch(`${origin}/api/client/state`, { headers }); assert.equal(denied.status, 403); assert.equal((await denied.json()).error.reason, "onboarding_required");
   console.log("Production image passed: unprivileged runtime, database health, HTTPS cookies, assets, and private paths");
+  console.log("Portal production image passed: public assets, guide, protected management, mentor routes and private script separation");
   console.log("Onboarding production image passed: new migrations, admin tooling, account setup, authenticated route and API gate");
 } finally { await app.close(); }

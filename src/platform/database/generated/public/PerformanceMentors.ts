@@ -8,6 +8,8 @@ export default interface PerformanceMentorsTable {
   account_id: ColumnType<AccountsId, AccountsId, AccountsId>;
 
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+
+  all_clients: ColumnType<boolean, boolean | undefined, boolean>;
 }
 
 export type PerformanceMentors = Selectable<PerformanceMentorsTable>;

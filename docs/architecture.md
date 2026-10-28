@@ -564,3 +564,42 @@ and intervals, and prevents late proposals from presenting or scheduling more
 effects. Navigation resolution also rejects superseded completions. Accepted
 transitions dismiss More, set the route title, reset content scroll and focus the
 content region without moving sidebar scroll or overriding dialog focus.
+
+## Management and coaching extension
+
+The public interfaces are `features/sales/index.ts`, `features/delivery/index.ts`
+and `features/marketing/index.ts`, with browser interfaces in their `browser.ts`
+entry points. HTTP adapters derive actor identity from the existing HttpOnly
+session and use its same-origin/CSRF transport. Manager access is explicit in
+`business_managers`. Mentor access uses the authoritative `features/access`
+predicate: assigned clients by default, or trusted all-client scope. This extends
+the assignment-only description above. Master username maps to a configured,
+provisioned email and the existing one-time link flow. The isolated disabled-email
+preview can directly sign in only its synthetic account; production never inherits
+that preview grant.
+
+Sales visitors use a separate opaque HttpOnly token, stored only as a hash. Lead
+journeys, consent, applications, bookings and manager notes persist in PostgreSQL.
+Reservations and availability creation share a lock; application and booking
+retries do not create duplicates. Page settings use optimistic revisions, published
+client stories are filtered on the server, and the private call script enters only
+a manager response, never the public browser bundle. Thirty editable web insights
+are available after signup; no automatic insight email sender is introduced.
+
+Coaching memberships distinguish group/community and individual messaging access.
+Messages and community posts have immutable request receipts and bounded history
+pages. Read positions advance monotonically. Client HTTP routes ignore supplied
+actor/client/mentor identities and keep the existing onboarding and weekly gates.
+Programming overrides validate against the foundation catalogue; new sessions use
+the latest effective prescription, while logged sessions retain their original
+rules. Client input cannot replace coach-prescribed rules. Reviews preserve the
+existing revision-specific receipts and account history.
+
+Marketing interviews and outputs are versioned JSON records. Output assembly uses
+actual supplied answers, including the required proof field. Provider access stays
+server-side, is sequential, counts calls against 80% of a configured allowance and
+respects Retry-After without automatic retries. Voice audio is bounded and not
+stored in the app. Notion export uses Markdown; a separate escaped HTML document
+preserves EBS typography. No Notion connection or remote publication is implied.
+All new browser workflows use correlated SAM effects, reject stale or wrong-kind
+completions and protect unresolved sends/unsaved work during navigation.

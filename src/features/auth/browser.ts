@@ -25,7 +25,7 @@ export function mountAuth(root: HTMLElement, config: Readonly<{
     signOut: () => runtime.propose({ kind: "signOutRequested" }),
   };
   const runtime = createAuthUiRuntime({ mode,
-    perform: createAuthUiEffects({ csrf: root.dataset.csrf ?? "", token, send: fetch, navigate: to => location.assign(to) }),
+    perform: createAuthUiEffects({ csrf: root.dataset.csrf ?? "", token, send: fetch, navigate: to => location.assign(to === "/" && root.dataset.returnTo === "/manage" ? "/manage" : to) }),
     present: state => {
       if (state.mode === "home" && state.account && config.presentHome) config.presentHome(state, actions);
       else render(authView(state, actions), root);
@@ -34,3 +34,5 @@ export function mountAuth(root: HTMLElement, config: Readonly<{
   runtime.propose({ kind: "started" });
   return () => { runtime.dispose(); window.removeEventListener("hashchange", changedLink); };
 }
+
+export { mountMasterSignIn } from "./master-browser.ts";

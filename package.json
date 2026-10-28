@@ -22,7 +22,8 @@
     "content:video": "node --env-file-if-exists=.env scripts/set-video.ts",
     "onboarding:admin": "node --env-file-if-exists=.env scripts/onboarding-admin.ts",
     "mentor:admin": "node --env-file-if-exists=.env scripts/mentor-admin.ts",
-    "verify": "npm run db:migrate && npm run db:generate && npm run lint && npm run typecheck && npm run build && npm test && npm run test:browser"
+    "verify": "npm run db:migrate && npm run db:generate && npm run lint && npm run typecheck && npm run build && npm test && npm run test:browser",
+    "management:admin": "node --env-file-if-exists=.env scripts/management-admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1155.0",

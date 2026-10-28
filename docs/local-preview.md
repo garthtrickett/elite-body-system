@@ -5,12 +5,16 @@ PostgreSQL database. Changes in this checkout rebuild browser JavaScript and CSS
 Node restarts for server changes. Refresh the page after an update. There is no
 automatic browser reload, which could discard an unfinished form.
 
-Enter `harrybaldwin` in the sign-in email field. This is the existing shared
-preview account, with ordinary client permissions. Use synthetic data only.
+Use `/master/sign-in` and the username `harrybaldwin` for the management portal.
+The existing `/sign-in` email field also accepts this alias for the member view.
+Both use the same synthetic preview account, with explicitly provisioned
+business-manager and all-client mentor permissions in this isolated database.
+Use synthetic data only.
 The eight-section setup is at `/onboarding`; the rollout gate is disabled so
-Harry can also explore the other app pages. Videos, legal approval, uploads,
-calendar booking and external meal analysis require their normal provider
-configuration and remain unavailable when not configured.
+Harry can also explore the other app pages. Videos, legal approval, uploads and
+external meal analysis require their normal provider configuration and remain
+unavailable when not configured. The sales system's own availability, booking
+and calendar download work without an external scheduling provider.
 
 The initial dashboard profile is a synthetic completed client so Harry can
 explore the app and Setup opens the revised onboarding. Its onboarding record
@@ -46,10 +50,11 @@ Remove the `previewEmail` composition in `application.ts` to end the exception.
 ## Performance Mentor preview
 
 The check-in review area is `/mentor/check-ins`. The shared synthetic preview
-account has a mentor grant assigned only to itself, so it can demonstrate both
-sides without access to other accounts. It does not auto-grant production roles or
-assign real clients. Submitted check-ins appear in the review queue, the first
-opens by default, and marking reviewed removes it while preserving its history.
+account has an explicit all-client mentor grant in this isolated database, so it
+can demonstrate both sides with synthetic clients. It does not auto-grant
+production roles or assign real clients. Submitted check-ins appear in the review
+queue, the first opens by default, and marking reviewed removes it while preserving
+its history.
 
 AI summary code uses `OPENAI_API_KEY`, which is not configured in this local
 preview. The summary panel states this explicitly; full answers and review remain
@@ -66,7 +71,10 @@ npm run mentor:admin -- revoke COACH_EMAIL
 ```
 
 Run these only with the intended app environment. There is no browser self-grant
-or public assignment endpoint. Production client assignments remain explicit.
+or unauthenticated assignment endpoint. A business manager who is also a mentor
+can explicitly add a confirmed member through Delivery. This provisions an account,
+membership and assignment; it does not collect payment or send an invitation.
+Production client assignments remain explicit.
 
 ## Services and private state
 
@@ -112,3 +120,26 @@ the persistent preview database.
 For a manual restart, use `work run` with the matching label and bounded scope,
 as required by the shared host conventions. Stop the existing scope first and
 check that the port has closed; preserve the database volume and private state.
+
+## EBS Master and management portal
+
+The dedicated master sign-in is `/master/sign-in`, username `harrybaldwin`.
+It opens `/manage`, containing Elite Marketing System, Elite Sales System and
+Elite Delivery. Delivery has separate EBS Mentor Portal and EBS Member Portal
+entries. The same synthetic preview account now has explicit business-manager
+and all-client mentor grants in this isolated database. Use synthetic clients only.
+
+This direct username access requires disabled email delivery and the preview flag;
+that delivery mode is rejected in production. Production master sign-in instead
+requires `EBS_MASTER_EMAIL`, a provisioned account and a trusted master grant:
+
+```sh
+npm run management:admin -- master OWNER_EMAIL
+```
+
+The fixed username sends a normal, rate-limited magic link to that configured
+email. It cannot select an account from browser input. The link returns to the
+management portal. No live owner email has been supplied yet; the public preview
+alias is never granted access to production client data.
+
+The team's daily workflow is in [management-quickstart.md](management-quickstart.md).

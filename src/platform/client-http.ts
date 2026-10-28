@@ -1,3 +1,4 @@
+import type { Delivery } from "../features/delivery/index.ts";
 import { createAuthenticatedHttp, json } from "../features/auth/index.ts";
 import type { Auth } from "../features/auth/index.ts";
 import { createProfiles, createPostgresProfileStore, clientDay } from "../features/profile/index.ts";
@@ -13,7 +14,7 @@ import { createOnboarding, createAssessmentMedia, createMarketingPermissions } f
 import type { AssessmentStorage, BookingProvider } from "../features/onboarding/index.ts";
 import type { WeeklyCheckins } from "../features/checkins/index.ts";
 
-export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; checkins: WeeklyCheckins; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
+export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Database>; checkins: WeeklyCheckins; delivery: Delivery; publicOrigin: string; openAiApiKey?: string; onboardingEnabled?: boolean; assessmentStorage?: AssessmentStorage; bookingProvider?: BookingProvider }>) {
   const onboarding = createOnboarding({ db: config.db });
   const marketing = createMarketingPermissions({ db: config.db });
   const assessmentMedia = createAssessmentMedia({ db: config.db, ...(config.assessmentStorage ? { storage: config.assessmentStorage } : {}) });
@@ -71,6 +72,12 @@ export function createClientHttp(config: Readonly<{ auth: Auth; db: Kysely<Datab
     const weekly = await config.checkins.access({ accountId: account.id });
     if (!weekly.ok) { send(weekly); return; }
     if (weekly.value.required) { json(response, 403, { ok: false, error: { code: "forbidden", reason: "checkin_required", message: "Complete your weekly check-in to continue to your dashboard.", redirect: "/check-in" } }); return; }
+    if (request.method === "GET" && url.pathname === "/api/client/coaching") { send(await config.delivery.member({actorId:account.id})); return; }
+    if (request.method === "GET" && url.pathname === "/api/client/coaching/messages") { send(await config.delivery.thread({actorId:account.id,clientId:account.id,mentor:false,...(url.searchParams.has("before")?{before:url.searchParams.get("before")}:{})})); return; }
+    if (request.method === "GET" && url.pathname === "/api/client/coaching/community") { send(await config.delivery.community({actorId:account.id,mentor:false,...(url.searchParams.has("before")?{before:url.searchParams.get("before")}:{})})); return; }
+    if (request.method === "POST" && url.pathname === "/api/client/coaching/messages/send") { send(await config.delivery.sendMember({actorId:account.id,requestId:body.requestId,body:body.body})); return; }
+    if (request.method === "POST" && url.pathname === "/api/client/coaching/messages/read") { send(await config.delivery.read({actorId:account.id,clientId:account.id,lastMessageId:body.lastMessageId,mentor:false})); return; }
+    if (request.method === "POST" && url.pathname === "/api/client/coaching/community/post") { send(await config.delivery.post({actorId:account.id,mentor:false,requestId:body.requestId,body:body.body})); return; }
     if (request.method === "GET" && url.pathname === "/api/client/state") {
       const profile = await profiles.get({ accountId: account.id });
       if (!profile.ok) { send(profile); return; }

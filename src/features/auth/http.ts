@@ -1,6 +1,7 @@
 import { appRoute } from "../../shared/app-routes.ts";
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { LINK_ACKNOWLEDGEMENT, isHarryPreviewAlias } from "./contracts.ts";
 import { newToken, validToken } from "./operations.ts";
 import type { Auth } from "./operations.ts";
 import type { AuthFailure } from "./contracts.ts";
@@ -62,7 +63,7 @@ export function createAuthenticatedHttp(config: Readonly<{
             !validToken(csrf) || !validToken(supplied) || !timingSafeEqual(Buffer.from(csrf), Buffer.from(supplied))) {
           json(response, 403, { ok: false, error: { code: "forbidden" } }); return;
         }
-        try { body = await readBody(request, new URL(request.url ?? "/", config.publicOrigin).pathname === "/api/client/meals/analyze" ? 6 * 1024 * 1024 : 256 * 1024); }
+        try { body = await readBody(request, new URL(request.url ?? "/", config.publicOrigin).pathname === "/api/marketing/voice" ? 12 * 1024 * 1024 : new URL(request.url ?? "/", config.publicOrigin).pathname === "/api/client/meals/analyze" ? 6 * 1024 * 1024 : 256 * 1024); }
         catch { json(response, 400, { ok: false, error: { code: "invalid_input" } }); return; }
       }
       await config.handle({ account: session.value, request, response, body });
@@ -70,7 +71,7 @@ export function createAuthenticatedHttp(config: Readonly<{
   };
 }
 
-export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean; forbidden?: boolean; redirect?: "/onboarding" | "/account/setup" | "/check-in" }>> }>):
+export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: string; uploadOrigin?: string; masterEmail?: string; masterPreview?: boolean; pageAccess?: (input: Readonly<{ accountId: string; path: string }>) => Promise<Readonly<{ allowed: boolean; unavailable?: boolean; forbidden?: boolean; redirect?: "/onboarding" | "/account/setup" | "/check-in" }>> }>):
   (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   const { auth, publicOrigin } = config;
   const secure = publicOrigin.startsWith("https:");
@@ -91,21 +92,23 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
     }
     const signedInPage = appRoute(path) !== undefined;
     let accountId: string | null = null;
-    if (request.method === "GET" && (signedInPage || ["/sign-in", "/sign-in/confirm"].includes(path))) {
+    if (request.method === "GET" && (signedInPage || ["/sign-in", "/sign-in/confirm", "/master/sign-in"].includes(path))) {
       if (signedInPage) {
         const session = await auth.resolveSession({ sessionToken });
         if (!session.ok) {
           if (session.error.code === "unavailable") { failure(response, 503, "unavailable"); return; }
-          response.writeHead(303, { Location: "/sign-in", "Cache-Control": "no-store" }); response.end(); return;
+          response.writeHead(303, { Location: path.startsWith("/manage") || path === "/master" ? "/master/sign-in" : "/sign-in", "Cache-Control": "no-store" }); response.end(); return;
         }
         accountId = session.value.id;
         if (config.pageAccess) {
           const access = await config.pageAccess({ accountId: session.value.id, path });
           if (access.unavailable) { failure(response, 503, "unavailable"); return; }
-          if (access.forbidden) { json(response, 403, { ok: false, error: { code: "forbidden", message: "This page requires a Performance Mentor account." } }); return; }
+          if (access.forbidden) { json(response, 403, { ok: false, error: { code: "forbidden", message: "This page requires an authorised staff account." } }); return; }
           if (!access.allowed) { response.writeHead(303, { Location: access.redirect ?? "/onboarding", "Cache-Control": "no-store" }); response.end(); return; }
         }
       }
+      const masterPage = path === "/master/sign-in";
+      const returnTo = new URL(request.url ?? "/", publicOrigin).searchParams.get("next") === "/manage" ? "/manage" : "";
       const existingCsrf = cookie(request, names.csrf);
       const csrf = validToken(existingCsrf) ? existingCsrf : newToken();
       // Client routing goes through exactly the same session and mandatory page gate.
@@ -117,11 +120,11 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store",
         "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff",
         "Set-Cookie": setCookie(names.csrf, csrf, 28_800),
-        "Content-Security-Policy": `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'${signedInPage && config.uploadOrigin ? ` ${new URL(config.uploadOrigin).origin}` : ""}; img-src 'self' data:; media-src https:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` });
-      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${appRoute(path)?.page ?? "scorecard"}" data-mode="${signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
+        "Content-Security-Policy": `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; connect-src 'self'${signedInPage && config.uploadOrigin ? ` ${new URL(config.uploadOrigin).origin}` : ""}; img-src 'self' https: data:; media-src https:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` });
+      response.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="${signedInPage ? "dark" : "light"}"><title>Elite Body System</title><link rel="stylesheet" href="/assets/app.css"></head><body><main id="app" data-csrf="${csrf}" data-page="${appRoute(path)?.page ?? "scorecard"}" data-return-to="${returnTo}" data-master-preview="${masterPage && config.masterPreview ? "true" : "false"}" data-mode="${masterPage ? "master" : signedInPage ? "home" : path === "/sign-in/confirm" ? "confirm" : "request"}"></main><noscript>JavaScript is needed to use this interface. Core operations are also available programmatically.</noscript><script type="module" src="/assets/app.js"></script></body></html>`);
       return;
     }
-    const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out", "/api/auth/harry-preview"];
+    const actions = ["/api/auth/request-link", "/api/auth/inspect-link", "/api/auth/redeem-link", "/api/auth/sign-out", "/api/auth/harry-preview", "/api/auth/master-request"];
     if (request.method !== "POST" || !actions.includes(path)) { failure(response, 404, "invalid_input"); return; }
     if (request.headers.origin !== publicOrigin || request.headers["content-type"]?.split(";")[0]?.trim() !== "application/json") {
       failure(response, 403, "invalid_input"); return;
@@ -134,8 +137,19 @@ export function createAuthHttp(config: Readonly<{ auth: Auth; publicOrigin: stri
     let body: Record<string, unknown>;
     try { body = await readBody(request); }
     catch { failure(response, 400, "invalid_input"); return; }
-    const expected = path.endsWith("harry-preview") ? "alias" : path.endsWith("request-link") ? "email" : path.endsWith("sign-out") ? "" : "token";
+    const expected = path.endsWith("master-request") ? "username" : path.endsWith("harry-preview") ? "alias" : path.endsWith("request-link") ? "email" : path.endsWith("sign-out") ? "" : "token";
     if (Object.keys(body).sort().join(",") !== expected) { failure(response, 400, "invalid_input"); return; }
+    if (path.endsWith("master-request")) {
+      if (config.masterPreview && isHarryPreviewAlias(body.username)) {
+        const result = await auth.signInHarryPreview({ alias: body.username, clientKey: request.socket.remoteAddress ?? "unknown" });
+        if (!result.ok) { failure(response, result.error.code === "unavailable" ? 503 : 400, result.error.code); return; }
+        response.setHeader("Set-Cookie", [setCookie(names.session, result.value.sessionToken, 28_800), setCookie(names.csrf, "", 0)]);
+        json(response, 200, { ok: true, value: { signedIn: true, message: "" } }); return;
+      }
+      if (!config.masterEmail) { json(response, 503, { ok: false, error: { code: "unavailable", message: "Master sign-in is not configured yet." } }); return; }
+      await auth.requestLink({ email: isHarryPreviewAlias(body.username) ? config.masterEmail : "unrecognised-master@preview.invalid", clientKey: request.socket.remoteAddress ?? "unknown", returnTo: "/manage" });
+      json(response, 200, { ok: true, value: { signedIn: false, message: LINK_ACKNOWLEDGEMENT } }); return;
+    }
     if (path.endsWith("request-link")) {
       const result = await auth.requestLink({ email: body.email, clientKey: request.socket.remoteAddress ?? "unknown" });
       json(response, result.ok ? 200 : 400, result); return;
