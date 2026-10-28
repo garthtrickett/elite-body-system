@@ -38,7 +38,7 @@ export function parseThread(v: unknown): Thread | undefined {
     return { messages, nextCursor: v.nextCursor };
 }
 export function parseDetail(v: unknown): ClientDetail | undefined {
-    if (!isRecord(v) || !isText(v.goals, 6000) || !isText(v.equipment, 6000) || !isText(v.limitations, 6000) || !isText(v.timezone, 100) || !Array.isArray(v.checkins) || !Array.isArray(v.workouts) || !Array.isArray(v.adjustments) || !(v.nextCheckinCursor === null || isDay(v.nextCheckinCursor)))
+    if (!isRecord(v) || (!Array.isArray(v.intake) || v.intake.length > 20 || v.intake.some(x => !isRecord(x) || !isText(x.label, 1000) || !isText(x.value, 6000))) || !isText(v.goals, 6000) || !isText(v.equipment, 6000) || !isText(v.limitations, 6000) || !isText(v.timezone, 100) || !Array.isArray(v.checkins) || !Array.isArray(v.workouts) || !Array.isArray(v.adjustments) || !(v.nextCheckinCursor === null || isDay(v.nextCheckinCursor)))
         return;
     const client = parseClient(v.client), thread = parseThread(v.thread);
     if (!client || !thread)
@@ -61,7 +61,10 @@ export function parseDetail(v: unknown): ClientDetail | undefined {
             return;
         workouts.push({ date: w.date, finished: w.finished, sets: w.sets, volume: w.volume });
     }
-    return { client, thread, checkins, workouts, adjustments, goals: v.goals, equipment: v.equipment, limitations: v.limitations, timezone: v.timezone, nextCheckinCursor: v.nextCheckinCursor };
+    return { client, thread, checkins, workouts, adjustments, intake: (v.intake as readonly Readonly<{
+            label: string;
+            value: string;
+        }>[]).map(x => ({ label: x.label, value: x.value })), goals: v.goals, equipment: v.equipment, limitations: v.limitations, timezone: v.timezone, nextCheckinCursor: v.nextCheckinCursor };
 }
 export function parseMember(v: unknown): MemberRoom | undefined {
     if (!isRecord(v) || !Array.isArray(v.adjustments) || !isText(v.coachingName, 300))

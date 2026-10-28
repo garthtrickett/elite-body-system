@@ -41,6 +41,10 @@ export type WorkoutSummary = Readonly<{
 export type ClientDetail = Readonly<{
     client: ClientCard;
     goals: string;
+    intake: readonly Readonly<{
+        label: string;
+        value: string;
+    }>[];
     equipment: string;
     limitations: string;
     timezone: string;

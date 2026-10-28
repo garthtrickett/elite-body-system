@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { createDatabase } from "../../src/platform/database/connection.ts";
 import type { AccountsId } from "../../src/platform/database/generated/public/Accounts.ts";
 import type { SalesCallSlotsId } from "../../src/platform/database/generated/public/SalesCallSlots.ts";
+import { createOnboarding } from "../../src/features/onboarding/index.ts";
 import { createSalesManagement } from "../../src/features/sales/index.ts";
 import { createPostgresProfileStore } from "../../src/features/profile/index.ts";
 import { completedProfile } from "../support/client.ts";
@@ -58,7 +59,9 @@ test("Marketing walks through proof, drafts and downloads while protecting unsav
 
 test("Mentor and Member messages survive a lost response without duplication and community works", async ({ page, browser }, info) => {
   test.setTimeout(60000); const member = await account(); await createPostgresProfileStore(db).write({ accountId: member, revision: 0, profile: completedProfile() }); await db.insertInto("coaching_memberships").values({ client_id: member, level: "individual", active: true }).execute(); await signIn(page.context(), manager);
-  const record = await db.selectFrom("accounts").select("email").where("id", "=", member).executeTakeFirstOrThrow(); await page.goto(app.origin + "/mentor"); await page.locator(".dv-client").filter({ hasText: record.email }).click(); await page.getByRole("button", { name: "Messages", exact: true }).click(); await page.getByLabel("Your message", { exact: true }).fill("A clear coaching action.");
+  const intake=createOnboarding({db}),currentIntake=await intake.get({accountId:member});if(!currentIntake.ok)throw new Error("Intake unavailable");
+  expect((await intake.save({accountId:member,revision:currentIntake.value.revision,contentVersion:currentIntake.value.content.version,answers:{...currentIntake.value.answers,questionnaire:{...currentIntake.value.answers.questionnaire,now:"I want energy for my family."}}})).ok).toBe(true);
+  const record = await db.selectFrom("accounts").select("email").where("id", "=", member).executeTakeFirstOrThrow(); await page.goto(app.origin + "/mentor"); await page.locator(".dv-client").filter({ hasText: record.email }).click(); await page.getByText("Start Point Form · Full answers",{exact:true}).click(); await expect(page.getByText("I want energy for my family.",{exact:true})).toBeVisible(); await page.getByRole("button", { name: "Messages", exact: true }).click(); await page.getByLabel("Your message", { exact: true }).fill("A clear coaching action.");
   await page.route("**/api/mentor/delivery/messages/send", async route => { await route.fetch(); await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ ok: false, error: { code: "unavailable", message: "Lost response" } }) }); }, { times: 1 });
   await page.getByRole("button", { name: "Send message", exact: true }).click(); await expect(page.getByRole("button", { name: "Retry last action", exact: true })).toBeVisible(); await page.getByRole("button", { name: "Retry last action", exact: true }).click(); await expect(page.getByLabel("Your message", { exact: true })).toHaveValue("");
   const sent = await db.selectFrom("coaching_messages").select("id").where("client_id", "=", member).where("body", "=", "A clear coaching action.").execute(); expect(sent).toHaveLength(1);

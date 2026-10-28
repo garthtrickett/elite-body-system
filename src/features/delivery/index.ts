@@ -6,7 +6,7 @@ import type { AccountsId } from "../../platform/database/generated/public/Accoun
 import { mentorAccess, mentorClientScope, managerAccess } from "../access/index.ts";
 import { createProgramming, parseWorkout, workoutStats } from "../training/index.ts";
 import type { MentorCheckins } from "../checkins/index.ts";
-import { parseAnswers } from "../onboarding/index.ts";
+import { parseAnswers, QUESTIONS, GOAL_LABELS } from "../onboarding/index.ts";
 import { isRecord, isRevision, isText } from "../../shared/validation.ts";
 import type { ClientResult } from "../../shared/client-result.ts";
 import { createCoachingMessages } from "./messaging.ts";
@@ -78,7 +78,9 @@ export function createDelivery(config: Readonly<{
             if (!client)
                 return fail("not_found", "That client no longer exists.");
             const profile = await db.selectFrom("client_profiles").select("data").where("account_id", "=", clientId as AccountsId).executeTakeFirst(), p = isRecord(profile?.data) ? profile.data : {};
-            const onboarding = await db.selectFrom("onboarding_records").select("data").where("account_id", "=", clientId as AccountsId).executeTakeFirst(), answers = onboarding ? parseAnswers(onboarding.data) : undefined;
+            const onboarding = await db.selectFrom("onboarding_records").select("data").where("account_id", "=", clientId as AccountsId).executeTakeFirst(), answers = onboarding ? parseAnswers(isRecord(onboarding.data) ? onboarding.data.answers : undefined) : undefined;
+            if (onboarding && !answers?.ok)
+                return fail("unavailable", "This client’s onboarding answers could not be read. Try again.");
             const candidate = answers?.ok && answers.value.routine.timezone ? answers.value.routine.timezone : isText(p.timezone, 100) && p.timezone ? p.timezone : "UTC";
             let timezone = "UTC";
             try {
@@ -100,7 +102,7 @@ export function createDelivery(config: Readonly<{
             const adjustmentResult = await programming.history({ accountId: clientId });
             if (!adjustmentResult.ok)
                 return adjustmentResult;
-            return { ok: true, value: { client, goals: answers?.ok ? answers.value.questionnaire.transformation : isText(p.firstGoal, 6000) ? p.firstGoal : "", equipment: answers?.ok ? answers.value.routine.equipment : isText(p.equipment, 6000) ? p.equipment : "", limitations: answers?.ok ? answers.value.healthDetails : isText(p.workaround, 6000) ? p.workaround : "", timezone, checkins: checkins.value.entries.map(e => e.entry), nextCheckinCursor: checkins.value.nextCursor, workouts: summaries, adjustments: adjustmentResult.value, thread: await thread(db, { clientId, actorId: input.actorId, mentor: true }) } };
+            return { ok: true, value: { client, intake: answers?.ok ? [...Object.entries(QUESTIONS).map(([key, label]) => ({ label, value: answers.value.questionnaire[key as keyof typeof QUESTIONS] })), { label: "Fitness goals in priority order", value: answers.value.goals.map((goal, i) => `${i + 1}. ${GOAL_LABELS[goal]}`).join("\n") }] : [], goals: answers?.ok ? answers.value.questionnaire.transformation : isText(p.firstGoal, 6000) ? p.firstGoal : "", equipment: answers?.ok ? answers.value.routine.equipment : isText(p.equipment, 6000) ? p.equipment : "", limitations: answers?.ok ? answers.value.healthDetails : isText(p.workaround, 6000) ? p.workaround : "", timezone, checkins: checkins.value.entries.map(e => e.entry), nextCheckinCursor: checkins.value.nextCursor, workouts: summaries, adjustments: adjustmentResult.value, thread: await thread(db, { clientId, actorId: input.actorId, mentor: true }) } };
         }),
         member: (input: Readonly<{
             actorId: string;

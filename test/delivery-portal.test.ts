@@ -101,3 +101,12 @@ test("thread pagination preserves microsecond ordering and read acknowledgements
   await delivery.read({ actorId: target, clientId: target, mentor: false, lastMessageId: two.value.id }); await delivery.read({ actorId: target, clientId: target, mentor: false, lastMessageId: one.value.id });
   const read = await db.selectFrom("coaching_thread_reads").select("last_message_id").where("client_id", "=", target).where("reader_id", "=", target).executeTakeFirstOrThrow(); assert.equal(read.last_message_id, two.value.id);
 });
+test("Mentor reads the actual saved onboarding wrapper and all Start Point answers", async () => {
+  const target = await account();
+  const { createOnboarding } = await import("../src/features/onboarding/index.ts"), onboarding = createOnboarding({ db });
+  const current = await onboarding.get({ accountId: target }); assert.ok(current.ok);
+  const answers = { ...current.value.answers, questionnaire: { ...current.value.answers.questionnaire, transformation: "A stronger and more energetic next 180 days", now: "I want to show up well for my family", motivation: "Long-term capability" }, routine: { ...current.value.answers.routine, name: "Saved intake client", timezone: "Australia/Sydney", equipment: "Dumbbells and pull-up bar" } };
+  assert.ok((await onboarding.save({ accountId: target, revision: current.value.revision, contentVersion: current.value.content.version, answers })).ok);
+  const result = await delivery.client({ actorId: manager, clientId: target }); assert.ok(result.ok); assert.equal(result.value.goals, answers.questionnaire.transformation); assert.equal(result.value.equipment, answers.routine.equipment); assert.equal(result.value.timezone, "Australia/Sydney"); assert.ok(result.value.intake.some(i => i.value === answers.questionnaire.now)); assert.ok(result.value.intake.some(i => i.value === answers.questionnaire.motivation));
+  assert.ok(!(await delivery.client({ actorId: mentor, clientId: target })).ok);
+});

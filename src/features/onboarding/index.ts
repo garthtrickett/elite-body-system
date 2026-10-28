@@ -13,3 +13,5 @@ export type { MarketingStory } from "./story-data.ts";
 export type { OnboardingAnswers, OnboardingContent, OnboardingSnapshot, Booking } from "./data.ts";
 export { createGoogleBookingProvider } from "./google-booking.ts";
 export type { GoogleBookingConfig, BookingProvider } from "./google-booking.ts";
+
+export { QUESTIONS, GOAL_LABELS } from "./data.ts";
