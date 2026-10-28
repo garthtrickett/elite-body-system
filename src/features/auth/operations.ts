@@ -14,7 +14,7 @@ export function validToken(value: unknown): value is string {
 export type Auth = Readonly<{
   provisionAccount: (input: Readonly<{ email: unknown }>) => Promise<AuthResult<Account>>;
   signInHarryPreview: (input: Readonly<{ alias: unknown; clientKey: string }>) => Promise<AuthResult<Readonly<{ account: Account; sessionToken: string }>>>;
-  requestLink: (input: Readonly<{ email: unknown; clientKey: string }>) => Promise<AuthResult<LinkAcknowledgement>>;
+  requestLink: (input: Readonly<{ email: unknown; clientKey: string; returnTo?: "/manage" }>) => Promise<AuthResult<LinkAcknowledgement>>;
   inspectLink: (input: Readonly<{ token: unknown }>) => Promise<AuthResult<Account>>;
   redeemLink: (input: Readonly<{ token: unknown }>) => Promise<AuthResult<Readonly<{ account: Account; sessionToken: string }>>>;
   resolveSession: (input: Readonly<{ sessionToken: unknown }>) => Promise<AuthResult<Account>>;
@@ -52,7 +52,7 @@ export function createAuth(config: Readonly<{
         return signedIn ? ok({ account: signedIn, sessionToken }) : unavailable();
       } catch { return unavailable(); }
     },
-    async requestLink({ email: input, clientKey }) {
+    async requestLink({ email: input, clientKey, returnTo }) {
       const email = normalizeEmail(input);
       if (!email || !clientKey || clientKey.length > 256) return err({ code: "invalid_input" });
       // The acknowledgement deliberately says nothing about admission or delivery.
@@ -67,7 +67,7 @@ export function createAuth(config: Readonly<{
             const digest = digestToken(token);
             await store.issue({ digest, accountId: account.id });
             try {
-              await deliverLink({ email, link: `${publicOrigin}/sign-in/confirm#${token}`,
+              await deliverLink({ email, link: `${publicOrigin}/sign-in/confirm${returnTo === "/manage" ? "?next=%2Fmanage" : ""}#${token}`,
                 signal: AbortSignal.timeout(5_000) });
             } catch { await store.revokeChallenge({ digest }); }
           }

@@ -112,3 +112,24 @@ the persistent preview database.
 For a manual restart, use `work run` with the matching label and bounded scope,
 as required by the shared host conventions. Stop the existing scope first and
 check that the port has closed; preserve the database volume and private state.
+
+## EBS Master and management portal
+
+The dedicated master sign-in is `/master/sign-in`, username `harrybaldwin`.
+It opens `/manage`, containing Elite Marketing System, Elite Sales System and
+Elite Delivery. Delivery has separate EBS Mentor Portal and EBS Member Portal
+entries. The same synthetic preview account now has explicit business-manager
+and all-client mentor grants in this isolated database. Use synthetic clients only.
+
+This direct username access requires disabled email delivery and the preview flag;
+that delivery mode is rejected in production. Production master sign-in instead
+requires `EBS_MASTER_EMAIL`, a provisioned account and a trusted master grant:
+
+```sh
+npm run management:admin -- master OWNER_EMAIL
+```
+
+The fixed username sends a normal, rate-limited magic link to that configured
+email. It cannot select an account from browser input. The link returns to the
+management portal. No live owner email has been supplied yet; the public preview
+alias is never granted access to production client data.

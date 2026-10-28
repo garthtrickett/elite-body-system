@@ -63,3 +63,9 @@ export function mountTraining(root: HTMLElement, config: RouteHost & Readonly<{ 
   runtime.propose({ kind: "started" });
   return { navigation: () => trainingNavigation(runtime.getModel()), dispose: () => { scope.abort(); clearInterval(tick); window.removeEventListener("beforeunload", protectUnsaved); window.removeEventListener("resize", resized); runtime.dispose(); } } as const;
 }
+
+export { parseProgramRules, programTemplates } from "./program-rules.ts";
+export type { ProgramRules } from "./program-rules.ts";
+
+export { parseProgramAdjustment } from "./program-rules.ts";
+export type { ProgramAdjustment } from "./program-rules.ts";

@@ -1,3 +1,4 @@
+import { mentorAccess, mentorClientScope } from "../access/index.ts";
 import type { Kysely } from "kysely";
 import type Database from "../../platform/database/generated/Database.ts";
 import type { AccountsId } from "../../platform/database/generated/public/Accounts.ts";
@@ -13,7 +14,7 @@ export function createMentorCheckins(config: Readonly<{ db: Kysely<Database>; su
   const { db } = config;
   const denied = () => err({ code: "forbidden", message: "Coach access to this client is required." } as const);
   const unavailable = () => err({ code: "unavailable", message: "The coach check-ins could not be loaded or updated. Try again." } as const);
-  const allowed = async (actorId: string, clientId: string) => !!await db.selectFrom("mentor_clients").select("client_id").where("mentor_id", "=", actorId as AccountsId).where("client_id", "=", clientId as AccountsId).executeTakeFirst();
+  const allowed = (actorId: string, clientId: string) => mentorAccess({ db, actorId, clientId });
   const name = (profile: unknown, fallback: string) => isRecord(profile) && typeof profile.name === "string" && profile.name.trim() ? profile.name.trim() : fallback;
   const inFlight = new Map<string, Promise<ClientResult<MentorSummary>>>();
   async function generate(input: Readonly<{ actorId: string; clientId: string; week: string }>): Promise<ClientResult<MentorSummary>> {
@@ -43,9 +44,9 @@ export function createMentorCheckins(config: Readonly<{ db: Kysely<Database>; su
       try {
         const mentor = await db.selectFrom("performance_mentors").select("account_id").where("account_id", "=", input.actorId as AccountsId).executeTakeFirst();
         if (!mentor) return denied();
-        const base = db.selectFrom("weekly_checkins as c").innerJoin("mentor_clients as a", "a.client_id", "c.account_id")
+        const base = db.selectFrom("weekly_checkins as c")
           .leftJoin("weekly_checkin_reviews as r", join => join.onRef("r.account_id", "=", "c.account_id").onRef("r.week", "=", "c.week"))
-          .where("a.mentor_id", "=", input.actorId as AccountsId).where("c.submitted_at", "is not", null).where("r.account_id", "is", null);
+          .where(mentorClientScope({ actorId: input.actorId, clientRef: "c.account_id" })).where("c.submitted_at", "is not", null).where("r.account_id", "is", null);
         const rows = await base.innerJoin("accounts as owner", "owner.id", "c.account_id").leftJoin("client_profiles as p", "p.account_id", "c.account_id")
           .leftJoin("weekly_checkin_summaries as s", join => join.onRef("s.account_id", "=", "c.account_id").onRef("s.week", "=", "c.week").onRef("s.checkin_revision", "=", "c.revision"))
           .selectAll("c").select(["owner.email as client_email", "p.data as profile", "s.summary as coach_summary"]).select(eb => eb.fn.countAll<string>().over().as("queue_total"))
@@ -70,7 +71,9 @@ export function createMentorCheckins(config: Readonly<{ db: Kysely<Database>; su
       const clientId = input.clientId as AccountsId, week = entryWeek(input.week), revision = input.revision;
       try {
         return await db.transaction().execute(async transaction => {
-          const assignment = await transaction.selectFrom("mentor_clients").select("client_id").where("mentor_id", "=", input.actorId as AccountsId).where("client_id", "=", clientId).forShare().executeTakeFirst();
+          const role = await transaction.selectFrom("performance_mentors").select("account_id").where("account_id", "=", input.actorId as AccountsId).forShare().executeTakeFirst();
+          await transaction.selectFrom("mentor_clients").select("client_id").where("mentor_id", "=", input.actorId as AccountsId).where("client_id", "=", clientId).forShare().executeTakeFirst();
+          const assignment = role && await mentorAccess({ db: transaction, actorId: input.actorId, clientId });
           if (!assignment) return denied();
           const row = await transaction.selectFrom("weekly_checkins").selectAll().where("account_id", "=", clientId).where("week", "=", week).forUpdate().executeTakeFirst();
           if (!row?.submitted_at) return err({ code: "not_found", message: "That submitted check-in is unavailable." } as const);

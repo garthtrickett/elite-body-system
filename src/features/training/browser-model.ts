@@ -1,5 +1,5 @@
 import type { NavigationGuard } from "../../shared/browser-route.ts";
-import { PROGRAM } from "./catalog.ts";
+import { baseExercises } from "./program-rules.ts";
 import { exercisesFor, workoutStats, setNumberProblem } from "./data.ts";
 import type { Workout, TrainingSnapshot, LiftSet } from "./data.ts";
 import type { ClientResult } from "../profile/browser.ts";
@@ -71,7 +71,7 @@ export function acceptTrainingProposal(model: TrainingModel, proposal: TrainingP
     case "loaded": {
       if (model.pending?.kind !== "load" || model.pending.id !== proposal.id) return model;
       if (!proposal.result.ok) return { ...model, pending: undefined, failedLoadDate: model.pending.date, error: proposal.result.error.message };
-      return { ...model, failedLoadDate: undefined, snapshot: proposal.result.value, workout: proposal.result.value.workout, pending: undefined, generation: 0, saved: 0, finishRequested: false, drafts: {}, error: "", selected: PROGRAM[proposal.result.value.workout.planKey]?.[0]?.id };
+      return { ...model, failedLoadDate: undefined, snapshot: proposal.result.value, workout: proposal.result.value.workout, pending: undefined, generation: 0, saved: 0, finishRequested: false, drafts: {}, error: "", selected: baseExercises(proposal.result.value.workout)[0]?.id };
     }
     case "saved": {
       if (model.pending?.kind !== "save" || model.pending.id !== proposal.id) return model;

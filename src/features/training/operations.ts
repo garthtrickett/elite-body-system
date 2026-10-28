@@ -1,3 +1,4 @@
+import { createProgramming } from "./programming.ts";
 import { sql } from "kysely";
 import type { Kysely } from "kysely";
 import type Database from "../../platform/database/generated/Database.ts";
@@ -13,6 +14,7 @@ import { parseWorkout, emptyWorkout, planFor, workoutStats } from "./data.ts";
 import type { TrainingSnapshot, Workout } from "./data.ts";
 
 export function createTraining(config: Readonly<{ db: Kysely<Database>; profiles: ReturnType<typeof createProfiles>; now?: () => number }>) {
+  const programming=createProgramming({db:config.db});
   const db = config.db, now = config.now ?? Date.now, media = createContentMedia(config.db);
   async function get(input: Readonly<{ accountId: string; date?: string }>): Promise<ClientResult<TrainingSnapshot>> {
     try {
@@ -26,8 +28,11 @@ export function createTraining(config: Readonly<{ db: Kysely<Database>; profiles
       let workout: Workout | undefined, revision = 0;
       for (const row of parsed) if (row.result.ok) { history.push(row.result.value); if (row.result.value.date === date) { workout = row.result.value; revision = row.revision; } }
       const videos = await media.list(); if (!videos.ok) return videos;
-      const p = profile.value.profile;
-      return ok({ workout: workout ?? emptyWorkout({ date, planKey: planFor({ profile: p, date }) }), revision, history, videoUrls: videos.value,
+      const p = profile.value.profile, planKey=planFor({profile:p,date});
+      const adjustmentResult=await programming.history({accountId:input.accountId,date});if(!adjustmentResult.ok)return adjustmentResult;
+      const adjustments=adjustmentResult.value;
+      const ruleResult=workout?ok(undefined):await programming.current({accountId:input.accountId,date,planKey});if(!ruleResult.ok)return ruleResult;const rules=ruleResult.value;
+      return ok({ ...(adjustments.length?{adjustments}:{}), workout: workout ?? {...emptyWorkout({date,planKey}),...(rules?{programRules:rules}:{})}, revision, history, videoUrls: videos.value,
         blocked: !p.completed ? "setup_required" : p.health.answers.some(Boolean) && !p.health.clearance ? "clearance_required" : null,
         readOnly: date > clientDay({ timezone: p.timezone, now: new Date(now()) }) });
     } catch { return err({ code: "unavailable", message: "Your workout could not be loaded." }); }
@@ -40,6 +45,7 @@ export function createTraining(config: Readonly<{ db: Kysely<Database>; profiles
       const current = await get({ accountId: input.accountId, date: parsed.value.date }); if (!current.ok) return current;
       if (current.value.blocked) return err({ code: "forbidden", message: current.value.blocked === "setup_required" ? "Complete your setup before training." : "Confirm doctor clearance in your profile before training." });
       if (current.value.workout.planKey !== parsed.value.planKey) return err({ code: "invalid_input", message: "This workout does not match your program for that date." });
+      if(JSON.stringify(parsed.value.programRules ?? {})!==JSON.stringify(current.value.workout.programRules ?? {}))return err({code:"conflict",message:"Your programmed session changed. Reload before logging it."});
       const profile = await config.profiles.get({ accountId: input.accountId }); if (!profile.ok) return profile;
       if (parsed.value.date > clientDay({ timezone: profile.value.profile.timezone, now: new Date(now()) })) return err({ code: "invalid_input", message: "Future workouts can be previewed but cannot be logged." });
       if ((input.finish || current.value.workout.finishedAt !== null) && !workoutStats({ workout: parsed.value, history: current.value.history }).hasActivity) return err({ code: "invalid_input", message: "Log at least one set or recovery activity before finishing." });

@@ -46,3 +46,10 @@ export function mountCheckins(root: HTMLElement, config: RouteHost & Readonly<{ 
   runtime.propose({ kind: "started" });
   return { navigation: () => checkinNavigation(runtime.getModel()), revisit: () => runtime.propose({ kind: "refresh" }), dispose: () => { scope.abort(); window.clearTimeout(autosaveTimer); window.clearInterval(timer); root.removeEventListener("focusout", flush); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("online", reconnect); window.removeEventListener("beforeunload", protect); runtime.dispose(); }, updateAccount: (input: Readonly<{ account: Readonly<{ busy: boolean; problem: string }> }>) => { account = input.account; runtime.propose({ kind: "started" }); } } as const;
 }
+
+export { parseEntry } from "./data.ts";
+export type { Entry } from "./data.ts";
+export { progressCharts, scoreAveragesChart } from "./charts.ts";
+
+export { parseMentorHistory } from "./mentor-data.ts";
+export type { MentorHistory } from "./mentor-data.ts";

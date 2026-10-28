@@ -1,5 +1,5 @@
 import { render, nothing } from "lit-html";
-import { mountAuth } from "./features/auth/browser.ts";
+import { mountAuth, mountMasterSignIn } from "./features/auth/browser.ts";
 import { mountScorecard } from "./features/scorecard/browser.ts";
 import { mountTraining } from "./features/training/browser.ts";
 import { mountMeals } from "./features/meals/browser.ts";
@@ -12,8 +12,18 @@ import { createBrowserNavigation } from "./shared/browser-navigation.ts";
 import type { ResolvedRoute } from "./shared/navigation-model.ts";
 import type { NavigationGuard, RouteRuntime } from "./shared/browser-route.ts";
 
+import { mountMemberDelivery, mountMentorDelivery } from "./features/delivery/browser.ts";
+import { mountPublicSales, mountManagement } from "./features/sales/browser.ts";
+
 const root = document.querySelector<HTMLElement>("#app");
-if (root) {
+if (root?.dataset.mode === "master") {
+  const dispose = mountMasterSignIn(root);
+  window.addEventListener("pagehide", event => { if (!event.persisted) dispose(); });
+} else if (root?.dataset.mode === "sales") {
+  const dispose = mountPublicSales(root);
+  window.addEventListener("pagehide", event => { if (!event.persisted) dispose(); });
+  window.addEventListener("pageshow", event => { if (event.persisted) location.reload(); });
+} else if (root) {
   let latestAccount = { email: "", busy: false, problem: "" };
   let feature: RouteRuntime | undefined, navigation: ReturnType<typeof createBrowserNavigation> | undefined;
   let featureDisposed = true;
@@ -40,6 +50,9 @@ if (root) {
         showShell();
         feature = route.page === "onboarding" || route.page === "media" || route.page === "account-setup" ? mountOnboarding(outlet, { ...host, signOut: actions.signOut, account: latestAccount, marketingOnly: route.page === "media", accountSetupOnly: route.page === "account-setup" })
           : route.page === "checkin" ? mountCheckins(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
+          : route.page === "messages" || route.page === "community" ? mountMemberDelivery(outlet, { ...host, signOut: actions.signOut, account: latestAccount, tab: route.page })
+          : route.page === "mentor-delivery" ? mountMentorDelivery(outlet, { ...host, signOut: actions.signOut, account: latestAccount, standalone: true })
+          : route.page === "management" ? mountManagement(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
           : route.page === "mentor-checkins" ? mountMentorCheckins(outlet, { ...host, signOut: actions.signOut, account: latestAccount })
           : route.page === "training" ? mountTraining(outlet, host)
           : route.page === "meals" ? mountMeals(outlet, host)

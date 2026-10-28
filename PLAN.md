@@ -329,3 +329,28 @@ email requires the new project's own sender configuration and credentials. Local
 outbox delivery demonstrates the full flow without claiming external delivery.
 Agent-native means the typed operations are callable without UI interaction; it
 does not require an LLM integration, autonomous agent, or separate tool server.
+
+## Management, sales and delivery portal — 28 October 2026
+
+The sequential [management build sheet](docs/management-build-sheet.md) records the
+operator's current scope and precedence. The supplied sales website is preserved
+at `/apply`, except for the requested investment question without a price. EBS
+Master contains Elite Marketing System, Elite Sales System and Elite Delivery.
+Delivery includes the existing Member app and a Mentor workspace for messages,
+community, progress, actual dated programme prescriptions and check-in reviews.
+This supersedes the earlier increment's messaging limitation above. Group/community
+and Individual memberships are explicitly assigned after confirmed enrolment.
+
+The public funnel has a 30-day web guide after signup, application, bookable call
+availability, ten FAQ/video slots and approved client stories after booking. The
+private sales guide follows CLOSER with the operator's stated support options.
+Marketing captures an owner's source, client angle, interview and proof, then
+arranges those answers as a blog and video script. It provides voice transcription
+when configured and illustrated Notion Markdown / branded HTML exports. No
+invented client proof or automatic publishing is used.
+
+Full verification, fixes and CI are batched before merging and Railway deployment.
+Production master email, external media, provider credentials and a Notion
+destination remain explicit configuration/content dependencies, not implied live
+connections. See the [sales journey](docs/sales-journey.md),
+[delivery guide](docs/delivery-portal.md) and [marketing guide](docs/marketing-workflow.md).
